@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
 import { Zap, GitBranch, Shield } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
@@ -10,7 +10,7 @@ const ringClass: Record<string, string> = {
   error: 'ring-2 ring-red-500',
 }
 
-export function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
+export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
   const { addNode, updateNode, settings } = useTreeStore()
   const [draft, setDraft] = useState('')
 
@@ -98,4 +98,4 @@ export function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
       <Handle type="source" position={Position.Bottom} className="!bg-indigo-500 !border-slate-800" />
     </div>
   )
-}
+})
