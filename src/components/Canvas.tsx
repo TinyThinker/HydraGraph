@@ -1,4 +1,4 @@
-import { useRef, useCallback, useMemo } from 'react'
+import { useRef, useCallback, useMemo, useState, useEffect } from 'react'
 import {
   ReactFlow,
   Background,
@@ -17,9 +17,10 @@ const nodeTypes = { turnNode: TurnNodeComponent }
 
 export function Canvas() {
   const { nodes, updateNode } = useTreeStore()
+  const isDragging = useRef(false)
   const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
-  const rfNodes = useMemo<Node<TurnNodeData>[]>(
+  const rfNodesFromStore = useMemo<Node<TurnNodeData>[]>(
     () =>
       Array.from(nodes.values()).map((n) => ({
         id: n.id,
@@ -29,6 +30,13 @@ export function Canvas() {
       })),
     [nodes],
   )
+
+  const [localNodes, setLocalNodes] = useState(rfNodesFromStore)
+
+  // Sync store → local only when not dragging (avoids fighting the drag)
+  useEffect(() => {
+    if (!isDragging.current) setLocalNodes(rfNodesFromStore)
+  }, [rfNodesFromStore])
 
   const edges = useMemo(
     () =>
@@ -46,6 +54,9 @@ export function Canvas() {
 
   const onNodesChange = useCallback(
     (changes: NodeChange<Node<TurnNodeData>>[]) => {
+      // Apply immediately for smooth drag — no waiting on store/Dexie
+      setLocalNodes((nds) => applyNodeChanges(changes, nds))
+
       for (const change of changes) {
         if (change.type === 'position' && change.position) {
           const { id, position } = change
@@ -58,18 +69,19 @@ export function Canvas() {
           debounceTimers.current.set(id, timer)
         }
       }
-      applyNodeChanges(changes, rfNodes)
     },
-    [rfNodes, updateNode],
+    [updateNode],
   )
 
   return (
     <div className="w-full h-full">
       <ReactFlow
-        nodes={rfNodes}
+        nodes={localNodes}
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onNodeDragStart={() => { isDragging.current = true }}
+        onNodeDragStop={() => { isDragging.current = false }}
         fitView
         deleteKeyCode={null}
         className="bg-slate-950"
