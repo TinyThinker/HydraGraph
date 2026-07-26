@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/logo.png" alt="Hydra Graph" width="360" />
+</p>
+
 # Hydra Graph
 
 A spatial 2D conversation tree interface for deep LLM research. Replaces the linear chat scroll with a node-based canvas where every branch is an isolated context — no more cognitive overload from parallel questions, no more context drift from deep dives.
