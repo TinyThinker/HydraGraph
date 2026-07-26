@@ -11,7 +11,7 @@
 - [x] Wire node dragging, viewport panning/zooming, and edge rendering to Zustand store
 
 ## Phase 3: Context Engine & Streaming API Client
-- [ ] Implement `resolveContextPayload()` parent chain traversal logic
+- [x] Implement `resolveContextPayload()` parent chain traversal logic
 - [ ] Implement native SSE streaming fetch client for Gemini API & Ollama
 - [ ] Connect real-time streaming deltas to active node state
 
