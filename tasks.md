@@ -6,9 +6,9 @@
 - [x] Implement Zustand central state store (`useTreeStore.ts`) with Dexie persistence
 
 ## Phase 2: Canvas Integration & Turn Node Component
-- [ ] Install `@xyflow/react` and configure main canvas container
-- [ ] Build custom `TurnNode` component (Prompt + Response card layout)
-- [ ] Wire node dragging, viewport panning/zooming, and edge rendering to Zustand store
+- [x] Install `@xyflow/react` and configure main canvas container
+- [x] Build custom `TurnNode` component (Prompt + Response card layout)
+- [x] Wire node dragging, viewport panning/zooming, and edge rendering to Zustand store
 
 ## Phase 3: Context Engine & Streaming API Client
 - [ ] Implement `resolveContextPayload()` parent chain traversal logic

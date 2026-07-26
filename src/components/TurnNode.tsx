@@ -1,0 +1,101 @@
+import { useState } from 'react'
+import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
+import { Zap, GitBranch, Shield } from 'lucide-react'
+import { useTreeStore } from '../store/useTreeStore'
+import type { TurnNodeData } from '../types'
+
+const ringClass: Record<string, string> = {
+  idle: 'ring-2 ring-indigo-500',
+  streaming: 'ring-2 ring-cyan-400 animate-pulse',
+  error: 'ring-2 ring-red-500',
+}
+
+export function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
+  const { addNode, updateNode, settings } = useTreeStore()
+  const [draft, setDraft] = useState('')
+
+  const handleSend = () => {
+    if (!draft.trim()) return
+    updateNode(data.id, { userPrompt: draft.trim() })
+    setDraft('')
+  }
+
+  const handleBranch = () => {
+    addNode({
+      id: crypto.randomUUID(),
+      treeId: data.treeId,
+      parentId: data.id,
+      childrenIds: [],
+      userPrompt: '',
+      assistantResponse: '',
+      positionX: data.positionX + data.childrenIds.length * 350,
+      positionY: data.positionY + 250,
+      isCollapsed: false,
+      status: 'idle',
+      modelUsed: settings.defaultModel,
+      timestamp: Date.now(),
+    })
+  }
+
+  return (
+    <div className={`w-80 rounded-xl bg-slate-900 border border-slate-700 shadow-xl ${ringClass[data.status] ?? ringClass.idle}`}>
+      <Handle type="target" position={Position.Top} className="!bg-indigo-500 !border-slate-800" />
+
+      {/* System prompt badge */}
+      {data.systemPromptOverride && (
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-700 text-amber-400 text-xs font-medium">
+          <Shield size={12} />
+          <span className="truncate">{data.systemPromptOverride}</span>
+        </div>
+      )}
+
+      {/* User prompt */}
+      <div className="px-3 pt-3 pb-2">
+        <div className="text-xs text-slate-400 mb-1 font-medium">👤 User</div>
+        {data.userPrompt ? (
+          <p className="text-sm text-slate-200 whitespace-pre-wrap break-words">{data.userPrompt}</p>
+        ) : (
+          <div className="space-y-2">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+              placeholder="Ask something…"
+              rows={3}
+              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 nodrag"
+            />
+            <button
+              onClick={handleSend}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-1.5 rounded-lg transition-colors nodrag"
+            >
+              Send
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Assistant response */}
+      {data.assistantResponse && (
+        <div className="px-3 pb-3 border-t border-slate-700 pt-2">
+          <div className="text-xs text-slate-400 mb-1 font-medium">🤖 Assistant</div>
+          <p className="text-sm text-slate-200 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">{data.assistantResponse}</p>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-3 py-2 border-t border-slate-700">
+        <span className="flex items-center gap-1 text-xs text-slate-500">
+          <Zap size={10} />{data.modelUsed}
+        </span>
+        <button
+          onClick={handleBranch}
+          className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors nodrag"
+        >
+          <GitBranch size={12} /> Branch
+        </button>
+      </div>
+
+      <Handle type="source" position={Position.Bottom} className="!bg-indigo-500 !border-slate-800" />
+    </div>
+  )
+}

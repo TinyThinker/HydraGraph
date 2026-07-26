@@ -50,3 +50,6 @@ export interface ContextResolutionResult {
   systemPrompt: string
   messages: MessagePayload[]
 }
+
+// React Flow requires node data to extend Record<string, unknown>
+export type TurnNodeData = TurnNode & Record<string, unknown>
