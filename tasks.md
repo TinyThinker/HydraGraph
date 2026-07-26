@@ -1,8 +1,8 @@
 # Execution Tasks Matrix
 
 ## Phase 1: Core Foundation & Storage Setup
-- [ ] Initialize Vite + React + TypeScript + Tailwind CSS project
-- [ ] Implement Dexie.js database schema (`ChatDatabase.ts`)
+- [x] Initialize Vite + React + TypeScript + Tailwind CSS project
+- [x] Implement Dexie.js database schema (`ChatDatabase.ts`)
 - [ ] Implement Zustand central state store (`useTreeStore.ts`) with Dexie persistence
 
 ## Phase 2: Canvas Integration & Turn Node Component
