@@ -3,7 +3,7 @@
 ## Phase 1: Core Foundation & Storage Setup
 - [x] Initialize Vite + React + TypeScript + Tailwind CSS project
 - [x] Implement Dexie.js database schema (`ChatDatabase.ts`)
-- [ ] Implement Zustand central state store (`useTreeStore.ts`) with Dexie persistence
+- [x] Implement Zustand central state store (`useTreeStore.ts`) with Dexie persistence
 
 ## Phase 2: Canvas Integration & Turn Node Component
 - [ ] Install `@xyflow/react` and configure main canvas container
