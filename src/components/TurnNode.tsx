@@ -11,12 +11,12 @@ const ringClass: Record<string, string> = {
 }
 
 export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
-  const { addNode, updateNode, settings } = useTreeStore()
+  const { addNode, submitPrompt, settings } = useTreeStore()
   const [draft, setDraft] = useState('')
 
   const handleSend = () => {
     if (!draft.trim()) return
-    updateNode(data.id, { userPrompt: draft.trim() })
+    submitPrompt(data.id, draft.trim())
     setDraft('')
   }
 

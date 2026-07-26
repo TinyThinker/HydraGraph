@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { db } from '../db/ChatDatabase'
+import { resolveContextPayload } from '../lib/contextEngine'
+import { streamLLMResponse } from '../lib/streamingClient'
 import type { TurnNode, ConversationTree, AppSettings, NodeStatus, TokenUsage } from '../types'
 
 interface TreeStoreState {
@@ -21,6 +23,7 @@ interface TreeStoreActions {
   finalizeNode: (id: string, usage: TokenUsage) => Promise<void>
   setActiveTree: (treeId: string) => void
   loadAllTrees: () => Promise<void>
+  submitPrompt: (nodeId: string, userPrompt: string) => Promise<() => void>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -172,4 +175,37 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   },
 
   setActiveTree: (treeId) => set({ activeTreeId: treeId }),
+
+  submitPrompt: async (nodeId, userPrompt) => {
+    const { nodes, settings, activeTreeId, appendTokenDelta, finalizeNode, setNodeStatus } = get()
+
+    const tree = activeTreeId ? await db.trees.get(activeTreeId) : null
+    const defaultSystemPrompt = tree?.defaultSystemPrompt ?? 'You are a helpful AI research assistant.'
+
+    // Persist prompt + set streaming status
+    const existing = nodes.get(nodeId)
+    if (!existing) return () => {}
+    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '' }
+    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '' })
+    set((state) => {
+      const next = new Map(state.nodes)
+      next.set(nodeId, updated)
+      return { nodes: next }
+    })
+
+    const payload = resolveContextPayload(nodeId, get().nodes, defaultSystemPrompt)
+
+    const abort = await streamLLMResponse(
+      payload,
+      settings,
+      (chunk) => appendTokenDelta(nodeId, chunk),
+      (usage) => finalizeNode(nodeId, usage),
+      (err) => {
+        console.error('[stream error]', err)
+        setNodeStatus(nodeId, 'error')
+      },
+    )
+
+    return abort
+  },
 }))
