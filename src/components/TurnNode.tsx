@@ -3,16 +3,13 @@ import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
 import { Zap, GitBranch, Shield, Square } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useRenderTally } from '../lib/renderTally'
+import { MarkdownContent } from './MarkdownContent'
 import type { TurnNodeData } from '../types'
 
 // Bounds only the DOM render of response text; stored text is never truncated
 const RENDERED_TEXT_CAP = 2000
 
-const ringClass: Record<string, string> = {
-  idle: 'ring-2 ring-indigo-500',
-  streaming: 'ring-2 ring-cyan-400 animate-pulse',
-  error: 'ring-2 ring-red-500',
-}
+const ringClass: Record<string, string> = { idle: 'ring-2 ring-indigo-500', streaming: 'ring-2 ring-cyan-400 animate-pulse', error: 'ring-2 ring-red-500' }
 
 export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
   useRenderTally(data.id)
@@ -117,7 +114,9 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
               </button>
             </div>
           )}
-          <p className="text-sm text-slate-200 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">{visibleText}</p>
+          <div className="max-h-48 overflow-y-auto text-sm text-slate-200 break-words">
+            <MarkdownContent markdown={visibleText} />
+          </div>
         </div>
       )}
 
