@@ -3,6 +3,7 @@ import { Settings, AlertTriangle, LayoutGrid } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { SettingsModal } from './SettingsModal'
 import { TreeSwitcher } from './TreeSwitcher'
+import { SearchBar } from './SearchBar'
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 
@@ -24,6 +25,9 @@ export function HeaderBar() {
     <>
       <div className="h-12 flex items-center justify-between px-4 border-b border-slate-800 bg-slate-900">
         <TreeSwitcher />
+        <div className="flex-1 flex justify-center px-4">
+          <SearchBar />
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setConfirmRelayout(true)}

@@ -4,6 +4,7 @@ import { useTreeStore } from '../store/useTreeStore'
 import { TurnNodeComponent } from './TurnNode'
 import { useCanvasGraph } from './useCanvasGraph'
 import { CanvasFitter } from './CanvasFitter'
+import { CanvasSearchFocus } from './CanvasSearchFocus'
 
 const nodeTypes = { turnNode: TurnNodeComponent }
 
@@ -33,6 +34,7 @@ export function Canvas() {
         <Background variant={BackgroundVariant.Dots} color="#1e293b" gap={24} size={1.5} />
         <Controls className="[&>button]:bg-slate-800 [&>button]:border-slate-700 [&>button]:text-slate-300" />
         <CanvasFitter />
+        <CanvasSearchFocus />
       </ReactFlow>
     </div>
   )
