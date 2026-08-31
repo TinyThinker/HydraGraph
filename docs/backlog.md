@@ -36,4 +36,13 @@
 
 **Reading:** Every card repaints on every token. `Canvas` subscribes to the whole store with no selector, so each `appendTokenDelta` rebuilds the React Flow node array — a new `data` object per node — defeating `React.memo()` on every card, plus `TurnNode` itself subscribes to the whole store. Phase 3 target: non-streaming nodes drop to **0** renders during a stream; the streaming node stays bounded and low.
 
-*(T3.8 appends the post-fix numbers beside this table.)*
+**Post-fix (after T3.2–T3.7):**
+
+| Node | Pre-fix | Post-fix |
+|---|---|---|
+| Streaming leaf | **40** (~2 per token) | **20** (1 per token) |
+| Root (not streaming) | **20** (1 per token) | **0** (no additional renders) |
+| Leaf 2 (not streaming) | **20** (1 per token) | **0** (no additional renders) |
+| Leaf 3 (not streaming) | **20** (1 per token) | **0** (no additional renders) |
+
+**Regression lock:** `src/components/renderBudget.test.tsx` — Two regression tests that fail if unselected whole-store subscriptions are reintroduced (Test A) or if text truncation breaks (Test B).
