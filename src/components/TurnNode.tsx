@@ -1,7 +1,7 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { Handle, Position, NodeResizer, type NodeProps, type Node } from '@xyflow/react'
-import { Zap, GitBranch, Shield } from 'lucide-react'
-import { useTreeStore } from '../store/useTreeStore'
+import { Zap, GitBranch, Shield, Trash2 } from 'lucide-react'
+import { useTreeStore, collectSubtreeIds } from '../store/useTreeStore'
 import { useReaderPanel } from './useReaderPanel'
 import { useRenderTally } from '../lib/renderTally'
 import { ResponseArea } from './ResponseArea'
@@ -19,6 +19,9 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
   const defaultModel = useTreeStore((s) => s.settings.defaultModel)
   const liveText = useTreeStore((s) => s.liveText.get(data.id))
   const openReader = useReaderPanel((s) => s.open)
+  const deleteNodeSubtree = useTreeStore((s) => s.deleteNodeSubtree)
+  const [confirmCount, setConfirmCount] = useState<number | null>(null)
+  const isRoot = data.parentId === null
 
   // Compute responseText: use liveText if streaming, otherwise use stored response
   const responseText = liveText !== undefined ? liveText : data.assistantResponse
@@ -79,17 +82,56 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
         </div>
       )}
 
+      {/* Delete confirmation */}
+      {confirmCount !== null && (
+        <div className="bg-red-950/40 border-t border-red-800/50 px-3 py-2 text-xs text-red-200">
+          <div className="mb-2">Remove {confirmCount} node{confirmCount === 1 ? '' : 's'}? This can't be undone.</div>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                await deleteNodeSubtree(data.id)
+                setConfirmCount(null)
+              }}
+              className="flex-1 bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors nodrag"
+            >
+              Remove {confirmCount}
+            </button>
+            <button
+              onClick={() => setConfirmCount(null)}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded text-xs font-medium transition-colors nodrag"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-slate-700">
         <span className="flex items-center gap-1 text-xs text-slate-500">
           <Zap size={10} />{data.modelUsed}
         </span>
-        <button
-          onClick={handleBranch}
-          className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors nodrag"
-        >
-          <GitBranch size={12} /> Branch
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (!isRoot) {
+                const count = collectSubtreeIds(data.id, useTreeStore.getState().nodes).size
+                setConfirmCount(count)
+              }
+            }}
+            disabled={isRoot}
+            title={isRoot ? "The root node can't be deleted" : 'Delete this node and all descendants'}
+            className={`text-xs nodrag transition-colors ${isRoot ? 'text-slate-700 cursor-not-allowed' : 'text-slate-500 hover:text-red-400'}`}
+          >
+            <Trash2 size={12} />
+          </button>
+          <button
+            onClick={handleBranch}
+            className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors nodrag"
+          >
+            <GitBranch size={12} /> Branch
+          </button>
+        </div>
       </div>
 
       <Handle type="source" position={Position.Bottom} className="!bg-indigo-500 !border-slate-800" />

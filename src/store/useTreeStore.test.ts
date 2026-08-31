@@ -617,3 +617,249 @@ describe('regenerate and edit prompts', () => {
     expect(parentAfter.childrenIds).toContain(childId)
   })
 })
+
+describe('delete node and subtree', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+      liveText: new Map(),
+    })
+  })
+
+  it('collectSubtreeIds collects a node and all descendants', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+
+    // Add child a under root
+    const aId = crypto.randomUUID()
+    const a = createNode({
+      id: aId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(a)
+
+    // Add grandchild b under a
+    const bId = crypto.randomUUID()
+    const b = createNode({
+      id: bId,
+      treeId: tree.id,
+      parentId: aId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(b)
+
+    // Add child c under root
+    const cId = crypto.randomUUID()
+    const c = createNode({
+      id: cId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(c)
+
+    const { collectSubtreeIds } = await import('../store/useTreeStore')
+    const nodesMap = useTreeStore.getState().nodes
+
+    // collectSubtreeIds(a) should return {a, b}
+    const subtreeA = collectSubtreeIds(aId, nodesMap)
+    expect(subtreeA).toEqual(new Set([aId, bId]))
+
+    // collectSubtreeIds(root) should return {root, a, b, c}
+    const subtreeRoot = collectSubtreeIds(rootId, nodesMap)
+    expect(subtreeRoot).toEqual(new Set([rootId, aId, bId, cId]))
+
+    // collectSubtreeIds(b) should return {b}
+    const subtreeB = collectSubtreeIds(bId, nodesMap)
+    expect(subtreeB).toEqual(new Set([bId]))
+  })
+
+  it('deleteNodeSubtree removes a node and all descendants from memory and db', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+
+    // Add child a under root
+    const aId = crypto.randomUUID()
+    const a = createNode({
+      id: aId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(a)
+
+    // Add grandchild b under a
+    const bId = crypto.randomUUID()
+    const b = createNode({
+      id: bId,
+      treeId: tree.id,
+      parentId: aId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(b)
+
+    // Add child c under root
+    const cId = crypto.randomUUID()
+    const c = createNode({
+      id: cId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(c)
+
+    // Delete a (which also deletes b)
+    await useTreeStore.getState().deleteNodeSubtree(aId)
+
+    // Assert in-memory: r and c remain, a and b removed
+    const memNodes = useTreeStore.getState().nodes
+    expect(memNodes.has(rootId)).toBe(true)
+    expect(memNodes.has(cId)).toBe(true)
+    expect(memNodes.has(aId)).toBe(false)
+    expect(memNodes.has(bId)).toBe(false)
+
+    // Assert parent's childrenIds is updated
+    expect(memNodes.get(rootId)!.childrenIds).toEqual([cId])
+
+    // Assert DB: a and b are gone, r and c remain
+    const dbA = await db.nodes.get(aId)
+    const dbB = await db.nodes.get(bId)
+    const dbR = await db.nodes.get(rootId)
+    const dbC = await db.nodes.get(cId)
+    expect(dbA).toBeUndefined()
+    expect(dbB).toBeUndefined()
+    expect(dbR).toBeDefined()
+    expect(dbC).toBeDefined()
+    expect(dbR!.childrenIds).toEqual([cId])
+  })
+
+  it('deleteNodeSubtree on root is a no-op', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+
+    // Add child under root
+    const childId = crypto.randomUUID()
+    const child = createNode({
+      id: childId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(child)
+
+    // Try to delete root
+    await useTreeStore.getState().deleteNodeSubtree(rootId)
+
+    // Assert: root and child still present in memory
+    const nodes = useTreeStore.getState().nodes
+    expect(nodes.has(rootId)).toBe(true)
+    expect(nodes.has(childId)).toBe(true)
+
+    // Assert: root and child still present in DB
+    const dbRoot = await db.nodes.get(rootId)
+    const dbChild = await db.nodes.get(childId)
+    expect(dbRoot).toBeDefined()
+    expect(dbChild).toBeDefined()
+  })
+
+  it('deleteNodeSubtree removes only a leaf node', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+
+    // Add child a under root
+    const aId = crypto.randomUUID()
+    const a = createNode({
+      id: aId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(a)
+
+    // Add grandchild b under a
+    const bId = crypto.randomUUID()
+    const b = createNode({
+      id: bId,
+      treeId: tree.id,
+      parentId: aId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(b)
+
+    // Add child c under root
+    const cId = crypto.randomUUID()
+    const c = createNode({
+      id: cId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(c)
+
+    // Delete b (a leaf)
+    await useTreeStore.getState().deleteNodeSubtree(bId)
+
+    // Assert: root, a, c remain; only b removed
+    const nodes = useTreeStore.getState().nodes
+    expect(nodes.has(rootId)).toBe(true)
+    expect(nodes.has(aId)).toBe(true)
+    expect(nodes.has(cId)).toBe(true)
+    expect(nodes.has(bId)).toBe(false)
+
+    // Assert: a's childrenIds is now empty
+    expect(nodes.get(aId)!.childrenIds).toEqual([])
+  })
+
+  it('deleteNodeSubtree removes liveText entries for deleted nodes', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+
+    // Add child a under root
+    const aId = crypto.randomUUID()
+    const a = createNode({
+      id: aId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(a)
+
+    // Add grandchild b under a
+    const bId = crypto.randomUUID()
+    const b = createNode({
+      id: bId,
+      treeId: tree.id,
+      parentId: aId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(b)
+
+    // Set liveText for both a and b
+    useTreeStore.setState({
+      liveText: new Map([
+        [aId, 'live text a'],
+        [bId, 'live text b'],
+      ]),
+    })
+
+    // Delete a (which also deletes b)
+    await useTreeStore.getState().deleteNodeSubtree(aId)
+
+    // Assert: liveText entries for a and b are removed
+    const liveText = useTreeStore.getState().liveText
+    expect(liveText.has(aId)).toBe(false)
+    expect(liveText.has(bId)).toBe(false)
+  })
+})

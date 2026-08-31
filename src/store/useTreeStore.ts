@@ -26,6 +26,7 @@ interface TreeStoreActions {
   loadAllTrees: () => Promise<void>
   submitPrompt: (nodeId: string, userPrompt: string) => Promise<() => void>
   cancelGeneration: (id: string) => Promise<void>
+  deleteNodeSubtree: (id: string) => Promise<void>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -70,6 +71,26 @@ function cancelThrottledFlush(nodeId: string) {
     clearTimeout(timerId)
     pendingTimers.delete(nodeId)
   }
+}
+
+// Collect a node and all its descendants into a Set of ids.
+// Uses explicit stack to guard against cycles and missing entries.
+export function collectSubtreeIds(rootId: string, nodes: Map<string, TurnNode>): Set<string> {
+  const result = new Set<string>()
+  const stack = [rootId]
+
+  while (stack.length > 0) {
+    const current = stack.pop()!
+    if (result.has(current)) continue // Guard against cycles
+
+    const node = nodes.get(current)
+    if (!node) continue // Guard against missing entries
+
+    result.add(current)
+    stack.push(...node.childrenIds)
+  }
+
+  return result
 }
 
 export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get) => ({
@@ -378,5 +399,65 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       nextLiveText.delete(id)
       return { nodes: nextNodes, liveText: nextLiveText }
     })
+  },
+
+  deleteNodeSubtree: async (id) => {
+    const target = get().nodes.get(id)
+    if (!target) return
+
+    // Guard: do not delete the tree root
+    if (target.parentId === null) return
+
+    const ids = collectSubtreeIds(id, get().nodes)
+
+    // Cancel any in-flight operations for each descendant
+    for (const nodeId of ids) {
+      const abort = abortRegistry.get(nodeId)
+      if (abort) {
+        abort()
+        abortRegistry.delete(nodeId)
+      }
+      cancelThrottledFlush(nodeId)
+    }
+
+    const parentId = target.parentId
+    const parent = get().nodes.get(parentId)
+
+    // Persist to DB
+    await db.transaction('rw', [db.nodes], async () => {
+      await db.nodes.bulkDelete([...ids])
+      if (parent) {
+        await db.nodes.update(parentId, { childrenIds: parent.childrenIds.filter((c) => c !== id) })
+      }
+    })
+
+    // Update memory immutably
+    set((state) => {
+      const next = new Map(state.nodes)
+      for (const nodeId of ids) {
+        next.delete(nodeId)
+      }
+
+      // Update parent's childrenIds in memory if it still exists
+      if (parent && next.has(parentId)) {
+        next.set(parentId, { ...parent, childrenIds: parent.childrenIds.filter((c) => c !== id) })
+      }
+
+      // Remove liveText entries for deleted nodes
+      let nextLiveText = state.liveText
+      for (const nodeId of ids) {
+        if (state.liveText.has(nodeId)) {
+          nextLiveText = new Map(nextLiveText)
+          nextLiveText.delete(nodeId)
+        }
+      }
+
+      return { nodes: next, liveText: nextLiveText }
+    })
+
+    // Bump tree timestamp
+    if (get().activeTreeId) {
+      await db.trees.update(get().activeTreeId!, { updatedAt: Date.now() })
+    }
   },
 }))
