@@ -305,3 +305,94 @@ describe('stream error surfacing', () => {
     expect(memNode!.errorMessage).toBe('')
   })
 })
+
+describe('zombie streaming recovery on load', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+    })
+  })
+
+  it('rewrites stale streaming nodes to error on loadTree and keeps partial text', async () => {
+    // Create a tree
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const treeId = tree.id
+    const rootId = tree.rootNodeId
+
+    // Insert a stale streaming node (simulating an interrupted stream from a previous session)
+    const streamingNodeId = crypto.randomUUID()
+    const streamingNode = createNode({
+      id: streamingNodeId,
+      treeId,
+      parentId: rootId,
+      assistantResponse: 'partial answer so far',
+      status: 'streaming',
+    })
+
+    // Insert an idle node with completed response
+    const idleNodeId = crypto.randomUUID()
+    const idleNode = createNode({
+      id: idleNodeId,
+      treeId,
+      parentId: rootId,
+      assistantResponse: 'done',
+      status: 'idle',
+    })
+
+    await db.nodes.put(streamingNode)
+    await db.nodes.put(idleNode)
+
+    // Clear the in-memory store to simulate a page reload
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+    })
+
+    // Load the tree (should trigger zombie recovery)
+    await useTreeStore.getState().loadTree(treeId)
+
+    // Check the streaming node in memory: should now be error with message, partial text preserved
+    const memoryStreamingNode = useTreeStore.getState().nodes.get(streamingNodeId)
+    expect(memoryStreamingNode).toBeDefined()
+    expect(memoryStreamingNode!.status).toBe('error')
+    expect(memoryStreamingNode!.errorMessage).toBeTruthy()
+    expect(memoryStreamingNode!.assistantResponse).toBe('partial answer so far')
+
+    // Check the streaming node in DB: should also be error with message
+    const dbStreamingNode = await db.nodes.get(streamingNodeId)
+    expect(dbStreamingNode).toBeDefined()
+    expect(dbStreamingNode!.status).toBe('error')
+    expect(dbStreamingNode!.errorMessage).toBeTruthy()
+    expect(dbStreamingNode!.assistantResponse).toBe('partial answer so far')
+
+    // Check the idle node: should be untouched
+    const memoryIdleNode = useTreeStore.getState().nodes.get(idleNodeId)
+    expect(memoryIdleNode).toBeDefined()
+    expect(memoryIdleNode!.status).toBe('idle')
+    expect(memoryIdleNode!.assistantResponse).toBe('done')
+    expect(memoryIdleNode!.errorMessage).toBeFalsy()
+
+    const dbIdleNode = await db.nodes.get(idleNodeId)
+    expect(dbIdleNode).toBeDefined()
+    expect(dbIdleNode!.status).toBe('idle')
+    expect(dbIdleNode!.assistantResponse).toBe('done')
+    expect(dbIdleNode!.errorMessage).toBeFalsy()
+  })
+})

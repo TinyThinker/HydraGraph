@@ -110,7 +110,36 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
   loadTree: async (treeId) => {
     const nodeArray = await db.nodes.where('treeId').equals(treeId).toArray()
-    const nodes = new Map(nodeArray.map((n) => [n.id, n]))
+
+    // Constant message for recovered zombie nodes
+    const STALE_STREAM_MESSAGE = 'Generation was interrupted before it finished (the page was reloaded or closed).'
+
+    // Detect zombie streaming nodes (stale streams from a previous session)
+    const staleStreamingIds = nodeArray
+      .filter((n) => n.status === 'streaming')
+      .map((n) => n.id)
+
+    // If there are stale streaming nodes, recover them in a single transaction
+    if (staleStreamingIds.length > 0) {
+      await db.transaction('rw', [db.nodes], async () => {
+        for (const id of staleStreamingIds) {
+          await db.nodes.update(id, {
+            status: 'error',
+            errorMessage: STALE_STREAM_MESSAGE,
+          })
+        }
+      })
+    }
+
+    // Build in-memory array/Map with corrected copies where streaming → error
+    const correctedArray = nodeArray.map((n) => {
+      if (n.status === 'streaming') {
+        return { ...n, status: 'error' as NodeStatus, errorMessage: STALE_STREAM_MESSAGE }
+      }
+      return n
+    })
+
+    const nodes = new Map(correctedArray.map((n) => [n.id, n]))
     const nextSettings = { ...get().settings, activeTreeId: treeId }
     set({ nodes, activeTreeId: treeId, settings: nextSettings })
     await db.settings.put(nextSettings)
