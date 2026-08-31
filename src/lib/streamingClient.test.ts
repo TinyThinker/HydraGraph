@@ -225,4 +225,130 @@ describe('streamingClient', () => {
     expect(errors[0].message).toContain('Malformed stream payload')
     expect(doneCount).toBe(1)
   })
+
+  it('emits every text part of a multi-part chunk in order', async () => {
+    const frameString = 'data: {"candidates":[{"content":{"parts":[{"text":"first "},{"text":"second"}]}}]}\n\n'
+    const frameBytes = new TextEncoder().encode(frameString)
+
+    const fakeResponse = createFakeResponse([frameBytes])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
+
+    const tokens: string[] = []
+    const errors: Error[] = []
+    let doneCount = 0
+
+    const onToken = (chunk: string) => {
+      tokens.push(chunk)
+    }
+
+    const onError = (err: Error) => {
+      errors.push(err)
+    }
+
+    const done = new Promise<void>((resolve) => {
+      streamLLMResponse(
+        testPayload,
+        testSettings,
+        onToken,
+        () => {
+          doneCount++
+          resolve()
+        },
+        onError,
+      )
+    })
+
+    await done
+
+    expect(tokens).toHaveLength(2)
+    expect(tokens[0]).toBe('first ')
+    expect(tokens[1]).toBe('second')
+    expect(tokens.join('')).toBe('first second')
+    expect(errors).toHaveLength(0)
+    expect(doneCount).toBe(1)
+  })
+
+  it('skips parts flagged as thought', async () => {
+    const frameString = 'data: {"candidates":[{"content":{"parts":[{"thought":true,"text":"MY HIDDEN REASONING"},{"text":"visible answer"}]}}]}\n\n'
+    const frameBytes = new TextEncoder().encode(frameString)
+
+    const fakeResponse = createFakeResponse([frameBytes])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
+
+    const tokens: string[] = []
+    const errors: Error[] = []
+    let doneCount = 0
+
+    const onToken = (chunk: string) => {
+      tokens.push(chunk)
+    }
+
+    const onError = (err: Error) => {
+      errors.push(err)
+    }
+
+    const done = new Promise<void>((resolve) => {
+      streamLLMResponse(
+        testPayload,
+        testSettings,
+        onToken,
+        () => {
+          doneCount++
+          resolve()
+        },
+        onError,
+      )
+    })
+
+    await done
+
+    expect(tokens.join('')).toBe('visible answer')
+    expect(tokens.join('')).not.toContain('MY HIDDEN REASONING')
+    expect(errors).toHaveLength(0)
+    expect(doneCount).toBe(1)
+  })
+
+  it('keeps usage metadata from the last frame that carries it', async () => {
+    const frameA = 'data: {"candidates":[{"content":{"parts":[{"text":"a"}]}}],"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":2}}'
+    const frameB = 'data: {"candidates":[{"content":{"parts":[{"text":"b"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":9}}'
+    const frameString = `${frameA}\n\n${frameB}\n\n`
+    const frameBytes = new TextEncoder().encode(frameString)
+
+    const fakeResponse = createFakeResponse([frameBytes])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
+
+    const tokens: string[] = []
+    const errors: Error[] = []
+    let capturedUsage: any = null
+    let doneCount = 0
+
+    const onToken = (chunk: string) => {
+      tokens.push(chunk)
+    }
+
+    const onError = (err: Error) => {
+      errors.push(err)
+    }
+
+    const done = new Promise<void>((resolve) => {
+      streamLLMResponse(
+        testPayload,
+        testSettings,
+        onToken,
+        (usage) => {
+          capturedUsage = usage
+          doneCount++
+          resolve()
+        },
+        onError,
+      )
+    })
+
+    await done
+
+    expect(capturedUsage).toEqual({ inputTokens: 5, outputTokens: 9 })
+    expect(tokens.join('')).toBe('ab')
+    expect(errors).toHaveLength(0)
+    expect(doneCount).toBe(1)
+  })
 })

@@ -64,8 +64,13 @@ async function streamGemini(
 
       try {
         const parsed = JSON.parse(json)
-        const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text
-        if (text) onToken(text)
+        const parts = parsed?.candidates?.[0]?.content?.parts
+        if (parts) {
+          for (const part of parts) {
+            if (part.thought) continue
+            if (part.text) onToken(part.text)
+          }
+        }
         const meta = parsed?.usageMetadata
         if (meta) {
           usage = { inputTokens: meta.promptTokenCount ?? 0, outputTokens: meta.candidatesTokenCount ?? 0 }
