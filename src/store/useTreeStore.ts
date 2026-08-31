@@ -33,6 +33,40 @@ const DEFAULT_SETTINGS: AppSettings = {
   provider: 'gemini',
 }
 
+// Module-scope: map of node id → pending flush timer
+const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+// Schedule a throttled flush for a node id. If a timer already exists,
+// do nothing (the existing timer will write the latest text when it fires).
+// Otherwise, set a timer for ~400ms that reads the current in-memory node text
+// and writes it to the database.
+function scheduleThrottledFlush(nodeId: string) {
+  if (pendingTimers.has(nodeId)) {
+    return // Already scheduled; new text will be written when timer fires
+  }
+
+  const timerId = setTimeout(() => {
+    const node = useTreeStore.getState().nodes.get(nodeId)
+    if (node) {
+      db.nodes.update(nodeId, { assistantResponse: node.assistantResponse }).catch((err) => {
+        console.error(`[throttled flush error for ${nodeId}]`, err)
+      })
+    }
+    pendingTimers.delete(nodeId)
+  }, 400)
+
+  pendingTimers.set(nodeId, timerId)
+}
+
+// Cancel any pending throttled flush for a node id.
+function cancelThrottledFlush(nodeId: string) {
+  const timerId = pendingTimers.get(nodeId)
+  if (timerId) {
+    clearTimeout(timerId)
+    pendingTimers.delete(nodeId)
+  }
+}
+
 export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get) => ({
   nodes: new Map(),
   trees: [],
@@ -168,6 +202,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       next.set(id, { ...existing, assistantResponse: existing.assistantResponse + chunk })
       return { nodes: next }
     })
+    // Schedule throttled flush to persist the latest text to IndexedDB
+    scheduleThrottledFlush(id)
   },
 
   setNodeStatus: (id, status) => {
@@ -181,6 +217,9 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   },
 
   finalizeNode: async (id, usage) => {
+    // Cancel any pending throttled flush so it cannot fire a stale write after this final write
+    cancelThrottledFlush(id)
+
     const existing = get().nodes.get(id)
     if (!existing) return
     const patch = { status: 'idle' as NodeStatus, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }
@@ -215,7 +254,21 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       return { nodes: next }
     })
 
+    // Clear any stale timer from a previous run so it cannot write into this fresh stream
+    cancelThrottledFlush(nodeId)
+
     const payload = resolveContextPayload(nodeId, get().nodes, defaultSystemPrompt)
+
+    // Local async function to persist error state: cancel pending flush, read current text, and write error + text to DB
+    const persistError = async (err: unknown) => {
+      console.error('[stream error]', err)
+      cancelThrottledFlush(nodeId)
+      const currentNode = get().nodes.get(nodeId)
+      if (currentNode) {
+        await db.nodes.update(nodeId, { status: 'error', assistantResponse: currentNode.assistantResponse })
+      }
+      setNodeStatus(nodeId, 'error')
+    }
 
     try {
       const abort = await streamLLMResponse(
@@ -225,15 +278,13 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         (chunk) => appendTokenDelta(nodeId, chunk),
         (usage) => finalizeNode(nodeId, usage),
         (err) => {
-          console.error('[stream error]', err)
-          setNodeStatus(nodeId, 'error')
+          persistError(err)
         },
       )
 
       return abort
     } catch (err) {
-      console.error('[stream error]', err)
-      setNodeStatus(nodeId, 'error')
+      await persistError(err)
       return () => {}
     }
   },

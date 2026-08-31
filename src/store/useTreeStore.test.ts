@@ -134,3 +134,90 @@ describe('useTreeStore', () => {
     expect(useTreeStore.getState().nodes.get(rootId)).toBe(rootBefore)
   })
 })
+
+describe('throttled streaming writes', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+    })
+  })
+
+  it('coalesces rapid token appends into a single DB write per window', async () => {
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    // Verify initial state: assistantResponse is empty in DB
+    let dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.assistantResponse).toBe('')
+
+    // Append tokens rapidly
+    useTreeStore.getState().appendTokenDelta(rootId, 'a')
+    useTreeStore.getState().appendTokenDelta(rootId, 'b')
+    useTreeStore.getState().appendTokenDelta(rootId, 'c')
+
+    // Immediately after append, DB should still have old text (no synchronous write)
+    dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.assistantResponse).toBe('')
+
+    // In-memory should have the accumulated text
+    expect(useTreeStore.getState().nodes.get(rootId)!.assistantResponse).toBe('abc')
+
+    // Wait for throttle window (~400ms) plus small buffer
+    await new Promise((r) => setTimeout(r, 450))
+
+    // Now DB should have the coalesced text
+    dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.assistantResponse).toBe('abc')
+
+    // Append more tokens (timer should re-arm for the next window)
+    useTreeStore.getState().appendTokenDelta(rootId, 'd')
+
+    // DB should still have the old text before timer fires
+    dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.assistantResponse).toBe('abc')
+
+    // In-memory should have new text
+    expect(useTreeStore.getState().nodes.get(rootId)!.assistantResponse).toBe('abcd')
+
+    // Wait for throttle window again
+    await new Promise((r) => setTimeout(r, 450))
+
+    // Now DB should have the new text
+    dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.assistantResponse).toBe('abcd')
+  })
+
+  it('finalizeNode cancels the pending throttled write and persists the final text', async () => {
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    // Append a token (schedules throttled flush)
+    useTreeStore.getState().appendTokenDelta(rootId, 'x')
+
+    // Immediately finalize (should cancel pending flush and write final state)
+    await useTreeStore.getState().finalizeNode(rootId, { inputTokens: 0, outputTokens: 0 })
+
+    // DB should have the final text and status should be 'idle'
+    let dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.assistantResponse).toBe('x')
+    expect(dbNode!.status).toBe('idle')
+
+    // Wait well beyond the throttle window to prove timer was cancelled
+    await new Promise((r) => setTimeout(r, 500))
+
+    // DB state should not have changed (timer did not fire)
+    const dbNodeAfter = await db.nodes.get(rootId)
+    expect(dbNodeAfter!.assistantResponse).toBe('x')
+    expect(dbNodeAfter!.status).toBe('idle')
+  })
+})
