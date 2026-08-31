@@ -5,6 +5,7 @@ import { downloadTreeExport } from '../lib/treeExport'
 import { SettingsModal } from './SettingsModal'
 import { TreeSwitcher } from './TreeSwitcher'
 import { SearchBar } from './SearchBar'
+import { ImportButton } from './ImportButton'
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 
@@ -50,6 +51,7 @@ export function HeaderBar() {
           >
             <Download size={20} />
           </button>
+          <ImportButton />
           <button
             onClick={() => setModalOpen(true)}
             className="text-slate-400 hover:text-slate-200 transition-colors p-2"

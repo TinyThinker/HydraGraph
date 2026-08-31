@@ -3,6 +3,7 @@ import { db } from '../db/ChatDatabase'
 import { resolveContextPayload } from '../lib/contextEngine'
 import { streamLLMResponse } from '../lib/streamingClient'
 import { computeChildPosition, layoutTree } from '../lib/autoLayout'
+import { parseImportDoc, remapImportedTree } from '../lib/treeExport'
 import type { TurnNode, ConversationTree, AppSettings, NodeStatus, TokenUsage } from '../types'
 
 interface TreeStoreState {
@@ -34,6 +35,7 @@ interface TreeStoreActions {
   relayoutActiveTree: () => Promise<void>
   renameTree: (treeId: string, title: string) => Promise<void>
   deleteTree: (treeId: string) => Promise<void>
+  importTree: (text: string) => Promise<{ ok: boolean; error?: string; treeId?: string }>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -602,6 +604,28 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         await get().loadTree(nextTree.id)
       }
     }
+    },
+
+    importTree: async (text) => {
+      const parsed = parseImportDoc(text)
+      if (!parsed.ok) {
+        return { ok: false, error: parsed.error }
+      }
+
+      const { tree, nodes } = remapImportedTree(parsed.doc)
+
+      try {
+        await db.transaction('rw', [db.trees, db.nodes], async () => {
+          await db.trees.add(tree)
+          await db.nodes.bulkAdd(nodes)
+        })
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+
+      set((state) => ({ trees: [tree, ...state.trees] }))
+      await get().loadTree(tree.id)
+      return { ok: true, treeId: tree.id }
     },
   }
 })

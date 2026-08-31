@@ -4,6 +4,8 @@ import {
   buildExportDoc,
   serializeExportDoc,
   exportFilename,
+  parseImportDoc,
+  remapImportedTree,
 } from './treeExport'
 import type { TreeExportDoc } from './treeExport'
 import type { ConversationTree, TurnNode } from '../types'
@@ -284,6 +286,186 @@ describe('treeExport', () => {
       expect(parsed.nodes[0].systemPromptOverride).toBe('Custom system')
       expect(parsed.nodes[0].provider).toBe('gemini')
       expect(parsed.nodes[0].inputTokens).toBe(100)
+    })
+  })
+
+  describe('import validation & remap', () => {
+    function createValidThreeNodeTree(): TreeExportDoc {
+      const rootId = 'root-123'
+      const childAId = 'child-a-456'
+      const grandchildId = 'grandchild-789'
+
+      const tree = createTestTree({
+        id: 'tree-import-test',
+        rootNodeId: rootId,
+      })
+
+      const root = createTestNode({
+        id: rootId,
+        treeId: tree.id,
+        parentId: null,
+        childrenIds: [childAId],
+        userPrompt: 'Root prompt',
+        assistantResponse: 'Root response',
+      })
+
+      const childA = createTestNode({
+        id: childAId,
+        treeId: tree.id,
+        parentId: rootId,
+        childrenIds: [grandchildId],
+        userPrompt: 'Child A prompt',
+        assistantResponse: 'Child A response',
+      })
+
+      const grandchild = createTestNode({
+        id: grandchildId,
+        treeId: tree.id,
+        parentId: childAId,
+        childrenIds: [],
+        userPrompt: 'Grandchild prompt',
+        assistantResponse: 'Grandchild response',
+      })
+
+      return buildExportDoc(tree, [root, childA, grandchild])
+    }
+
+    it('1. parseImportDoc(serializeExportDoc(validDoc)) returns ok: true', () => {
+      const doc = createValidThreeNodeTree()
+      const serialized = serializeExportDoc(doc)
+      const result = parseImportDoc(serialized)
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.doc).toEqual(doc)
+      }
+    })
+
+    it('2. parseImportDoc on invalid JSON returns ok: false with JSON error message', () => {
+      const result = parseImportDoc('not json{')
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error.toLowerCase()).toContain('json')
+      }
+    })
+
+    it('3. parseImportDoc on doc with schemaVersion: 99 returns ok: false mentioning both versions', () => {
+      const doc = createValidThreeNodeTree()
+      const invalidDoc = { ...doc, schemaVersion: 99 }
+      const serialized = JSON.stringify(invalidDoc)
+      const result = parseImportDoc(serialized)
+
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error).toContain('99')
+        expect(result.error).toContain('1')
+      }
+    })
+
+    it('4. parseImportDoc on doc with two root nodes returns ok: false mentioning root count', () => {
+      const doc = createValidThreeNodeTree()
+      const root2 = createTestNode({
+        id: 'root-2',
+        treeId: doc.tree.id,
+        parentId: null,
+        childrenIds: [],
+      })
+      const invalidDoc = { ...doc, nodes: [...doc.nodes, root2] }
+      const serialized = JSON.stringify(invalidDoc)
+      const result = parseImportDoc(serialized)
+
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error.toLowerCase()).toContain('root')
+      }
+    })
+
+    it('5. parseImportDoc on doc where node.parentId points to missing id returns ok: false', () => {
+      const doc = createValidThreeNodeTree()
+      const invalidDoc = {
+        ...doc,
+        nodes: doc.nodes.map((n) =>
+          n.id === 'grandchild-789' ? { ...n, parentId: 'missing-parent-id' } : n
+        ),
+      }
+      const serialized = JSON.stringify(invalidDoc)
+      const result = parseImportDoc(serialized)
+
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error.toLowerCase()).toContain('missing')
+      }
+    })
+
+    it('6. parseImportDoc on doc where parent.childrenIds includes child with different parentId returns ok: false', () => {
+      const doc = createValidThreeNodeTree()
+      const invalidDoc = {
+        ...doc,
+        nodes: doc.nodes.map((n) =>
+          n.id === 'grandchild-789' ? { ...n, parentId: 'root-123' } : n
+        ),
+      }
+      const serialized = JSON.stringify(invalidDoc)
+      const result = parseImportDoc(serialized)
+
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error.toLowerCase()).toContain('does not point back')
+      }
+    })
+
+    it('7. remapImportedTree creates new ids not in original set', () => {
+      const doc = createValidThreeNodeTree()
+      const originalIds = new Set(doc.nodes.map((n) => n.id))
+
+      const { tree, nodes } = remapImportedTree(doc)
+
+      const newIds = new Set(nodes.map((n) => n.id))
+      expect(tree.id).not.toBe(doc.tree.id)
+
+      for (const newId of newIds) {
+        expect(originalIds.has(newId)).toBe(false)
+      }
+
+      const remappedRootId = nodes.find((n) => n.parentId === null)!.id
+      expect(remappedRootId).toBe(tree.rootNodeId)
+    })
+
+    it('8. remapImportedTree called twice yields disjoint id sets', () => {
+      const doc = createValidThreeNodeTree()
+
+      const { nodes: nodes1 } = remapImportedTree(doc)
+      const { nodes: nodes2 } = remapImportedTree(doc)
+
+      const ids1 = new Set(nodes1.map((n) => n.id))
+      const ids2 = new Set(nodes2.map((n) => n.id))
+
+      for (const id of ids1) {
+        expect(ids2.has(id)).toBe(false)
+      }
+    })
+
+    it('9. remapImportedTree converts streaming status to idle', () => {
+      const doc = createValidThreeNodeTree()
+      const docWithStreaming = {
+        ...doc,
+        nodes: doc.nodes.map((n) => (n.id === 'child-a-456' ? { ...n, status: 'streaming' as const } : n)),
+      }
+
+      const { nodes } = remapImportedTree(docWithStreaming)
+
+      const remappedChild = nodes.find((n) => n.id !== nodes[0].id && n.parentId === nodes[0].id)
+      expect(remappedChild!.status).toBe('idle')
+    })
+
+    it('10. remapImportedTree preserves tree structure isomorphically', () => {
+      const doc = createValidThreeNodeTree()
+      const { tree, nodes } = remapImportedTree(doc)
+
+      const originalRoot = doc.nodes.find((n) => n.parentId === null)!
+      const remappedRoot = nodes.find((n) => n.parentId === null)!
+      expect(remappedRoot.childrenIds.length).toBe(originalRoot.childrenIds.length)
+      expect(tree.rootNodeId).toBe(remappedRoot.id)
     })
   })
 })

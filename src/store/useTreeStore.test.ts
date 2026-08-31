@@ -1489,3 +1489,136 @@ describe('deleteTree', () => {
     expect(nodes.get(treesAfter[0].rootNodeId)).toBeDefined()
   })
 })
+
+describe('importTree', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+      liveText: new Map(),
+    })
+  })
+
+  it('1. valid import succeeds and populates db and store', async () => {
+    // Create a source tree and export it
+    const sourceTree = await useTreeStore.getState().createTree('Source Tree')
+    const sourceRootId = sourceTree.rootNodeId
+
+    const sourceChild = createNode({
+      id: crypto.randomUUID(),
+      treeId: sourceTree.id,
+      parentId: sourceRootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(sourceChild)
+
+    const sourceNodes = [...useTreeStore.getState().nodes.values()]
+
+    const exportText = JSON.stringify({
+      schemaVersion: 1,
+      exportedAt: Date.now(),
+      tree: sourceTree,
+      nodes: sourceNodes,
+    })
+
+    // Import it
+    const res = await useTreeStore.getState().importTree(exportText)
+
+    expect(res.ok).toBe(true)
+    expect(typeof res.treeId).toBe('string')
+
+    if (res.ok && res.treeId) {
+      // Check database
+      const importedTree = await db.trees.get(res.treeId)
+      expect(importedTree).toBeDefined()
+      expect(importedTree!.title).toBe('Source Tree')
+
+      const importedNodeCount = await db.nodes.where('treeId').equals(res.treeId).count()
+      expect(importedNodeCount).toBe(sourceNodes.length)
+
+      // Check store state
+      const storeTree = useTreeStore.getState().trees.find((t) => t.id === res.treeId)
+      expect(storeTree).toBeDefined()
+
+      expect(useTreeStore.getState().activeTreeId).toBe(res.treeId)
+
+      const storeNodeCount = useTreeStore.getState().nodes.size
+      expect(storeNodeCount).toBe(sourceNodes.length)
+    }
+  })
+
+  it('2. invalid import writes nothing and returns error', async () => {
+    const treeCountBefore = await db.trees.count()
+    const nodeCountBefore = await db.nodes.count()
+
+    const res = await useTreeStore.getState().importTree('garbage')
+
+    expect(res.ok).toBe(false)
+    expect(res.error).toBeDefined()
+    expect(res.error).not.toBe('')
+
+    const treeCountAfter = await db.trees.count()
+    const nodeCountAfter = await db.nodes.count()
+
+    expect(treeCountAfter).toBe(treeCountBefore)
+    expect(nodeCountAfter).toBe(nodeCountBefore)
+  })
+
+  it('3. importing the same text twice creates disjoint trees', async () => {
+    const sourceTree = await useTreeStore.getState().createTree('Duplicate Test')
+    const sourceRootId = sourceTree.rootNodeId
+
+    const sourceChild = createNode({
+      id: crypto.randomUUID(),
+      treeId: sourceTree.id,
+      parentId: sourceRootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(sourceChild)
+
+    const exportText = JSON.stringify({
+      schemaVersion: 1,
+      exportedAt: Date.now(),
+      tree: sourceTree,
+      nodes: [...useTreeStore.getState().nodes.values()],
+    })
+
+    const sourceNodeCount = (await db.nodes.where('treeId').equals(sourceTree.id).toArray()).length
+
+    // First import
+    const res1 = await useTreeStore.getState().importTree(exportText)
+    expect(res1.ok).toBe(true)
+    const treeId1 = res1.treeId!
+
+    // Second import
+    const res2 = await useTreeStore.getState().importTree(exportText)
+    expect(res2.ok).toBe(true)
+    const treeId2 = res2.treeId!
+
+    expect(treeId1).not.toBe(treeId2)
+
+    // Check node id sets are disjoint
+    const nodes1 = await db.nodes.where('treeId').equals(treeId1).toArray()
+    const nodes2 = await db.nodes.where('treeId').equals(treeId2).toArray()
+
+    const ids1 = new Set(nodes1.map((n) => n.id))
+    const ids2 = new Set(nodes2.map((n) => n.id))
+
+    for (const id of ids1) {
+      expect(ids2.has(id)).toBe(false)
+    }
+
+    // Both trees should have the same node count as the source
+    expect(nodes1.length).toBe(sourceNodeCount)
+    expect(nodes2.length).toBe(sourceNodeCount)
+  })
+})
