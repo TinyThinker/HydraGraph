@@ -1,9 +1,9 @@
 # Agent Execution Guidelines: Spatial Conversation Tree Architecture
 
 ## Code Style & Architecture Constraints
-- Framework: React 18 + Vite + TypeScript (Strict Mode).
+- Framework: React 19 + Vite 8 + TypeScript 6 (Strict Mode).
 - Canvas Engine: @xyflow/react (React Flow v12).
-- State Management: Zustand (Store mutating actions must be immutable).
+- State Management: Zustand 5 (Store mutating actions must be immutable).
 - Database: Dexie.js (IndexedDB). Always use async/await for Dexie transactions.
 - Styling: Tailwind CSS (Dark theme slate/indigo palette).
 

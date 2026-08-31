@@ -156,13 +156,15 @@ graph TD
 
 | Layer | Technology | Version | Selection Rationale |
 |---|---|---|---|
-| Framework | React + Vite | ^18.3 / ^5.0 | Blazing fast HMR, small bundle footprint, native TypeScript support. |
-| Language | TypeScript | ^5.4 | Strict typing across state, database, and API payloads. |
-| Canvas Engine | @xyflow/react (React Flow) | ^12.0 | Industry standard for 2D node graphs. Includes pan/zoom, custom node rendering, edge routing, and viewport controls out of the box. |
-| State Management | Zustand | ^4.5 | Unopinionated, ultra-fast client state manager with zero boilerplate. Handles fast-frequency streaming token updates without triggering re-render loops across unrelated nodes. |
-| Local Database | Dexie.js | ^4.0 | Minimalist wrapper around browser IndexedDB. Provides ACID-compliant, high-performance local storage with index queries for O(1) node lookups. |
+| Framework | React + Vite | ^19.2 / ^8.1 | Blazing fast HMR, small bundle footprint, native TypeScript support. |
+| Language | TypeScript | ~6.0 | Strict typing across state, database, and API payloads. |
+| Canvas Engine | @xyflow/react (React Flow) | ^12.11 | Industry standard for 2D node graphs. Includes pan/zoom, custom node rendering, edge routing, and viewport controls out of the box. |
+| State Management | Zustand | ^5.0 | Unopinionated, ultra-fast client state manager with zero boilerplate. Handles fast-frequency streaming token updates without triggering re-render loops across unrelated nodes. |
+| Local Database | Dexie.js | ^4.4 | Minimalist wrapper around browser IndexedDB. Provides ACID-compliant, high-performance local storage with index queries for O(1) node lookups. |
 | Layout Engine | @dagrejs/dagre | ^1.0 | Directed graph auto-layout algorithm for calculating clean X, Y coordinates when spawning new child branches automatically. |
 | HTTP/SSE Client | Native fetch + ReadableStream | Web Standard | Zero external dependency weight for handling HTTP POST Server-Sent Event streaming responses. |
+
+_This table records the versions actually installed in `package.json`. Update it whenever a major dependency version changes._
 
 ### 3.3 Main Architectural System Components
 
@@ -452,9 +454,9 @@ The generated `CLAUDE.md` MUST contain the following rules:
 # Agent Execution Guidelines: Spatial Conversation Tree Architecture
 
 ## Code Style & Architecture Constraints
-- Framework: React 18 + Vite + TypeScript (Strict Mode).
+- Framework: React 19 + Vite 8 + TypeScript 6 (Strict Mode).
 - Canvas Engine: @xyflow/react (React Flow v12).
-- State Management: Zustand (Store mutating actions must be immutable).
+- State Management: Zustand 5 (Store mutating actions must be immutable).
 - Database: Dexie.js (IndexedDB). Always use async/await for Dexie transactions.
 - Styling: Tailwind CSS (Dark theme slate/indigo palette).
 
