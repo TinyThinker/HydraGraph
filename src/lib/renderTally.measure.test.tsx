@@ -149,4 +149,104 @@ describe('renderTally baseline measurement', () => {
     expect(tally[leaf1Id]).toBeGreaterThan(0)
     unmount()
   })
+
+  it('measures render counts during headless drag proxy (position update)', async () => {
+    // Create 4 nodes: 1 root + 3 leaf children
+    const rootId = crypto.randomUUID()
+    const leaf1Id = crypto.randomUUID()
+    const leaf2Id = crypto.randomUUID()
+    const leaf3Id = crypto.randomUUID()
+
+    const root = createNode({
+      id: rootId,
+      treeId: 'tree-test',
+      parentId: null,
+      childrenIds: [leaf1Id, leaf2Id, leaf3Id],
+      userPrompt: 'Hello',
+      positionX: 400,
+      positionY: 100,
+    })
+
+    const leaf1 = createNode({
+      id: leaf1Id,
+      treeId: 'tree-test',
+      parentId: rootId,
+      childrenIds: [],
+      userPrompt: 'Follow-up 1',
+      positionX: 100,
+      positionY: 400,
+    })
+
+    const leaf2 = createNode({
+      id: leaf2Id,
+      treeId: 'tree-test',
+      parentId: rootId,
+      childrenIds: [],
+      userPrompt: 'Follow-up 2',
+      positionX: 400,
+      positionY: 400,
+    })
+
+    const leaf3 = createNode({
+      id: leaf3Id,
+      treeId: 'tree-test',
+      parentId: rootId,
+      childrenIds: [],
+      userPrompt: 'Follow-up 3',
+      positionX: 700,
+      positionY: 400,
+    })
+
+    // Add all nodes to store
+    const nodes = new Map<string, TurnNode>([
+      [rootId, root],
+      [leaf1Id, leaf1],
+      [leaf2Id, leaf2],
+      [leaf3Id, leaf3],
+    ])
+
+    useTreeStore.setState({
+      nodes,
+      activeTreeId: 'tree-test',
+    })
+
+    // Render Canvas
+    const { unmount } = render(
+      <ReactFlowProvider>
+        <Canvas />
+      </ReactFlowProvider>,
+    )
+
+    // Wait for initial mount and effects to settle
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // AFTER mount settles, enable tally and reset counts
+    enableRenderTally()
+    resetRenderTally()
+
+    // Simulate a committed drag of the root node by updating its position
+    await act(async () => {
+      await useTreeStore.getState().updateNode(rootId, { positionX: 999 })
+    })
+
+    // Wait a moment for final renders to settle
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    // Read the tally
+    const tally = getRenderTally()
+
+    // Log results for human inspection
+    console.log('DRAG PROXY render counts:', JSON.stringify(tally))
+    console.log(`Root node (${rootId}): ${tally[rootId] ?? 0} renders`)
+    console.log(`Leaf 1 (${leaf1Id}): ${tally[leaf1Id] ?? 0} renders`)
+    console.log(`Leaf 2 (${leaf2Id}): ${tally[leaf2Id] ?? 0} renders`)
+    console.log(`Leaf 3 (${leaf3Id}): ${tally[leaf3Id] ?? 0} renders`)
+
+    // Assert: leaf nodes must NOT have rendered due to position change of root
+    expect(tally[leaf1Id] ?? 0).toBe(0)
+    expect(tally[leaf2Id] ?? 0).toBe(0)
+    expect(tally[leaf3Id] ?? 0).toBe(0)
+
+    unmount()
+  })
 })

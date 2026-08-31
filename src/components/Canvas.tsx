@@ -20,15 +20,42 @@ export function Canvas() {
   const updateNode = useTreeStore((s) => s.updateNode)
   const isDragging = useRef(false)
   const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const nodeWrapperCache = useRef<Map<string, Node<TurnNodeData>>>(new Map())
 
   const rfNodesFromStore = useMemo<Node<TurnNodeData>[]>(
-    () =>
-      Array.from(nodes.values()).map((n) => ({
-        id: n.id,
-        type: 'turnNode',
-        position: { x: n.positionX, y: n.positionY },
-        data: n as TurnNodeData,
-      })),
+    () => {
+      const result: Node<TurnNodeData>[] = []
+      const seenIds = new Set<string>()
+
+      Array.from(nodes.values()).forEach((n) => {
+        seenIds.add(n.id)
+        const cached = nodeWrapperCache.current.get(n.id)
+
+        // Reuse cached wrapper if the data reference is the same
+        if (cached && cached.data === n) {
+          result.push(cached)
+        } else {
+          // Create new wrapper and cache it
+          const newWrapper: Node<TurnNodeData> = {
+            id: n.id,
+            type: 'turnNode',
+            position: { x: n.positionX, y: n.positionY },
+            data: n as TurnNodeData,
+          }
+          nodeWrapperCache.current.set(n.id, newWrapper)
+          result.push(newWrapper)
+        }
+      })
+
+      // Clean up cache entries for removed nodes
+      for (const id of nodeWrapperCache.current.keys()) {
+        if (!seenIds.has(id)) {
+          nodeWrapperCache.current.delete(id)
+        }
+      }
+
+      return result
+    },
     [nodes],
   )
 
@@ -39,18 +66,32 @@ export function Canvas() {
     if (!isDragging.current) setLocalNodes(rfNodesFromStore)
   }, [rfNodesFromStore])
 
-  const edges = useMemo(
+  const structureKey = useMemo(
     () =>
       Array.from(nodes.values())
-        .filter((n) => n.parentId !== null)
-        .map((n) => ({
-          id: `${n.parentId}-${n.id}`,
-          source: n.parentId!,
-          target: n.id,
+        .map((n) => `${n.id}>${n.parentId}`)
+        .sort()
+        .join('|'),
+    [nodes],
+  )
+
+  // Edges are derived purely from the structure key, so they keep a stable
+  // reference until the parent/child structure actually changes.
+  const edges = useMemo(
+    () =>
+      structureKey
+        .split('|')
+        .filter(Boolean)
+        .map((pair) => pair.split('>'))
+        .filter(([, parentId]) => parentId !== 'null')
+        .map(([id, parentId]) => ({
+          id: `${parentId}-${id}`,
+          source: parentId,
+          target: id,
           type: 'smoothstep',
           style: { stroke: '#4f46e5', strokeWidth: 2 },
         })),
-    [nodes],
+    [structureKey],
   )
 
   const onNodesChange = useCallback(
