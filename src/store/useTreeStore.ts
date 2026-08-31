@@ -9,6 +9,7 @@ interface TreeStoreState {
   trees: ConversationTree[]
   activeTreeId: string | null
   settings: AppSettings
+  liveText: Map<string, string>
 }
 
 interface TreeStoreActions {
@@ -42,7 +43,7 @@ const abortRegistry = new Map<string, () => void>()
 
 // Schedule a throttled flush for a node id. If a timer already exists,
 // do nothing (the existing timer will write the latest text when it fires).
-// Otherwise, set a timer for ~400ms that reads the current in-memory node text
+// Otherwise, set a timer for ~400ms that reads the current in-flight text from liveText
 // and writes it to the database.
 function scheduleThrottledFlush(nodeId: string) {
   if (pendingTimers.has(nodeId)) {
@@ -50,9 +51,9 @@ function scheduleThrottledFlush(nodeId: string) {
   }
 
   const timerId = setTimeout(() => {
-    const node = useTreeStore.getState().nodes.get(nodeId)
-    if (node) {
-      db.nodes.update(nodeId, { assistantResponse: node.assistantResponse }).catch((err) => {
+    const liveText = useTreeStore.getState().liveText.get(nodeId)
+    if (liveText !== undefined) {
+      db.nodes.update(nodeId, { assistantResponse: liveText }).catch((err) => {
         console.error(`[throttled flush error for ${nodeId}]`, err)
       })
     }
@@ -76,6 +77,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   trees: [],
   activeTreeId: null,
   settings: DEFAULT_SETTINGS,
+  liveText: new Map(),
 
   loadSettings: async () => {
     const saved = await db.settings.get('global_settings')
@@ -229,11 +231,13 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
   appendTokenDelta: (id, chunk) => {
     set((state) => {
-      const existing = state.nodes.get(id)
-      if (!existing) return state
-      const next = new Map(state.nodes)
-      next.set(id, { ...existing, assistantResponse: existing.assistantResponse + chunk })
-      return { nodes: next }
+      // If node doesn't exist, it's a ghost id — no-op
+      if (!state.nodes.has(id)) return state
+      // Append to liveText, creating new Map
+      const newLiveText = new Map(state.liveText)
+      const current = state.liveText.get(id) ?? ''
+      newLiveText.set(id, current + chunk)
+      return { liveText: newLiveText }
     })
     // Schedule throttled flush to persist the latest text to IndexedDB
     scheduleThrottledFlush(id)
@@ -256,13 +260,19 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
     const existing = get().nodes.get(id)
     if (!existing) return
+
+    // Compute final text: use liveText if present, otherwise fall back to existing node response
+    const finalText = get().liveText.get(id) ?? existing.assistantResponse
+
     const patch = { status: 'idle' as NodeStatus, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }
-    const updated = { ...existing, ...patch }
-    await db.nodes.update(id, { ...patch, assistantResponse: updated.assistantResponse })
+    const updated = { ...existing, ...patch, assistantResponse: finalText }
+    await db.nodes.update(id, { ...patch, assistantResponse: finalText })
     set((state) => {
-      const next = new Map(state.nodes)
-      next.set(id, updated)
-      return { nodes: next }
+      const nextNodes = new Map(state.nodes)
+      nextNodes.set(id, updated)
+      const nextLiveText = new Map(state.liveText)
+      nextLiveText.delete(id)
+      return { nodes: nextNodes, liveText: nextLiveText }
     })
     if (get().activeTreeId) {
       await db.trees.update(get().activeTreeId!, { updatedAt: Date.now() })
@@ -285,7 +295,10 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     set((state) => {
       const next = new Map(state.nodes)
       next.set(nodeId, updated)
-      return { nodes: next }
+      // Remove any stale liveText entry for this node
+      const nextLiveText = new Map(state.liveText)
+      nextLiveText.delete(nodeId)
+      return { nodes: next, liveText: nextLiveText }
     })
 
     // Clear any stale timer from a previous run so it cannot write into this fresh stream
@@ -302,11 +315,15 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       abortRegistry.delete(nodeId)
       const currentNode = get().nodes.get(nodeId)
       if (currentNode) {
-        await db.nodes.update(nodeId, { status: 'error', assistantResponse: currentNode.assistantResponse, errorMessage: message })
+        // Compute text: use liveText if present, otherwise fall back to node's current response
+        const text = get().liveText.get(nodeId) ?? currentNode.assistantResponse
+        await db.nodes.update(nodeId, { status: 'error', assistantResponse: text, errorMessage: message })
         set((state) => {
-          const next = new Map(state.nodes)
-          next.set(nodeId, { ...currentNode, status: 'error', errorMessage: message })
-          return { nodes: next }
+          const nextNodes = new Map(state.nodes)
+          nextNodes.set(nodeId, { ...currentNode, status: 'error', assistantResponse: text, errorMessage: message })
+          const nextLiveText = new Map(state.liveText)
+          nextLiveText.delete(nodeId)
+          return { nodes: nextNodes, liveText: nextLiveText }
         })
       }
     }
@@ -346,14 +363,19 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     const node = get().nodes.get(id)
     if (!node) return
 
+    // Compute text: use liveText if present, otherwise fall back to node's current response
+    const text = get().liveText.get(id) ?? node.assistantResponse
+
     // Update DB with idle status and preserved text
-    await db.nodes.update(id, { status: 'idle', assistantResponse: node.assistantResponse })
+    await db.nodes.update(id, { status: 'idle', assistantResponse: text })
 
     // Update memory immutably
     set((state) => {
-      const next = new Map(state.nodes)
-      next.set(id, { ...node, status: 'idle' })
-      return { nodes: next }
+      const nextNodes = new Map(state.nodes)
+      nextNodes.set(id, { ...node, status: 'idle', assistantResponse: text })
+      const nextLiveText = new Map(state.liveText)
+      nextLiveText.delete(id)
+      return { nodes: nextNodes, liveText: nextLiveText }
     })
   },
 }))

@@ -17,7 +17,11 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
   const submitPrompt = useTreeStore((s) => s.submitPrompt)
   const cancelGeneration = useTreeStore((s) => s.cancelGeneration)
   const defaultModel = useTreeStore((s) => s.settings.defaultModel)
+  const liveText = useTreeStore((s) => s.liveText.get(data.id))
   const [draft, setDraft] = useState('')
+
+  // Compute responseText: use liveText if streaming, otherwise use stored response
+  const responseText = liveText !== undefined ? liveText : data.assistantResponse
 
   const handleSend = () => {
     if (!draft.trim()) return
@@ -91,10 +95,10 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
       </div>
 
       {/* Assistant response */}
-      {data.assistantResponse && (
+      {responseText && (
         <div className="px-3 pb-3 border-t border-slate-700 pt-2">
           <div className="text-xs text-slate-400 mb-1 font-medium">🤖 Assistant</div>
-          <p className="text-sm text-slate-200 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">{data.assistantResponse}</p>
+          <p className="text-sm text-slate-200 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">{responseText}</p>
         </div>
       )}
 

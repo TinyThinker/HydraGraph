@@ -41,6 +41,7 @@ describe('useTreeStore', () => {
         defaultModel: 'gemini-2.5-flash',
         provider: 'gemini',
       },
+      liveText: new Map(),
     })
   })
 
@@ -99,27 +100,26 @@ describe('useTreeStore', () => {
     expect(dbChild!.id).toBe(child.id)
   })
 
-  it('3. appendTokenDelta creates new object and does not mutate old reference', async () => {
+  it('3. appendTokenDelta writes live text without touching the node object', async () => {
     const tree = await useTreeStore.getState().createTree('My Tree')
     const rootId = tree.rootNodeId
 
-    const before = useTreeStore.getState().nodes.get(rootId)!
-    const beforeResponse = before.assistantResponse
-    expect(beforeResponse).toBe('')
+    const nodeBeforeStream = useTreeStore.getState().nodes.get(rootId)!
+    expect(nodeBeforeStream.assistantResponse).toBe('')
 
     useTreeStore.getState().appendTokenDelta(rootId, 'Hello')
     useTreeStore.getState().appendTokenDelta(rootId, ' world')
 
-    const after = useTreeStore.getState().nodes.get(rootId)!
+    const nodeAfterStream = useTreeStore.getState().nodes.get(rootId)!
 
-    // After should be a different object reference
-    expect(after).not.toBe(before)
+    // Node object should be the SAME reference (untouched)
+    expect(nodeAfterStream).toBe(nodeBeforeStream)
 
-    // Before should not have been mutated
-    expect(before.assistantResponse).toBe(beforeResponse)
+    // Node's assistantResponse should still be empty (tokens go to liveText, not node)
+    expect(nodeAfterStream.assistantResponse).toBe('')
 
-    // After should have the accumulated text
-    expect(after.assistantResponse).toBe('Hello world')
+    // liveText should have the accumulated chunks
+    expect(useTreeStore.getState().liveText.get(rootId)).toBe('Hello world')
   })
 
   it('4. appendTokenDelta for absent id is a no-op', async () => {
@@ -136,6 +136,9 @@ describe('useTreeStore', () => {
 
     // Root node should still be the same object
     expect(useTreeStore.getState().nodes.get(rootId)).toBe(rootBefore)
+
+    // liveText should remain empty
+    expect(useTreeStore.getState().liveText.size).toBe(0)
   })
 })
 
@@ -153,6 +156,7 @@ describe('throttled streaming writes', () => {
         defaultModel: 'gemini-2.5-flash',
         provider: 'gemini',
       },
+      liveText: new Map(),
     })
   })
 
@@ -173,8 +177,8 @@ describe('throttled streaming writes', () => {
     dbNode = await db.nodes.get(rootId)
     expect(dbNode!.assistantResponse).toBe('')
 
-    // In-memory should have the accumulated text
-    expect(useTreeStore.getState().nodes.get(rootId)!.assistantResponse).toBe('abc')
+    // In-memory liveText should have the accumulated text
+    expect(useTreeStore.getState().liveText.get(rootId)).toBe('abc')
 
     // Wait for throttle window (~400ms) plus small buffer
     await new Promise((r) => setTimeout(r, 450))
@@ -190,8 +194,8 @@ describe('throttled streaming writes', () => {
     dbNode = await db.nodes.get(rootId)
     expect(dbNode!.assistantResponse).toBe('abc')
 
-    // In-memory should have new text
-    expect(useTreeStore.getState().nodes.get(rootId)!.assistantResponse).toBe('abcd')
+    // In-memory liveText should have new text
+    expect(useTreeStore.getState().liveText.get(rootId)).toBe('abcd')
 
     // Wait for throttle window again
     await new Promise((r) => setTimeout(r, 450))
@@ -240,6 +244,7 @@ describe('stream error surfacing', () => {
         defaultModel: 'gemini-2.5-flash',
         provider: 'gemini',
       },
+      liveText: new Map(),
     })
   })
 
@@ -320,6 +325,7 @@ describe('zombie streaming recovery on load', () => {
         defaultModel: 'gemini-2.5-flash',
         provider: 'gemini',
       },
+      liveText: new Map(),
     })
   })
 
@@ -411,6 +417,7 @@ describe('cancel generation', () => {
         defaultModel: 'gemini-2.5-flash',
         provider: 'gemini',
       },
+      liveText: new Map(),
     })
   })
 
@@ -432,9 +439,9 @@ describe('cancel generation', () => {
     // Simulate partial streaming
     useTreeStore.getState().appendTokenDelta(rootId, 'partial text')
 
-    // Verify we're streaming with partial text
+    // Verify we're streaming with partial text (in liveText, not in node)
     expect(useTreeStore.getState().nodes.get(rootId)!.status).toBe('streaming')
-    expect(useTreeStore.getState().nodes.get(rootId)!.assistantResponse).toBe('partial text')
+    expect(useTreeStore.getState().liveText.get(rootId)).toBe('partial text')
 
     // Cancel the generation
     await useTreeStore.getState().cancelGeneration(rootId)
