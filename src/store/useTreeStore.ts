@@ -32,6 +32,8 @@ interface TreeStoreActions {
   markDescendantsStale: (id: string) => Promise<void>
   toggleCollapse: (id: string) => Promise<void>
   relayoutActiveTree: () => Promise<void>
+  renameTree: (treeId: string, title: string) => Promise<void>
+  deleteTree: (treeId: string) => Promise<void>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -548,5 +550,46 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       }
       return { nodes: nextNodes, fitViewNonce: state.fitViewNonce + 1 }
     })
+  },
+
+  renameTree: async (treeId, title) => {
+    const trimmed = title.trim()
+    if (!trimmed) return
+
+    await db.trees.update(treeId, { title: trimmed })
+    set((state) => ({
+      trees: state.trees.map((t) => (t.id === treeId ? { ...t, title: trimmed } : t)),
+    }))
+  },
+
+  deleteTree: async (treeId) => {
+    // Collect this tree's node ids: use DB query as source of truth
+    const nodeIds = (await db.nodes.where('treeId').equals(treeId).toArray()).map((n) => n.id)
+
+    // Delete in one transaction
+    await db.transaction('rw', [db.nodes, db.trees], async () => {
+      await db.nodes.bulkDelete(nodeIds)
+      await db.trees.delete(treeId)
+    })
+
+    // Update memory: remove tree immutably
+    const nextTrees = get().trees.filter((t) => t.id !== treeId)
+    set({ trees: nextTrees })
+
+    // Guard: if no trees remain, create a fresh one and activate it
+    if (nextTrees.length === 0) {
+      await get().createTree('New Research')
+      return
+    }
+
+    // If deleted tree was active, pick next one and activate it
+    if (get().activeTreeId === treeId) {
+      const remaining = get().trees
+      const sorted = [...remaining].sort((a, b) => b.updatedAt - a.updatedAt)
+      const nextTree = sorted[0]
+      if (nextTree) {
+        await get().loadTree(nextTree.id)
+      }
+    }
   },
 }))

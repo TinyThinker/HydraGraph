@@ -2,19 +2,15 @@ import { useState } from 'react'
 import { Settings, AlertTriangle, LayoutGrid } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { SettingsModal } from './SettingsModal'
+import { TreeSwitcher } from './TreeSwitcher'
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 
 export function HeaderBar() {
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmRelayout, setConfirmRelayout] = useState(false)
-  const activeTreeId = useTreeStore((s) => s.activeTreeId)
-  const trees = useTreeStore((s) => s.trees)
   const settings = useTreeStore((s) => s.settings)
   const relayoutActiveTree = useTreeStore((s) => s.relayoutActiveTree)
-
-  const activeTree = activeTreeId ? trees.find((t) => t.id === activeTreeId) : null
-  const title = activeTree?.title ?? 'Untitled'
 
   // Banner is shown if no provider is configured: no Gemini key, no OpenRouter key,
   // and Ollama is either unconfigured or still at the default untested URL
@@ -27,7 +23,7 @@ export function HeaderBar() {
   return (
     <>
       <div className="h-12 flex items-center justify-between px-4 border-b border-slate-800 bg-slate-900">
-        <span className="text-slate-200 font-medium">{title}</span>
+        <TreeSwitcher />
         <div className="flex items-center gap-1">
           <button
             onClick={() => setConfirmRelayout(true)}

@@ -1187,3 +1187,151 @@ describe('delete node and subtree', () => {
     })
   })
 })
+
+describe('renameTree', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+      liveText: new Map(),
+    })
+  })
+
+  it('changes the title in memory and in db, does not change updatedAt', async () => {
+    const tree = await useTreeStore.getState().createTree('Original Title')
+    const originalUpdatedAt = tree.updatedAt
+
+    await useTreeStore.getState().renameTree(tree.id, 'New Title')
+
+    // Check memory
+    const memTree = useTreeStore.getState().trees.find((t) => t.id === tree.id)
+    expect(memTree).toBeDefined()
+    expect(memTree!.title).toBe('New Title')
+    expect(memTree!.updatedAt).toBe(originalUpdatedAt)
+
+    // Check DB
+    const dbTree = await db.trees.get(tree.id)
+    expect(dbTree).toBeDefined()
+    expect(dbTree!.title).toBe('New Title')
+    expect(dbTree!.updatedAt).toBe(originalUpdatedAt)
+  })
+
+  it('is a no-op when title is whitespace-only', async () => {
+    const tree = await useTreeStore.getState().createTree('Original')
+
+    await useTreeStore.getState().renameTree(tree.id, '   ')
+
+    // Check title is unchanged
+    const memTree = useTreeStore.getState().trees.find((t) => t.id === tree.id)
+    expect(memTree!.title).toBe('Original')
+
+    const dbTree = await db.trees.get(tree.id)
+    expect(dbTree!.title).toBe('Original')
+  })
+})
+
+describe('deleteTree', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+      liveText: new Map(),
+    })
+  })
+
+  it('deletes a non-active tree and its nodes', async () => {
+    const treeA = await useTreeStore.getState().createTree('Tree A')
+    const treeB = await useTreeStore.getState().createTree('Tree B')
+
+    // Switch to A, leaving B inactive
+    await useTreeStore.getState().loadTree(treeA.id)
+
+    // Add nodes to B directly via DB
+    const nodeB1 = createNode({ treeId: treeB.id, parentId: treeB.rootNodeId })
+    const nodeB2 = createNode({ treeId: treeB.id, parentId: treeB.rootNodeId })
+    await db.nodes.add(nodeB1)
+    await db.nodes.add(nodeB2)
+
+    // Delete B
+    await useTreeStore.getState().deleteTree(treeB.id)
+
+    // Assert B is gone from DB
+    expect(await db.trees.get(treeB.id)).toBeUndefined()
+
+    // Assert B's nodes are gone
+    const bNodeCount = await db.nodes.where('treeId').equals(treeB.id).count()
+    expect(bNodeCount).toBe(0)
+
+    // Assert B is removed from memory
+    expect(useTreeStore.getState().trees.find((t) => t.id === treeB.id)).toBeUndefined()
+
+    // Assert activeTreeId is still A
+    expect(useTreeStore.getState().activeTreeId).toBe(treeA.id)
+  })
+
+  it('deletes the active tree, switches to another and loads its nodes', async () => {
+    const treeA = await useTreeStore.getState().createTree('Tree A')
+    const treeB = await useTreeStore.getState().createTree('Tree B')
+
+    // B is currently active (createTree activates)
+    expect(useTreeStore.getState().activeTreeId).toBe(treeB.id)
+
+    // Delete B
+    await useTreeStore.getState().deleteTree(treeB.id)
+
+    // Assert B is gone
+    expect(await db.trees.get(treeB.id)).toBeUndefined()
+    expect(useTreeStore.getState().trees.find((t) => t.id === treeB.id)).toBeUndefined()
+
+    // Assert A is now active
+    expect(useTreeStore.getState().activeTreeId).toBe(treeA.id)
+
+    // Assert A's nodes are loaded in memory
+    const aNodesInMemory = [...useTreeStore.getState().nodes.values()].filter((n) => n.treeId === treeA.id)
+    expect(aNodesInMemory.length).toBeGreaterThan(0)
+    expect(aNodesInMemory[0].id).toBe(treeA.rootNodeId)
+  })
+
+  it('creates a replacement tree when deleting the last remaining tree', async () => {
+    const treeA = await useTreeStore.getState().createTree('Only Tree')
+    const treeAId = treeA.id
+
+    // Delete A (the only tree)
+    await useTreeStore.getState().deleteTree(treeAId)
+
+    // Assert A is gone
+    expect(await db.trees.get(treeAId)).toBeUndefined()
+
+    // Assert a new tree exists
+    const treesAfter = useTreeStore.getState().trees
+    expect(treesAfter.length).toBe(1)
+    expect(treesAfter[0].id).not.toBe(treeAId)
+    expect(treesAfter[0].title).toBe('New Research')
+
+    // Assert the new tree is active
+    expect(useTreeStore.getState().activeTreeId).toBe(treesAfter[0].id)
+
+    // Assert the new tree's root node is in memory
+    const nodes = useTreeStore.getState().nodes
+    expect(nodes.size).toBe(1)
+    expect(nodes.get(treesAfter[0].rootNodeId)).toBeDefined()
+  })
+})
