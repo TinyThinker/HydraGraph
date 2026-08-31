@@ -39,7 +39,7 @@ class ChatDatabase extends Dexie {
         }
       })
 
-    // version(3): backfills width, height (T4.2) and stale:false (T4.6) on existing node rows — do NOT add version(4)
+    // version(3): backfills width, height (T4.2) and stale:false (T4.6) on existing node rows
     this.version(3)
       .stores({
         nodes: 'id, treeId, parentId, timestamp',
@@ -62,6 +62,33 @@ class ChatDatabase extends Dexie {
           }
           if (Object.keys(updates).length > 0) {
             await tx.table('nodes').update(node.id, updates)
+          }
+        }
+      })
+
+    // version(4): backfills viewportX, viewportY, viewportZoom on tree rows (T5.9)
+    this.version(4)
+      .stores({
+        nodes: 'id, treeId, parentId, timestamp',
+        trees: 'id, createdAt, updatedAt',
+        settings: 'id',
+      })
+      .upgrade(async (tx) => {
+        // Backfill viewport settings on all existing trees
+        const allTrees = await tx.table('trees').toArray()
+        for (const tree of allTrees) {
+          const updates: Record<string, number> = {}
+          if (tree.viewportX === undefined || tree.viewportX === null) {
+            updates.viewportX = 0
+          }
+          if (tree.viewportY === undefined || tree.viewportY === null) {
+            updates.viewportY = 0
+          }
+          if (tree.viewportZoom === undefined || tree.viewportZoom === null) {
+            updates.viewportZoom = 1
+          }
+          if (Object.keys(updates).length > 0) {
+            await tx.table('trees').update(tree.id, updates)
           }
         }
       })

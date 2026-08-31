@@ -31,6 +31,9 @@ export interface ConversationTree {
   defaultSystemPrompt: string
   createdAt: number
   updatedAt: number
+  viewportX?: number
+  viewportY?: number
+  viewportZoom?: number
 }
 
 export interface AppSettings {

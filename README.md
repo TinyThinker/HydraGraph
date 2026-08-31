@@ -111,6 +111,24 @@ Then restart Ollama. If the app is served from a different origin (e.g., `http:/
 
 ---
 
+## Keyboard Shortcuts
+
+| Key | Action |
+|---|---|
+| `↑` | Select the parent node |
+| `↓` | Select the first child |
+| `←` / `→` | Previous / next sibling |
+| `b` | Branch a new child from the selected node |
+| `r` | Open the reader panel for the selected node |
+
+Shortcuts are ignored while a text field is focused.
+
+### Canvas Viewport
+
+The canvas remembers pan and zoom per tree and restores your last view when you reopen that tree, instead of always fitting the whole graph.
+
+---
+
 ## Architecture
 
 ```
