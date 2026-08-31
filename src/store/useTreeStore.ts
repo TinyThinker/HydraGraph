@@ -290,8 +290,9 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     // Persist prompt + set streaming status
     const existing = nodes.get(nodeId)
     if (!existing) return () => {}
-    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: settings.provider, errorMessage: '' }
-    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: settings.provider, errorMessage: '' })
+    if (existing.status === 'streaming') return () => {}
+    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: settings.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined }
+    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: settings.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined })
     set((state) => {
       const next = new Map(state.nodes)
       next.set(nodeId, updated)

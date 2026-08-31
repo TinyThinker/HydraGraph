@@ -1,10 +1,11 @@
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import { Handle, Position, NodeResizer, type NodeProps, type Node } from '@xyflow/react'
-import { Zap, GitBranch, Shield, Square } from 'lucide-react'
+import { Zap, GitBranch, Shield } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useReaderPanel } from './useReaderPanel'
 import { useRenderTally } from '../lib/renderTally'
 import { ResponseArea } from './ResponseArea'
+import { PromptSection } from './PromptSection'
 import type { TurnNodeData } from '../types'
 
 // Bounds only the DOM render of response text; stored text is never truncated
@@ -15,12 +16,9 @@ const ringClass: Record<string, string> = { idle: 'ring-2 ring-indigo-500', stre
 export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selected }: NodeProps<Node<TurnNodeData>>) {
   useRenderTally(data.id)
   const addNode = useTreeStore((s) => s.addNode)
-  const submitPrompt = useTreeStore((s) => s.submitPrompt)
-  const cancelGeneration = useTreeStore((s) => s.cancelGeneration)
   const defaultModel = useTreeStore((s) => s.settings.defaultModel)
   const liveText = useTreeStore((s) => s.liveText.get(data.id))
   const openReader = useReaderPanel((s) => s.open)
-  const [draft, setDraft] = useState('')
 
   // Compute responseText: use liveText if streaming, otherwise use stored response
   const responseText = liveText !== undefined ? liveText : data.assistantResponse
@@ -28,12 +26,6 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
   // Cap rendered text to last N characters; stored text is never truncated
   const isTruncated = responseText.length > RENDERED_TEXT_CAP
   const visibleText = isTruncated ? responseText.slice(-RENDERED_TEXT_CAP) : responseText
-
-  const handleSend = () => {
-    if (!draft.trim()) return
-    submitPrompt(data.id, draft.trim())
-    setDraft('')
-  }
 
   const handleBranch = () => {
     addNode({
@@ -69,40 +61,7 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
       )}
 
       {/* User prompt */}
-      <div className="px-3 pt-3 pb-2">
-        <div className="text-xs text-slate-400 mb-1 font-medium">👤 User</div>
-        {data.userPrompt ? (
-          <div className="space-y-2">
-            <p className="text-sm text-slate-200 whitespace-pre-wrap break-words">{data.userPrompt}</p>
-            {data.status === 'streaming' && (
-              <button
-                onClick={() => cancelGeneration(data.id)}
-                className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-medium py-1.5 rounded-lg transition-colors nodrag flex items-center justify-center gap-2"
-              >
-                <Square size={12} />
-                Cancel
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-              placeholder="Ask something…"
-              rows={3}
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 nodrag"
-            />
-            <button
-              onClick={handleSend}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-1.5 rounded-lg transition-colors nodrag"
-            >
-              Send
-            </button>
-          </div>
-        )}
-      </div>
+      <PromptSection node={data} />
 
       {/* Assistant response */}
       <ResponseArea

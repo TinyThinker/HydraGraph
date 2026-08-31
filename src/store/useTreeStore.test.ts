@@ -465,3 +465,155 @@ describe('cancel generation', () => {
     expect(abortSpy).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('regenerate and edit prompts', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+      liveText: new Map(),
+    })
+  })
+
+  it('regenerate via submitPrompt clears the previous response and error and re-enters streaming', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, _onError) => {
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    // Set node to error state with old response
+    await useTreeStore.getState().updateNode(rootId, {
+      userPrompt: 'q',
+      assistantResponse: 'old answer',
+      status: 'error',
+      errorMessage: 'boom',
+    })
+
+    // Regenerate with the same prompt
+    await useTreeStore.getState().submitPrompt(rootId, 'q')
+
+    // Assert: in-memory node has cleared response and error
+    const memNode = useTreeStore.getState().nodes.get(rootId)!
+    expect(memNode.assistantResponse).toBe('')
+    expect(memNode.errorMessage).toBe('')
+    expect(memNode.status).toBe('streaming')
+    expect(memNode.userPrompt).toBe('q')
+
+    // Assert: DB also has cleared response and error
+    const dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.assistantResponse).toBe('')
+    expect(dbNode!.errorMessage).toBe('')
+    expect(dbNode!.status).toBe('streaming')
+  })
+
+  it('edit via submitPrompt changes the stored prompt', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, _onError) => {
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    // Set initial prompt
+    await useTreeStore.getState().updateNode(rootId, {
+      userPrompt: 'original prompt',
+      assistantResponse: 'old answer',
+      status: 'idle',
+    })
+
+    // Edit to a different prompt
+    await useTreeStore.getState().submitPrompt(rootId, 'a different question')
+
+    // Assert: in-memory node has new prompt
+    const memNode = useTreeStore.getState().nodes.get(rootId)!
+    expect(memNode.userPrompt).toBe('a different question')
+
+    // Assert: DB also has new prompt
+    const dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.userPrompt).toBe('a different question')
+  })
+
+  it('submitPrompt is a no-op while the node is already streaming', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, _onError) => {
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    // Start streaming
+    await useTreeStore.getState().submitPrompt(rootId, 'q')
+
+    // Clear the mock call count
+    vi.mocked(streamLLMResponse).mockClear()
+
+    // Try to submit while streaming (should be no-op)
+    await useTreeStore.getState().submitPrompt(rootId, 'q2')
+
+    // Assert: streamLLMResponse was NOT called
+    expect(vi.mocked(streamLLMResponse)).not.toHaveBeenCalled()
+
+    // Assert: node status is still streaming
+    const node = useTreeStore.getState().nodes.get(rootId)!
+    expect(node.status).toBe('streaming')
+  })
+
+  it('editing/regenerating a parent leaves its children in place', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, _onError) => {
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+
+    // Add a child node
+    const childId = crypto.randomUUID()
+    const child = createNode({
+      id: childId,
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(child)
+
+    // Verify child is in place
+    expect(useTreeStore.getState().nodes.get(rootId)!.childrenIds).toContain(childId)
+
+    // Edit/regenerate the parent
+    await useTreeStore.getState().submitPrompt(rootId, 'edited')
+
+    // Assert: child still exists in memory
+    expect(useTreeStore.getState().nodes.has(childId)).toBe(true)
+
+    // Assert: child still exists in DB
+    const dbChild = await db.nodes.get(childId)
+    expect(dbChild).toBeDefined()
+
+    // Assert: parent's childrenIds still contains child
+    const parentAfter = useTreeStore.getState().nodes.get(rootId)!
+    expect(parentAfter.childrenIds).toContain(childId)
+  })
+})
