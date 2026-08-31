@@ -38,6 +38,30 @@ class ChatDatabase extends Dexie {
           await tx.table('nodes').update(node.id, { provider: inferredProvider, errorMessage: '' })
         }
       })
+
+    // version(3): T4.2 backfills width/height; T4.6 will EXTEND this same upgrade to also default stale:false — do not add version(4) for that.
+    this.version(3)
+      .stores({
+        nodes: 'id, treeId, parentId, timestamp',
+        trees: 'id, createdAt, updatedAt',
+        settings: 'id',
+      })
+      .upgrade(async (tx) => {
+        // Backfill width and height on all existing nodes
+        const allNodes = await tx.table('nodes').toArray()
+        for (const node of allNodes) {
+          const updates: Record<string, number> = {}
+          if (node.width === undefined || node.width === null) {
+            updates.width = 320
+          }
+          if (node.height === undefined || node.height === null) {
+            updates.height = 240
+          }
+          if (Object.keys(updates).length > 0) {
+            await tx.table('nodes').update(node.id, updates)
+          }
+        }
+      })
   }
 }
 

@@ -19,6 +19,8 @@ export interface TurnNode {
   timestamp: number
   provider?: LLMProvider
   errorMessage?: string
+  width?: number
+  height?: number
 }
 
 export interface ConversationTree {

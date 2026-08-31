@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
+import { Handle, Position, NodeResizer, type NodeProps, type Node } from '@xyflow/react'
 import { Zap, GitBranch, Shield, Square } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useRenderTally } from '../lib/renderTally'
@@ -11,7 +11,7 @@ const RENDERED_TEXT_CAP = 2000
 
 const ringClass: Record<string, string> = { idle: 'ring-2 ring-indigo-500', streaming: 'ring-2 ring-cyan-400 animate-pulse', error: 'ring-2 ring-red-500' }
 
-export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
+export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selected }: NodeProps<Node<TurnNodeData>>) {
   useRenderTally(data.id)
   const addNode = useTreeStore((s) => s.addNode)
   const submitPrompt = useTreeStore((s) => s.submitPrompt)
@@ -51,7 +51,8 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
   }
 
   return (
-    <div className={`w-80 rounded-xl bg-slate-900 border border-slate-700 shadow-xl ${ringClass[data.status] ?? ringClass.idle}`}>
+    <div className={`w-full h-full flex flex-col overflow-hidden rounded-xl bg-slate-900 border border-slate-700 shadow-xl ${ringClass[data.status] ?? ringClass.idle}`}>
+      <NodeResizer minWidth={280} minHeight={200} isVisible={selected} lineClassName="!border-indigo-500" handleClassName="!bg-indigo-500 !border-slate-800" />
       <Handle type="target" position={Position.Top} className="!bg-indigo-500 !border-slate-800" />
 
       {/* System prompt badge */}
@@ -100,7 +101,7 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
 
       {/* Assistant response */}
       {responseText && (
-        <div className="px-3 pb-3 border-t border-slate-700 pt-2">
+        <div className="px-3 pb-3 border-t border-slate-700 pt-2 flex-1 min-h-0 flex flex-col">
           <div className="text-xs text-slate-400 mb-1 font-medium">🤖 Assistant</div>
           {isTruncated && (
             <div className="text-xs text-slate-500 mb-2">
@@ -114,7 +115,7 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
               </button>
             </div>
           )}
-          <div className="max-h-48 overflow-y-auto text-sm text-slate-200 break-words">
+          <div className="flex-1 min-h-0 overflow-y-auto text-sm text-slate-200 break-words">
             <MarkdownContent markdown={visibleText} />
           </div>
         </div>
