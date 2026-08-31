@@ -55,27 +55,45 @@ async function streamGemini(
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 }
+    let buffer = ''
+
+    const processLine = (line: string) => {
+      if (!line.startsWith('data:')) return
+      const json = line.slice(5).trim()
+      if (!json || json === '[DONE]') return
+
+      try {
+        const parsed = JSON.parse(json)
+        const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text
+        if (text) onToken(text)
+        const meta = parsed?.usageMetadata
+        if (meta) {
+          usage = { inputTokens: meta.promptTokenCount ?? 0, outputTokens: meta.candidatesTokenCount ?? 0 }
+        }
+      } catch {
+        const snippet = line.slice(0, 100)
+        onError(new Error(`Malformed stream payload: ${snippet}`))
+      }
+    }
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      for (const line of decoder.decode(value).split('\n')) {
-        if (!line.startsWith('data:')) continue
-        const json = line.slice(5).trim()
-        if (!json || json === '[DONE]') continue
-
-        try {
-          const parsed = JSON.parse(json)
-          const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text
-          if (text) onToken(text)
-          const meta = parsed?.usageMetadata
-          if (meta) {
-            usage = { inputTokens: meta.promptTokenCount ?? 0, outputTokens: meta.candidatesTokenCount ?? 0 }
-          }
-        } catch { /* skip malformed chunks */ }
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      for (let i = 0; i < lines.length - 1; i++) {
+        processLine(lines[i])
       }
+      buffer = lines[lines.length - 1]
     }
+
+    // Final flush of decoder and remaining buffer
+    buffer += decoder.decode()
+    if (buffer) {
+      processLine(buffer)
+    }
+
     onDone(usage)
   } catch (err) {
     if ((err as Error).name !== 'AbortError') onError(err as Error)
@@ -115,22 +133,40 @@ async function streamOllama(
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 }
+    let buffer = ''
+
+    const processLine = (line: string) => {
+      if (!line.trim()) return
+      try {
+        const parsed = JSON.parse(line)
+        if (parsed.message?.content) onToken(parsed.message.content)
+        if (parsed.done) {
+          usage = { inputTokens: parsed.prompt_eval_count ?? 0, outputTokens: parsed.eval_count ?? 0 }
+        }
+      } catch {
+        const snippet = line.slice(0, 100)
+        onError(new Error(`Malformed stream payload: ${snippet}`))
+      }
+    }
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      for (const line of decoder.decode(value).split('\n')) {
-        if (!line.trim()) continue
-        try {
-          const parsed = JSON.parse(line)
-          if (parsed.message?.content) onToken(parsed.message.content)
-          if (parsed.done) {
-            usage = { inputTokens: parsed.prompt_eval_count ?? 0, outputTokens: parsed.eval_count ?? 0 }
-          }
-        } catch { /* skip */ }
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      for (let i = 0; i < lines.length - 1; i++) {
+        processLine(lines[i])
       }
+      buffer = lines[lines.length - 1]
     }
+
+    // Final flush of decoder and remaining buffer
+    buffer += decoder.decode()
+    if (buffer) {
+      processLine(buffer)
+    }
+
     onDone(usage)
   } catch (err) {
     if ((err as Error).name !== 'AbortError') onError(err as Error)
