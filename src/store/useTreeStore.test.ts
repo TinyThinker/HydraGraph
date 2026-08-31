@@ -396,3 +396,65 @@ describe('zombie streaming recovery on load', () => {
     expect(dbIdleNode!.errorMessage).toBeFalsy()
   })
 })
+
+describe('cancel generation', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+    })
+  })
+
+  it('cancels streaming, preserves partial text, and returns to idle', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    const abortSpy = vi.fn()
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, _onError) => {
+        return abortSpy
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    // Submit a prompt (starts streaming)
+    await useTreeStore.getState().submitPrompt(rootId, 'hi')
+
+    // Simulate partial streaming
+    useTreeStore.getState().appendTokenDelta(rootId, 'partial text')
+
+    // Verify we're streaming with partial text
+    expect(useTreeStore.getState().nodes.get(rootId)!.status).toBe('streaming')
+    expect(useTreeStore.getState().nodes.get(rootId)!.assistantResponse).toBe('partial text')
+
+    // Cancel the generation
+    await useTreeStore.getState().cancelGeneration(rootId)
+
+    // Assert: abort was called exactly once
+    expect(abortSpy).toHaveBeenCalledTimes(1)
+
+    // Assert: status is now idle
+    expect(useTreeStore.getState().nodes.get(rootId)!.status).toBe('idle')
+
+    // Assert: partial text is preserved
+    expect(useTreeStore.getState().nodes.get(rootId)!.assistantResponse).toBe('partial text')
+
+    // Assert: DB also reflects idle status and preserved text
+    const dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.status).toBe('idle')
+    expect(dbNode!.assistantResponse).toBe('partial text')
+
+    // Assert: calling cancel again does not throw and abort is still only called once
+    await useTreeStore.getState().cancelGeneration(rootId)
+    expect(abortSpy).toHaveBeenCalledTimes(1)
+  })
+})

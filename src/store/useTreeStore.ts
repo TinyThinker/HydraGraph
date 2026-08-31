@@ -24,6 +24,7 @@ interface TreeStoreActions {
   setActiveTree: (treeId: string) => void
   loadAllTrees: () => Promise<void>
   submitPrompt: (nodeId: string, userPrompt: string) => Promise<() => void>
+  cancelGeneration: (id: string) => Promise<void>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -35,6 +36,9 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 // Module-scope: map of node id → pending flush timer
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+// Module-scope: map of node id → abort function (transient session state, never persisted)
+const abortRegistry = new Map<string, () => void>()
 
 // Schedule a throttled flush for a node id. If a timer already exists,
 // do nothing (the existing timer will write the latest text when it fires).
@@ -248,6 +252,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   finalizeNode: async (id, usage) => {
     // Cancel any pending throttled flush so it cannot fire a stale write after this final write
     cancelThrottledFlush(id)
+    abortRegistry.delete(id)
 
     const existing = get().nodes.get(id)
     if (!existing) return
@@ -285,6 +290,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
     // Clear any stale timer from a previous run so it cannot write into this fresh stream
     cancelThrottledFlush(nodeId)
+    abortRegistry.delete(nodeId)
 
     const payload = resolveContextPayload(nodeId, get().nodes, defaultSystemPrompt)
 
@@ -293,6 +299,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       console.error('[stream error]', err)
       const message = err instanceof Error ? err.message : String(err)
       cancelThrottledFlush(nodeId)
+      abortRegistry.delete(nodeId)
       const currentNode = get().nodes.get(nodeId)
       if (currentNode) {
         await db.nodes.update(nodeId, { status: 'error', assistantResponse: currentNode.assistantResponse, errorMessage: message })
@@ -316,10 +323,37 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         },
       )
 
+      abortRegistry.set(nodeId, abort)
       return abort
     } catch (err) {
       await persistError(err)
       return () => {}
     }
+  },
+
+  cancelGeneration: async (id) => {
+    // Call abort function if registered
+    const abort = abortRegistry.get(id)
+    if (abort) {
+      abort()
+      abortRegistry.delete(id)
+    }
+
+    // Cancel pending throttled flush
+    cancelThrottledFlush(id)
+
+    // Read current node from memory
+    const node = get().nodes.get(id)
+    if (!node) return
+
+    // Update DB with idle status and preserved text
+    await db.nodes.update(id, { status: 'idle', assistantResponse: node.assistantResponse })
+
+    // Update memory immutably
+    set((state) => {
+      const next = new Map(state.nodes)
+      next.set(id, { ...node, status: 'idle' })
+      return { nodes: next }
+    })
   },
 }))

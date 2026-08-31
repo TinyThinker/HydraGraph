@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
-import { Zap, GitBranch, Shield } from 'lucide-react'
+import { Zap, GitBranch, Shield, Square } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import type { TurnNodeData } from '../types'
 
@@ -11,7 +11,7 @@ const ringClass: Record<string, string> = {
 }
 
 export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
-  const { addNode, submitPrompt, settings } = useTreeStore()
+  const { addNode, submitPrompt, cancelGeneration, settings } = useTreeStore()
   const [draft, setDraft] = useState('')
 
   const handleSend = () => {
@@ -53,7 +53,18 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
       <div className="px-3 pt-3 pb-2">
         <div className="text-xs text-slate-400 mb-1 font-medium">👤 User</div>
         {data.userPrompt ? (
-          <p className="text-sm text-slate-200 whitespace-pre-wrap break-words">{data.userPrompt}</p>
+          <div className="space-y-2">
+            <p className="text-sm text-slate-200 whitespace-pre-wrap break-words">{data.userPrompt}</p>
+            {data.status === 'streaming' && (
+              <button
+                onClick={() => cancelGeneration(data.id)}
+                className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-medium py-1.5 rounded-lg transition-colors nodrag flex items-center justify-center gap-2"
+              >
+                <Square size={12} />
+                Cancel
+              </button>
+            )}
+          </div>
         ) : (
           <div className="space-y-2">
             <textarea
