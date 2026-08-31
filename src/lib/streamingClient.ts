@@ -1,18 +1,28 @@
-import type { ContextResolutionResult, AppSettings, TokenUsage } from '../types'
+import type { ContextResolutionResult, AppSettings, TokenUsage, LLMProvider } from '../types'
 
 export async function streamLLMResponse(
   payload: ContextResolutionResult,
   settings: AppSettings,
+  target: { provider: LLMProvider; model?: string },
   onToken: (chunk: string) => void,
   onDone: (usage: TokenUsage) => void,
   onError: (err: Error) => void,
 ): Promise<() => void> {
   const controller = new AbortController()
+  const provider = target.provider
+  const model = target.model || settings.defaultModel
 
-  if (settings.geminiApiKey) {
-    streamGemini(payload, settings, controller, onToken, onDone, onError)
+  if (provider === 'gemini') {
+    streamGemini(payload, settings, model, controller, onToken, onDone, onError)
+  } else if (provider === 'ollama') {
+    streamOllama(payload, settings, model, controller, onToken, onDone, onError)
+  } else if (provider === 'openrouter') {
+    // OpenRouter client not yet implemented
+    onError(new Error('OpenRouter client not yet implemented'))
+    return () => controller.abort()
   } else {
-    streamOllama(payload, settings, controller, onToken, onDone, onError)
+    onError(new Error(`Unknown provider: ${provider}`))
+    return () => controller.abort()
   }
 
   return () => controller.abort()
@@ -21,12 +31,12 @@ export async function streamLLMResponse(
 async function streamGemini(
   payload: ContextResolutionResult,
   settings: AppSettings,
+  model: string,
   controller: AbortController,
   onToken: (chunk: string) => void,
   onDone: (usage: TokenUsage) => void,
   onError: (err: Error) => void,
 ) {
-  const model = settings.defaultModel || 'gemini-2.5-flash'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`
 
   // Gemini uses 'model' not 'assistant' for role
@@ -111,6 +121,7 @@ async function streamGemini(
 async function streamOllama(
   payload: ContextResolutionResult,
   settings: AppSettings,
+  model: string,
   controller: AbortController,
   onToken: (chunk: string) => void,
   onDone: (usage: TokenUsage) => void,
@@ -123,7 +134,7 @@ async function streamOllama(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: settings.defaultModel,
+        model,
         messages: [
           { role: 'system', content: payload.systemPrompt },
           ...payload.messages.map((m) => ({ role: m.role, content: m.content })),

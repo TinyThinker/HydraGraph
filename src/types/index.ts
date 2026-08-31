@@ -1,4 +1,5 @@
 export type NodeStatus = 'idle' | 'streaming' | 'error'
+export type LLMProvider = 'gemini' | 'openrouter' | 'ollama'
 
 export interface TurnNode {
   id: string
@@ -16,6 +17,7 @@ export interface TurnNode {
   inputTokens?: number
   outputTokens?: number
   timestamp: number
+  provider?: LLMProvider
 }
 
 export interface ConversationTree {
@@ -34,6 +36,7 @@ export interface AppSettings {
   ollamaBaseUrl: string
   defaultModel: string
   activeTreeId?: string
+  provider: LLMProvider
 }
 
 export interface TokenUsage {

@@ -41,6 +41,7 @@ describe('streamingClient', () => {
     geminiApiKey: 'test-key',
     ollamaBaseUrl: 'http://localhost:11434',
     defaultModel: 'gemini-2.5-flash',
+    provider: 'gemini',
   }
 
   const testPayload: ContextResolutionResult = {
@@ -71,6 +72,7 @@ describe('streamingClient', () => {
       streamLLMResponse(
         testPayload,
         testSettings,
+        { provider: 'gemini', model: 'gemini-2.5-flash' },
         onToken,
         () => {
           doneCount++
@@ -128,6 +130,7 @@ describe('streamingClient', () => {
       streamLLMResponse(
         testPayload,
         testSettings,
+        { provider: 'gemini', model: 'gemini-2.5-flash' },
         onToken,
         () => {
           doneCount++
@@ -167,6 +170,7 @@ describe('streamingClient', () => {
       streamLLMResponse(
         testPayload,
         testSettings,
+        { provider: 'gemini', model: 'gemini-2.5-flash' },
         onToken,
         () => {
           doneCount++
@@ -208,6 +212,7 @@ describe('streamingClient', () => {
       streamLLMResponse(
         testPayload,
         testSettings,
+        { provider: 'gemini', model: 'gemini-2.5-flash' },
         onToken,
         () => {
           doneCount++
@@ -249,6 +254,7 @@ describe('streamingClient', () => {
       streamLLMResponse(
         testPayload,
         testSettings,
+        { provider: 'gemini', model: 'gemini-2.5-flash' },
         onToken,
         () => {
           doneCount++
@@ -291,6 +297,7 @@ describe('streamingClient', () => {
       streamLLMResponse(
         testPayload,
         testSettings,
+        { provider: 'gemini', model: 'gemini-2.5-flash' },
         onToken,
         () => {
           doneCount++
@@ -334,6 +341,7 @@ describe('streamingClient', () => {
       streamLLMResponse(
         testPayload,
         testSettings,
+        { provider: 'gemini', model: 'gemini-2.5-flash' },
         onToken,
         (usage) => {
           capturedUsage = usage
@@ -369,6 +377,7 @@ describe('streamingClient', () => {
       geminiApiKey: 'SECRET-KEY-VALUE',
       ollamaBaseUrl: 'http://localhost:11434',
       defaultModel: 'gemini-2.5-flash',
+      provider: 'gemini',
     }
 
     const onToken = (chunk: string) => {
@@ -383,6 +392,7 @@ describe('streamingClient', () => {
       streamLLMResponse(
         testPayload,
         secretSettings,
+        { provider: 'gemini', model: 'gemini-2.5-flash' },
         onToken,
         () => {
           doneCount++
@@ -404,5 +414,82 @@ describe('streamingClient', () => {
     expect(url).not.toContain('key=')
     expect(init.headers['x-goog-api-key']).toBe('SECRET-KEY-VALUE')
     expect(init.headers['Content-Type']).toBe('application/json')
+  })
+
+  it('routes to Ollama when target.provider is ollama even though a Gemini key is present', async () => {
+    const ollamaLineChunk1 = '{"message":{"content":"hi"},"done":false}\n'
+    const ollamaLineChunk2 = '{"done":true,"prompt_eval_count":1,"eval_count":1}\n'
+    const frameBytes = new TextEncoder().encode(ollamaLineChunk1 + ollamaLineChunk2)
+
+    const fakeResponse = createFakeResponse([frameBytes])
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const tokens: string[] = []
+    const errors: Error[] = []
+    let doneCount = 0
+
+    const onToken = (chunk: string) => {
+      tokens.push(chunk)
+    }
+
+    const onError = (err: Error) => {
+      errors.push(err)
+    }
+
+    const done = new Promise<void>((resolve) => {
+      streamLLMResponse(
+        testPayload,
+        testSettings,
+        { provider: 'ollama', model: 'llama3' },
+        onToken,
+        () => {
+          doneCount++
+          resolve()
+        },
+        onError,
+      )
+    })
+
+    await done
+
+    expect(doneCount).toBe(1)
+    expect(errors).toHaveLength(0)
+    expect(tokens.join('')).toBe('hi')
+
+    const [url, init] = fetchMock.mock.calls[0]
+
+    expect(url).toContain('/api/chat')
+    expect(url).not.toContain('generativelanguage.googleapis.com')
+    const body = JSON.parse(init.body)
+    expect(body.model).toBe('llama3')
+  })
+
+  it('reports not-implemented for the openrouter provider', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const errors: Error[] = []
+    let doneCount = 0
+
+    const onError = (err: Error) => {
+      errors.push(err)
+    }
+
+    await streamLLMResponse(
+      testPayload,
+      testSettings,
+      { provider: 'openrouter' },
+      () => {},
+      () => {
+        doneCount++
+      },
+      onError,
+    )
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0].message).toContain('OpenRouter client not yet implemented')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(doneCount).toBe(0)
   })
 })

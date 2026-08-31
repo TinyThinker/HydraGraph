@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   id: 'global_settings',
   ollamaBaseUrl: 'http://localhost:11434',
   defaultModel: 'gemini-2.5-flash',
+  provider: 'gemini',
 }
 
 export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get) => ({
@@ -50,9 +51,22 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   },
 
   saveSettings: async (patch) => {
-    const updated = { ...get().settings, ...patch }
-    await db.settings.put(updated)
-    set({ settings: updated })
+    const current = get().settings
+    const merged = { ...current, ...patch }
+
+    // Derive provider if not explicitly provided in patch
+    if (!patch.provider) {
+      if (merged.geminiApiKey) {
+        merged.provider = 'gemini'
+      } else if (merged.ollamaBaseUrl) {
+        merged.provider = 'ollama'
+      } else {
+        merged.provider = current.provider
+      }
+    }
+
+    await db.settings.put(merged)
+    set({ settings: merged })
   },
 
   loadAllTrees: async () => {
@@ -193,8 +207,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     // Persist prompt + set streaming status
     const existing = nodes.get(nodeId)
     if (!existing) return () => {}
-    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '' }
-    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '' })
+    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: settings.provider }
+    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: settings.provider })
     set((state) => {
       const next = new Map(state.nodes)
       next.set(nodeId, updated)
@@ -203,17 +217,24 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
     const payload = resolveContextPayload(nodeId, get().nodes, defaultSystemPrompt)
 
-    const abort = await streamLLMResponse(
-      payload,
-      settings,
-      (chunk) => appendTokenDelta(nodeId, chunk),
-      (usage) => finalizeNode(nodeId, usage),
-      (err) => {
-        console.error('[stream error]', err)
-        setNodeStatus(nodeId, 'error')
-      },
-    )
+    try {
+      const abort = await streamLLMResponse(
+        payload,
+        settings,
+        { provider: settings.provider, model: existing.modelUsed || settings.defaultModel },
+        (chunk) => appendTokenDelta(nodeId, chunk),
+        (usage) => finalizeNode(nodeId, usage),
+        (err) => {
+          console.error('[stream error]', err)
+          setNodeStatus(nodeId, 'error')
+        },
+      )
 
-    return abort
+      return abort
+    } catch (err) {
+      console.error('[stream error]', err)
+      setNodeStatus(nodeId, 'error')
+      return () => {}
+    }
   },
 }))

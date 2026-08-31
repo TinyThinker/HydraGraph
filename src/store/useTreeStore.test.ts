@@ -35,6 +35,7 @@ describe('useTreeStore', () => {
         id: 'global_settings',
         ollamaBaseUrl: 'http://localhost:11434',
         defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
       },
     })
   })
