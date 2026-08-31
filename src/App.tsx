@@ -1,21 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './index.css'
 import { useTreeStore } from './store/useTreeStore'
 import { Canvas } from './components/Canvas'
 
 export default function App() {
-  const { loadSettings, loadAllTrees, loadTree, createTree } = useTreeStore()
+  const bootedRef = useRef(false)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    if (bootedRef.current) return
+    bootedRef.current = true
+
     async function boot() {
+      const { loadSettings, loadAllTrees, loadTree, createTree } = useTreeStore.getState()
       await loadSettings()
       await loadAllTrees()
       const { settings } = useTreeStore.getState()
       if (settings.activeTreeId) {
         await loadTree(settings.activeTreeId)
       } else {
-        await createTree('New Research')
+        const freshState = useTreeStore.getState()
+        if (!freshState.settings.activeTreeId && !freshState.activeTreeId) {
+          await createTree('New Research')
+        }
       }
       setReady(true)
     }
