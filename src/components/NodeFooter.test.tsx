@@ -212,4 +212,53 @@ describe('NodeFooter', () => {
     expect(deleteButton).toBeDisabled()
     expect(deleteButton).toHaveClass('text-slate-700')
   })
+
+  it('clicking the model badge opens the picker', async () => {
+    const r = createNode({ id: 'r', parentId: null, modelUsed: 'gemini-2.5-flash' })
+
+    useTreeStore.setState({
+      nodes: new Map([['r', r]]),
+    })
+
+    render(
+      <ReactFlowProvider>
+        <NodeFooter node={r as any} />
+      </ReactFlowProvider>
+    )
+
+    // Initially, picker should not be visible
+    expect(screen.queryByText('Model for this node')).not.toBeInTheDocument()
+
+    // Click model badge button
+    const modelButton = screen.getByTitle('Change the model for this node')
+    await act(async () => {
+      fireEvent.click(modelButton)
+    })
+
+    // Now picker should be visible
+    expect(screen.getByText('Model for this node')).toBeInTheDocument()
+  })
+
+  it('the model badge is disabled while streaming', () => {
+    const r = createNode({ id: 'r', parentId: null, status: 'streaming' })
+
+    useTreeStore.setState({
+      nodes: new Map([['r', r]]),
+    })
+
+    render(
+      <ReactFlowProvider>
+        <NodeFooter node={r as any} />
+      </ReactFlowProvider>
+    )
+
+    // Assert model button is disabled
+    const modelButton = screen.getByTitle('Change the model for this node')
+    expect(modelButton).toBeDisabled()
+    expect(modelButton).toHaveClass('opacity-50')
+    expect(modelButton).toHaveClass('cursor-not-allowed')
+
+    // Assert picker is NOT visible (clicking disabled button does nothing)
+    expect(screen.queryByText('Model for this node')).not.toBeInTheDocument()
+  })
 })

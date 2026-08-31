@@ -579,6 +579,25 @@ describe('regenerate and edit prompts', () => {
     expect(node.status).toBe('streaming')
   })
 
+  it('submitPrompt requests the node\'s own modelUsed', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(async () => () => {})
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    // Update node with a custom model
+    await useTreeStore.getState().updateNode(rootId, { modelUsed: 'special-model-v9' })
+
+    // Submit prompt
+    await useTreeStore.getState().submitPrompt(rootId, 'hi')
+
+    // Assert: streamLLMResponse was called with the node's custom model
+    expect(vi.mocked(streamLLMResponse)).toHaveBeenCalledTimes(1)
+    const call = vi.mocked(streamLLMResponse).mock.calls[0]
+    expect(call[2]).toEqual({ provider: 'gemini', model: 'special-model-v9' })
+  })
+
   it('editing/regenerating a parent leaves its children in place', async () => {
     const { streamLLMResponse } = await import('../lib/streamingClient')
     vi.mocked(streamLLMResponse).mockImplementation(

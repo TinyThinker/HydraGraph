@@ -2,11 +2,13 @@ import { memo, useState } from 'react'
 import { Trash2, GitBranch, Zap, Shield } from 'lucide-react'
 import { useTreeStore, collectSubtreeIds } from '../store/useTreeStore'
 import { SystemPromptEditor } from './SystemPromptEditor'
+import { ModelPicker } from './ModelPicker'
 import type { TurnNodeData } from '../types'
 
 export const NodeFooter = memo(function NodeFooter({ node }: { node: TurnNodeData }) {
   const [confirmCount, setConfirmCount] = useState<number | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const deleteNodeSubtree = useTreeStore((s) => s.deleteNodeSubtree)
   const addNode = useTreeStore((s) => s.addNode)
   const defaultModel = useTreeStore((s) => s.settings.defaultModel)
@@ -57,10 +59,19 @@ export const NodeFooter = memo(function NodeFooter({ node }: { node: TurnNodeDat
 
       {/* Footer */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-slate-700">
-        <span className="flex items-center gap-1 text-xs text-slate-500">
+        <button
+          onClick={() => setModelPickerOpen((v) => !v)}
+          disabled={node.status === 'streaming'}
+          title="Change the model for this node"
+          className={`flex items-center gap-1 text-xs nodrag transition-colors ${
+            node.status === 'streaming'
+              ? 'opacity-50 cursor-not-allowed text-slate-500'
+              : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
           <Zap size={10} />
           {node.modelUsed}
-        </span>
+        </button>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setEditorOpen(!editorOpen)}
@@ -93,6 +104,9 @@ export const NodeFooter = memo(function NodeFooter({ node }: { node: TurnNodeDat
 
       {/* System prompt editor overlay */}
       {editorOpen && <SystemPromptEditor node={node} onClose={() => setEditorOpen(false)} />}
+
+      {/* Model picker overlay */}
+      {modelPickerOpen && <ModelPicker node={node} onClose={() => setModelPickerOpen(false)} />}
     </>
   )
 })
