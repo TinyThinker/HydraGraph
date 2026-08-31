@@ -112,3 +112,49 @@ listed as PENDING HUMAN in the Phase 2 summary:**
 markdown/code rendering, collapse/expand, system-prompt override editing, per-node model
 picker UI, provider-picker UI, auto-layout, tree switcher / search / export / import,
 node edit / retry / regenerate / delete, resizable cards.
+
+---
+
+## Phase 3 Update (2026-08-31) — "The Render Path"
+
+Branch `re-engineer`, commits `74002b3`..`1dff557`. Full detail and grades in
+`docs/re-engineer-phase-3.md`. `npm run check` passes with 34 tests.
+
+**The "Whole-canvas re-render on every streamed token" defect above is fixed.** Headless
+measurement (`src/lib/renderTally.measure.test.tsx`, `src/components/renderBudget.test.tsx`):
+streaming 20 tokens into one node used to re-render every card 20 times and the streaming
+card 40 times; it now re-renders **zero** other cards and the streaming card once per token.
+Repositioning one node re-renders only that card.
+
+- **Render-cost harness (dev-only)** — `src/lib/renderTally.ts`: per-node render counter on
+  `window.__hydraRenderTally`, plus a 50-node bushy-tree seeder on
+  `window.__hydraSeedFiftyNodes`. Both gated by `import.meta.env.DEV` (tree-shaken from prod).
+- **Narrow store selectors** — no component subscribes to the whole store any more; `Canvas`
+  and `TurnNode` select only the slices/actions they use.
+- **Live streaming text off node identity** — a separate `liveText: Map<string,string>` in the
+  store holds in-flight response text; `appendTokenDelta` writes only there, leaving the `nodes`
+  map and every node object untouched during a stream. Terminal paths (finalize / cancel /
+  error) write the final text into the node once and delete the `liveText` entry. The throttled
+  incremental DB writer now reads from `liveText`, so T2.7 durability is preserved.
+- **Stable derived arrays** — `Canvas` caches each React Flow node wrapper by id and reuses it
+  while the node's store object is unchanged; edges are derived from a structure-only key, so a
+  position change never rebuilds them.
+- **Drag-vs-store sync** — the drag no longer drops store updates: every store change is
+  accepted, only the dragged node keeps its local position, and the final position is written
+  immediately on drag stop so there is no snap. A response streaming into a node keeps updating
+  while that node is dragged.
+- **Canvas timer cleanup** — pending position-write timers are flushed and cleared on unmount.
+- **Bounded card text** — a card renders at most 2,000 characters (the tail) of a response,
+  with a truncation notice and a disabled "Open full text" control; stored text is never
+  truncated.
+- **Regression lock** — `src/components/renderBudget.test.tsx` fails if an unselected
+  whole-store subscription is reintroduced or if the text cap breaks.
+
+**PENDING HUMAN (need a browser):** 50-node frame-rate/smoothness under a live stream;
+drag-while-streaming with no snap on release; the drag-then-unmount race. Steps in
+`docs/re-engineer-phase-3.md` → Outstanding.
+
+**Still absent (Phase 4+):** markdown/code rendering, resizable cards, full-text reader panel,
+node edit / retry / regenerate / delete, mark-descendants-stale, system-prompt override
+editing, collapse/expand, per-node model picker UI, provider-picker UI, auto-layout, tree
+switcher / search / export / import.
