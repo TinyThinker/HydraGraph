@@ -14,7 +14,6 @@ import type { TurnNodeData } from '../types'
 import { TurnNodeComponent } from './TurnNode'
 
 const nodeTypes = { turnNode: TurnNodeComponent }
-
 // Pure helper: accept every store update, but keep the dragged node's live
 // local position instead of the (stale) stored one.
 function mergeDragPosition(
@@ -27,12 +26,17 @@ function mergeDragPosition(
   if (!localPos) return incoming
   return incoming.map((n) => (n.id === dragId ? { ...n, position: localPos } : n))
 }
+type TimerEntry = {
+  timer: ReturnType<typeof setTimeout>
+  x: number
+  y: number
+}
 
 export function Canvas() {
   const nodes = useTreeStore((s) => s.nodes)
   const updateNode = useTreeStore((s) => s.updateNode)
   const draggingIdRef = useRef<string | null>(null)
-  const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const debounceTimers = useRef<Map<string, TimerEntry>>(new Map())
   const nodeWrapperCache = useRef<Map<string, Node<TurnNodeData>>>(new Map())
 
   // Reuse each node's RF wrapper object while its store object is unchanged, so
@@ -61,6 +65,17 @@ export function Canvas() {
   useEffect(() => {
     setLocalNodes((prev) => mergeDragPosition(rfNodesFromStore, prev, draggingIdRef.current))
   }, [rfNodesFromStore])
+  // Cleanup timers on unmount: flush pending positions and clear timers.
+  useEffect(() => {
+    const timers = debounceTimers.current
+    return () => {
+      for (const [id, entry] of timers.entries()) {
+        useTreeStore.getState().updateNode(id, { positionX: entry.x, positionY: entry.y })
+        clearTimeout(entry.timer)
+      }
+      timers.clear()
+    }
+  }, [])
 
   const structureKey = useMemo(
     () =>
@@ -70,7 +85,6 @@ export function Canvas() {
         .join('|'),
     [nodes],
   )
-
   // Edges are derived purely from the structure key, so they keep a stable
   // reference until the parent/child structure actually changes.
   const edges = useMemo(
@@ -89,7 +103,6 @@ export function Canvas() {
         })),
     [structureKey],
   )
-
   const onNodesChange = useCallback(
     (changes: NodeChange<Node<TurnNodeData>>[]) => {
       // Apply immediately for smooth drag — no waiting on store/Dexie
@@ -99,18 +112,17 @@ export function Canvas() {
         if (change.type === 'position' && change.position) {
           const { id, position } = change
           const existing = debounceTimers.current.get(id)
-          if (existing) clearTimeout(existing)
+          if (existing) clearTimeout(existing.timer)
           const timer = setTimeout(() => {
             updateNode(id, { positionX: position.x, positionY: position.y })
             debounceTimers.current.delete(id)
           }, 300)
-          debounceTimers.current.set(id, timer)
+          debounceTimers.current.set(id, { timer, x: position.x, y: position.y })
         }
       }
     },
     [updateNode],
   )
-
   return (
     <div className="w-full h-full">
       <ReactFlow
@@ -121,7 +133,7 @@ export function Canvas() {
         onNodeDragStart={(_event, node) => { draggingIdRef.current = node.id }}
         onNodeDragStop={(_event, node) => {
           const existing = debounceTimers.current.get(node.id)
-          if (existing) clearTimeout(existing)
+          if (existing) clearTimeout(existing.timer)
           updateNode(node.id, { positionX: node.position.x, positionY: node.position.y })
           debounceTimers.current.delete(node.id)
           draggingIdRef.current = null
