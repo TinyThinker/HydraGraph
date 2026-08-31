@@ -956,6 +956,119 @@ describe('delete node and subtree', () => {
     expect(liveText.has(bId)).toBe(false)
   })
 
+  describe('relayoutActiveTree', () => {
+    it('relayouts all nodes and updates positions in memory and DB', async () => {
+      const { layoutTree } = await import('../lib/autoLayout')
+
+      const tree = await useTreeStore.getState().createTree('Test Tree')
+      const treeId = tree.id
+      const rootId = tree.rootNodeId
+
+      // Build tree: root + 2 children + 1 grandchild with scrambled positions
+      const childAId = crypto.randomUUID()
+      const childBId = crypto.randomUUID()
+      const grandchildId = crypto.randomUUID()
+
+      const childA = createNode({
+        id: childAId,
+        treeId,
+        parentId: rootId,
+        positionX: 100,
+        positionY: 100,
+      })
+      const childB = createNode({
+        id: childBId,
+        treeId,
+        parentId: rootId,
+        positionX: 100,
+        positionY: 100,
+      })
+      const grandchild = createNode({
+        id: grandchildId,
+        treeId,
+        parentId: childAId,
+        positionX: 100,
+        positionY: 100,
+      })
+
+      await useTreeStore.getState().addNode(childA)
+      await useTreeStore.getState().addNode(childB)
+      await useTreeStore.getState().addNode(grandchild)
+
+      // Set activeTreeId
+      useTreeStore.setState({ activeTreeId: treeId })
+
+      // Get the expected positions from layoutTree
+      const allNodes = useTreeStore.getState().nodes
+      const expectedPositions = layoutTree(allNodes)
+
+      // Call relayoutActiveTree
+      await useTreeStore.getState().relayoutActiveTree()
+
+      // Assert: all nodes in memory have been repositioned
+      const memNodes = useTreeStore.getState().nodes
+      for (const [id, expected] of expectedPositions) {
+        const node = memNodes.get(id)
+        expect(node).toBeDefined()
+        expect(node!.positionX).toBe(expected.x)
+        expect(node!.positionY).toBe(expected.y)
+      }
+
+      // Assert: all nodes in DB have been repositioned
+      for (const [id, expected] of expectedPositions) {
+        const dbNode = await db.nodes.get(id)
+        expect(dbNode).toBeDefined()
+        expect(dbNode!.positionX).toBe(expected.x)
+        expect(dbNode!.positionY).toBe(expected.y)
+      }
+
+      // Assert: fitViewNonce was incremented
+      expect(useTreeStore.getState().fitViewNonce).toBe(1)
+    })
+
+    it('does not change tree updatedAt', async () => {
+      const tree = await useTreeStore.getState().createTree('Test Tree')
+      const treeId = tree.id
+
+      // Put the tree in DB and get its updatedAt
+      const originalTree = await db.trees.get(treeId)
+      expect(originalTree).toBeDefined()
+      const originalUpdatedAt = originalTree!.updatedAt
+
+      // Set activeTreeId
+      useTreeStore.setState({ activeTreeId: treeId })
+
+      // Run relayout
+      await useTreeStore.getState().relayoutActiveTree()
+
+      // Read tree from DB and assert updatedAt is unchanged
+      const treeAfter = await db.trees.get(treeId)
+      expect(treeAfter!.updatedAt).toBe(originalUpdatedAt)
+    })
+
+    it('is a no-op when activeTreeId is null', async () => {
+      await useTreeStore.getState().createTree('Test Tree')
+      useTreeStore.setState({ activeTreeId: null })
+
+      const nonceBefore = useTreeStore.getState().fitViewNonce
+      await useTreeStore.getState().relayoutActiveTree()
+      const nonceAfter = useTreeStore.getState().fitViewNonce
+
+      expect(nonceAfter).toBe(nonceBefore)
+    })
+
+    it('is a no-op when nodes map is empty', async () => {
+      const tree = await useTreeStore.getState().createTree('Test Tree')
+      useTreeStore.setState({ activeTreeId: tree.id, nodes: new Map() })
+
+      const nonceBefore = useTreeStore.getState().fitViewNonce
+      await useTreeStore.getState().relayoutActiveTree()
+      const nonceAfter = useTreeStore.getState().fitViewNonce
+
+      expect(nonceAfter).toBe(nonceBefore)
+    })
+  })
+
   describe('mark descendants stale', () => {
     it('editing/regenerating a node marks every descendant stale', async () => {
       const { streamLLMResponse } = await import('../lib/streamingClient')

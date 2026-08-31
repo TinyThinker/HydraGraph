@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { db } from '../db/ChatDatabase'
 import { resolveContextPayload } from '../lib/contextEngine'
 import { streamLLMResponse } from '../lib/streamingClient'
-import { computeChildPosition } from '../lib/autoLayout'
+import { computeChildPosition, layoutTree } from '../lib/autoLayout'
 import type { TurnNode, ConversationTree, AppSettings, NodeStatus, TokenUsage } from '../types'
 
 interface TreeStoreState {
@@ -11,6 +11,7 @@ interface TreeStoreState {
   activeTreeId: string | null
   settings: AppSettings
   liveText: Map<string, string>
+  fitViewNonce: number
 }
 
 interface TreeStoreActions {
@@ -30,6 +31,7 @@ interface TreeStoreActions {
   deleteNodeSubtree: (id: string) => Promise<void>
   markDescendantsStale: (id: string) => Promise<void>
   toggleCollapse: (id: string) => Promise<void>
+  relayoutActiveTree: () => Promise<void>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -102,6 +104,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   activeTreeId: null,
   settings: DEFAULT_SETTINGS,
   liveText: new Map(),
+  fitViewNonce: 0,
 
   loadSettings: async () => {
     const saved = await db.settings.get('global_settings')
@@ -518,6 +521,32 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       const n = m.get(id)
       if (n) m.set(id, { ...n, isCollapsed: nextVal })
       return { nodes: m }
+    })
+  },
+
+  relayoutActiveTree: async () => {
+    const { nodes, activeTreeId } = get()
+    if (!activeTreeId || nodes.size === 0) return
+
+    const positions = layoutTree(nodes)
+
+    // Persist every position in one transaction
+    await db.transaction('rw', [db.nodes], async () => {
+      for (const [id, pos] of positions) {
+        await db.nodes.update(id, { positionX: pos.x, positionY: pos.y })
+      }
+    })
+
+    // Update memory immutably
+    set((state) => {
+      const nextNodes = new Map(state.nodes)
+      for (const [id, pos] of positions) {
+        const node = nextNodes.get(id)
+        if (node) {
+          nextNodes.set(id, { ...node, positionX: pos.x, positionY: pos.y })
+        }
+      }
+      return { nodes: nextNodes, fitViewNonce: state.fitViewNonce + 1 }
     })
   },
 }))
