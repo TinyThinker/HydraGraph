@@ -12,7 +12,6 @@
     "check": "tsc -b && npm run lint && npm run test"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@xyflow/react": "^12.11.2",
     "dexie": "^4.4.4",
     "lucide-react": "^1.27.0",
