@@ -27,6 +27,7 @@ interface TreeStoreActions {
   submitPrompt: (nodeId: string, userPrompt: string) => Promise<() => void>
   cancelGeneration: (id: string) => Promise<void>
   deleteNodeSubtree: (id: string) => Promise<void>
+  markDescendantsStale: (id: string) => Promise<void>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -308,12 +309,12 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     const tree = activeTreeId ? await db.trees.get(activeTreeId) : null
     const defaultSystemPrompt = tree?.defaultSystemPrompt ?? 'You are a helpful AI research assistant.'
 
-    // Persist prompt + set streaming status
+    // Persist prompt + set streaming status + clear stale flag on the target
     const existing = nodes.get(nodeId)
     if (!existing) return () => {}
     if (existing.status === 'streaming') return () => {}
-    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: settings.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined }
-    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: settings.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined })
+    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: settings.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false }
+    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: settings.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false })
     set((state) => {
       const next = new Map(state.nodes)
       next.set(nodeId, updated)
@@ -326,6 +327,9 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     // Clear any stale timer from a previous run so it cannot write into this fresh stream
     cancelThrottledFlush(nodeId)
     abortRegistry.delete(nodeId)
+
+    // Mark all descendants as stale
+    await get().markDescendantsStale(nodeId)
 
     const payload = resolveContextPayload(nodeId, get().nodes, defaultSystemPrompt)
 
@@ -459,5 +463,37 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     if (get().activeTreeId) {
       await db.trees.update(get().activeTreeId!, { updatedAt: Date.now() })
     }
+  },
+
+  markDescendantsStale: async (id) => {
+    const nodes = get().nodes
+    const subtree = collectSubtreeIds(id, nodes)
+    subtree.delete(id) // Only mark descendants, not the target itself
+
+    const toMark = [...subtree].filter((d) => {
+      const n = nodes.get(d)
+      return !!n && !n.stale
+    })
+
+    if (toMark.length === 0) return
+
+    // Persist to DB
+    await db.transaction('rw', [db.nodes], async () => {
+      for (const d of toMark) {
+        await db.nodes.update(d, { stale: true })
+      }
+    })
+
+    // Update memory immutably
+    set((state) => {
+      const next = new Map(state.nodes)
+      for (const d of toMark) {
+        const n = next.get(d)
+        if (n) {
+          next.set(d, { ...n, stale: true })
+        }
+      }
+      return { nodes: next }
+    })
   },
 }))

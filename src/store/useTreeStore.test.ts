@@ -24,6 +24,7 @@ function createNode(overrides: Partial<TurnNode>): TurnNode {
     modelUsed: overrides.modelUsed ?? 'test-model',
     timestamp: overrides.timestamp ?? Date.now(),
     systemPromptOverride: overrides.systemPromptOverride,
+    stale: overrides.stale,
   }
 }
 
@@ -861,5 +862,123 @@ describe('delete node and subtree', () => {
     const liveText = useTreeStore.getState().liveText
     expect(liveText.has(aId)).toBe(false)
     expect(liveText.has(bId)).toBe(false)
+  })
+
+  describe('mark descendants stale', () => {
+    it('editing/regenerating a node marks every descendant stale', async () => {
+      const { streamLLMResponse } = await import('../lib/streamingClient')
+      vi.mocked(streamLLMResponse).mockImplementation(
+        async (_payload, _settings, _target, _onToken, _onDone, _onError) => {
+          return () => {}
+        }
+      )
+
+      const tree = await useTreeStore.getState().createTree('My Tree')
+      const r = tree.rootNodeId
+
+      // Build tree: r has children a and c; a has child b
+      const a = crypto.randomUUID()
+      const b = crypto.randomUUID()
+      const c = crypto.randomUUID()
+
+      await useTreeStore.getState().addNode(createNode({ id: a, treeId: tree.id, parentId: r, childrenIds: [b] }))
+      await useTreeStore.getState().addNode(createNode({ id: b, treeId: tree.id, parentId: a, childrenIds: [] }))
+      await useTreeStore.getState().addNode(createNode({ id: c, treeId: tree.id, parentId: r, childrenIds: [] }))
+
+      // Submit prompt on r
+      await useTreeStore.getState().submitPrompt(r, 'edited prompt')
+
+      // Assert: a, b, c are all stale in memory
+      expect(useTreeStore.getState().nodes.get(a)!.stale).toBe(true)
+      expect(useTreeStore.getState().nodes.get(b)!.stale).toBe(true)
+      expect(useTreeStore.getState().nodes.get(c)!.stale).toBe(true)
+
+      // Assert: r itself is NOT stale (the target is cleared, never marked)
+      expect(useTreeStore.getState().nodes.get(r)!.stale).toBeFalsy()
+
+      // Assert: DB also has stale=true for descendants
+      expect((await db.nodes.get(a))!.stale).toBe(true)
+      expect((await db.nodes.get(b))!.stale).toBe(true)
+      expect((await db.nodes.get(c))!.stale).toBe(true)
+
+      // Assert: a, b, c status is still idle (NOT auto-regenerated)
+      expect(useTreeStore.getState().nodes.get(a)!.status).toBe('idle')
+      expect(useTreeStore.getState().nodes.get(b)!.status).toBe('idle')
+      expect(useTreeStore.getState().nodes.get(c)!.status).toBe('idle')
+    })
+
+    it('regenerating a node clears its own stale and marks its descendants', async () => {
+      const { streamLLMResponse } = await import('../lib/streamingClient')
+      vi.mocked(streamLLMResponse).mockImplementation(
+        async (_payload, _settings, _target, _onToken, _onDone, _onError) => {
+          return () => {}
+        }
+      )
+
+      const tree = await useTreeStore.getState().createTree('My Tree')
+      const r = tree.rootNodeId
+
+      const a = crypto.randomUUID()
+      const b = crypto.randomUUID()
+      const c = crypto.randomUUID()
+
+      await useTreeStore.getState().addNode(createNode({ id: a, treeId: tree.id, parentId: r, childrenIds: [b] }))
+      await useTreeStore.getState().addNode(createNode({ id: b, treeId: tree.id, parentId: a, childrenIds: [] }))
+      await useTreeStore.getState().addNode(createNode({ id: c, treeId: tree.id, parentId: r, childrenIds: [] }))
+
+      // Manually set a.stale = true and b.stale = false
+      await useTreeStore.getState().updateNode(a, { stale: true })
+      await useTreeStore.getState().updateNode(b, { stale: false })
+
+      // Regenerate a
+      await useTreeStore.getState().submitPrompt(a, 'q')
+
+      // Assert: a.stale is falsy (cleared by submitPrompt)
+      expect(useTreeStore.getState().nodes.get(a)!.stale).toBeFalsy()
+      expect((await db.nodes.get(a))!.stale).toBeFalsy()
+
+      // Assert: b.stale is now true (descendant marked)
+      expect(useTreeStore.getState().nodes.get(b)!.stale).toBe(true)
+      expect((await db.nodes.get(b))!.stale).toBe(true)
+
+      // Assert: c is unaffected (not under a)
+      expect(useTreeStore.getState().nodes.get(c)!.stale).toBeFalsy()
+      expect((await db.nodes.get(c))!.stale).toBeFalsy()
+    })
+
+    it('markDescendantsStale on a leaf is a no-op', async () => {
+      const tree = await useTreeStore.getState().createTree('My Tree')
+      const r = tree.rootNodeId
+
+      const a = crypto.randomUUID()
+      await useTreeStore.getState().addNode(createNode({ id: a, treeId: tree.id, parentId: r, childrenIds: [] }))
+
+      // Mark a (leaf) as stale — should not throw and mark nothing
+      await useTreeStore.getState().markDescendantsStale(a)
+
+      // Assert: a itself is unchanged
+      expect(useTreeStore.getState().nodes.get(a)!.stale).toBeFalsy()
+    })
+
+    it('markDescendantsStale does not touch the target node itself', async () => {
+      const tree = await useTreeStore.getState().createTree('My Tree')
+      const r = tree.rootNodeId
+
+      const a = crypto.randomUUID()
+      const b = crypto.randomUUID()
+
+      await useTreeStore.getState().addNode(createNode({ id: a, treeId: tree.id, parentId: r, childrenIds: [b], stale: true }))
+      await useTreeStore.getState().addNode(createNode({ id: b, treeId: tree.id, parentId: a, childrenIds: [] }))
+
+      // Mark descendants of a
+      await useTreeStore.getState().markDescendantsStale(a)
+
+      // Assert: a's stale is unchanged (still true from before)
+      expect(useTreeStore.getState().nodes.get(a)!.stale).toBe(true)
+      expect((await db.nodes.get(a))!.stale).toBe(true)
+
+      // Assert: b is now stale
+      expect(useTreeStore.getState().nodes.get(b)!.stale).toBe(true)
+    })
   })
 })

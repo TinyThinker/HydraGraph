@@ -39,7 +39,7 @@ class ChatDatabase extends Dexie {
         }
       })
 
-    // version(3): T4.2 backfills width/height; T4.6 will EXTEND this same upgrade to also default stale:false — do not add version(4) for that.
+    // version(3): backfills width, height (T4.2) and stale:false (T4.6) on existing node rows — do NOT add version(4)
     this.version(3)
       .stores({
         nodes: 'id, treeId, parentId, timestamp',
@@ -47,15 +47,18 @@ class ChatDatabase extends Dexie {
         settings: 'id',
       })
       .upgrade(async (tx) => {
-        // Backfill width and height on all existing nodes
+        // Backfill width, height, and stale on all existing nodes
         const allNodes = await tx.table('nodes').toArray()
         for (const node of allNodes) {
-          const updates: Record<string, number> = {}
+          const updates: Record<string, number | boolean> = {}
           if (node.width === undefined || node.width === null) {
             updates.width = 320
           }
           if (node.height === undefined || node.height === null) {
             updates.height = 240
+          }
+          if (node.stale === undefined || node.stale === null) {
+            updates.stale = false
           }
           if (Object.keys(updates).length > 0) {
             await tx.table('nodes').update(node.id, updates)

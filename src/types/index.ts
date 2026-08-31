@@ -21,6 +21,7 @@ export interface TurnNode {
   errorMessage?: string
   width?: number
   height?: number
+  stale?: boolean
 }
 
 export interface ConversationTree {
