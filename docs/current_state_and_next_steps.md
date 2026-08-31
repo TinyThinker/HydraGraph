@@ -158,3 +158,60 @@ drag-while-streaming with no snap on release; the drag-then-unmount race. Steps 
 node edit / retry / regenerate / delete, mark-descendants-stale, system-prompt override
 editing, collapse/expand, per-node model picker UI, provider-picker UI, auto-layout, tree
 switcher / search / export / import.
+
+## Phase 4 Update (2026-08-31) — "The Research Surface"
+
+All nine tasks (T4.1–T4.9) landed as individual commits; `npm run check` passes
+(102 tests, lint clean); `npm run build` is clean. Full detail, grades and the
+human-verification list are in `docs/re-engineer-phase-4.md`.
+
+**Now working from the UI (implemented; end-to-end confirmation is PENDING HUMAN
+per the phase-4 doc):**
+
+- **Markdown + code rendering** — assistant responses render as sanitized Markdown
+  (GFM tables, lists, headings, blockquotes, links opening in a new tab) with
+  syntax-highlighted fenced code blocks and a per-block copy button. No raw HTML
+  pass-through. `MarkdownContent.tsx` / `CodeBlock.tsx`.
+- **Resizable cards** — `NodeResizer` on selected cards, min 280×200; width/height
+  persist through a debounced path; the response region fills the card and scrolls
+  internally. Schema `version(3)` backfills `width`/`height`.
+- **Full-text reader panel** — a side panel outside the React Flow viewport
+  (`App.tsx` layout, unaffected by zoom) showing the complete untruncated prompt +
+  response via the markdown renderer; opened by double-clicking a card or the
+  now-enabled "Open full text" control; copy + Escape/close; follows live text.
+  Dedicated `useReaderPanel` store.
+- **Edit prompt / regenerate** — idle or errored nodes expose an inline Edit
+  textarea and a Regenerate button; both re-run through `submitPrompt` (which
+  clears the old response + error and re-enters streaming); descendants are left
+  in place. `submitPrompt` no-ops while already streaming.
+- **Delete node + subtree** — `collectSubtreeIds` + `deleteNodeSubtree`: one
+  transaction removes the whole subtree and fixes the parent's `childrenIds`; the
+  card's Trash control shows a confirmation naming the node count; the tree root's
+  control is disabled.
+- **Stale descendants** — `stale?: boolean` on the node type (backfilled `false`
+  in the same `version(3)` upgrade). Editing/regenerating a node — or changing its
+  system-prompt override — flags every descendant `stale: true` via
+  `markDescendantsStale`; stale cards render muted with an amber badge. No
+  auto-regeneration.
+- **System-prompt override editor** — per-node overlay showing the inherited
+  prompt (resolved at the parent / tree default) read-only above the input;
+  Save/Clear; the amber Shield badge reflects the state; descendants marked stale
+  on change; existing answers are not re-run.
+- **Collapse / expand subtrees** — `toggleCollapse` + `computeHiddenIds`
+  (`src/lib/collapse.ts`); the canvas excludes hidden nodes and their edges;
+  collapsed cards show "Show N hidden" (all depths); inner collapsed state
+  survives an outer expand; a hidden node still streams to completion.
+- **Per-node model picker** — the footer model badge opens a picker (curated
+  per-provider list + global default + current value + free-text); the choice
+  persists to `node.modelUsed` and is what the next request actually calls
+  (per-node routing from T2.6); disabled while streaming.
+
+**Still forces DevTools / absent (Phase 5):** the **provider selector** — the
+Settings modal still has no provider dropdown, so choosing Ollama while a Gemini
+key is set, or choosing OpenRouter (which also has no client), requires editing
+the `settings` row in IndexedDB. Tree-level `defaultSystemPrompt` has no editor.
+Auto-layout, tree switcher / rename / delete, search, and export/import are
+Phase 5.
+
+**Final DB schema:** `version(3)` — its upgrade backfills `width` (320),
+`height` (240) and `stale` (false) on existing node rows.
