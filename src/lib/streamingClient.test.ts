@@ -465,31 +465,75 @@ describe('streamingClient', () => {
     expect(body.model).toBe('llama3')
   })
 
-  it('reports not-implemented for the openrouter provider', async () => {
-    const fetchMock = vi.fn()
+  it('streams OpenRouter deltas, sends a Bearer header, and reads usage from the final chunk', async () => {
+    const orSettings: AppSettings = { ...testSettings, openRouterApiKey: 'or-secret', provider: 'openrouter' }
+    // Split one JSON frame across two reads to also exercise cross-read buffering
+    const frame1 = 'data: {"choices":[{"delta":{"content":"Hel'
+    const frame2 = 'lo"}}]}\n\ndata: {"choices":[{"delta":{"content":" world"}}],"usage":{"prompt_tokens":11,"completion_tokens":2}}\n\ndata: [DONE]\n\n'
+    const chunks = [new TextEncoder().encode(frame1), new TextEncoder().encode(frame2)]
+
+    const fakeResponse = createFakeResponse(chunks)
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse)
     vi.stubGlobal('fetch', fetchMock)
 
+    const tokens: string[] = []
     const errors: Error[] = []
-    let doneCount = 0
+    let usage: { inputTokens: number; outputTokens: number } | null = null
 
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
+    await new Promise<void>((resolve) => {
+      streamLLMResponse(
+        testPayload,
+        orSettings,
+        { provider: 'openrouter', model: 'openai/gpt-4o-mini' },
+        (chunk) => tokens.push(chunk),
+        (u) => {
+          usage = u
+          resolve()
+        },
+        (err) => errors.push(err),
+      )
+    })
 
-    await streamLLMResponse(
-      testPayload,
-      testSettings,
-      { provider: 'openrouter' },
-      () => {},
-      () => {
-        doneCount++
-      },
-      onError,
-    )
+    expect(errors).toHaveLength(0)
+    expect(tokens.join('')).toBe('Hello world')
+    expect(usage).toEqual({ inputTokens: 11, outputTokens: 2 })
 
-    expect(errors).toHaveLength(1)
-    expect(errors[0].message).toContain('OpenRouter client not yet implemented')
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(doneCount).toBe(0)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
+    expect(url).not.toContain('or-secret')
+    expect(init.headers.Authorization).toBe('Bearer or-secret')
+    const body = JSON.parse(init.body)
+    expect(body.model).toBe('openai/gpt-4o-mini')
+    expect(body.stream).toBe(true)
+    expect(body.messages[0]).toEqual({ role: 'system', content: 'sys' })
+  })
+
+  it('skips OpenRouter SSE keep-alive comment lines', async () => {
+    const orSettings: AppSettings = { ...testSettings, openRouterApiKey: 'or-secret', provider: 'openrouter' }
+    const payload =
+      ': OPENROUTER PROCESSING\n\n' +
+      'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n' +
+      ': OPENROUTER PROCESSING\n\n' +
+      'data: [DONE]\n\n'
+
+    const fakeResponse = createFakeResponse([new TextEncoder().encode(payload)])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
+
+    const tokens: string[] = []
+    const errors: Error[] = []
+
+    await new Promise<void>((resolve) => {
+      streamLLMResponse(
+        testPayload,
+        orSettings,
+        { provider: 'openrouter', model: 'x' },
+        (chunk) => tokens.push(chunk),
+        () => resolve(),
+        (err) => errors.push(err),
+      )
+    })
+
+    expect(errors).toHaveLength(0)
+    expect(tokens.join('')).toBe('ok')
   })
 })

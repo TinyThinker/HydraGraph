@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { MaskedInput } from './MaskedInput'
+import { ProviderSelect } from './ProviderSelect'
+import type { LLMProvider } from '../types'
 
 interface SettingsModalProps {
   open: boolean
@@ -13,6 +15,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const saveSettings = useTreeStore((s) => s.saveSettings)
 
   const [draft, setDraft] = useState({
+    provider: 'gemini' as LLMProvider,
     geminiApiKey: '',
     openRouterApiKey: '',
     ollamaBaseUrl: '',
@@ -26,6 +29,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   useEffect(() => {
     if (open) {
       setDraft({
+        provider: settings.provider,
         geminiApiKey: settings.geminiApiKey ?? '',
         openRouterApiKey: settings.openRouterApiKey ?? '',
         ollamaBaseUrl: settings.ollamaBaseUrl,
@@ -42,6 +46,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     setSaving(true)
     try {
       await saveSettings({
+        provider: draft.provider,
         geminiApiKey: draft.geminiApiKey.trim() || undefined,
         openRouterApiKey: draft.openRouterApiKey.trim() || undefined,
         ollamaBaseUrl: draft.ollamaBaseUrl.trim(),
@@ -73,6 +78,10 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
         {/* Content */}
         <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <ProviderSelect
+            value={draft.provider}
+            onChange={(value) => setDraft((prev) => ({ ...prev, provider: value }))}
+          />
           <MaskedInput
             label="Gemini API key"
             value={draft.geminiApiKey}
@@ -91,7 +100,6 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             onToggleShow={() => setShowOpenRouterKey(!showOpenRouterKey)}
           />
 
-          {/* Ollama Base URL */}
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-2">
               Ollama base URL
@@ -105,7 +113,6 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             />
           </div>
 
-          {/* Default Model */}
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-2">
               Default model

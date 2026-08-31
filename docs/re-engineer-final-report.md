@@ -21,6 +21,10 @@ Every task T1.1–T5.9 is committed one-per-task. No task is FAILED. Two tasks
 (T3.1, T4.1) shipped at C+ and were not re-built for quality per the plan's
 "record and move on" rule; their follow-ups are noted below.
 
+> §1–§8 record the state at the end of the five-phase plan (180 tests). A post-plan
+> addition — the OpenRouter provider and a Settings provider selector — is documented
+> in **§9** and brings the suite to 183.
+
 ---
 
 ## 2. Commits per phase
@@ -232,13 +236,12 @@ core. Configure a real Gemini key and/or a reachable Ollama (`OLLAMA_ORIGINS=htt
 
 ## 7. Known limitations
 
-1. **No provider-selector control (recommended follow-up #1).** The Settings modal has
-   no provider dropdown. Provider self-derives: `gemini` when a Gemini key is present,
-   otherwise `ollama`. Choosing Ollama while a Gemini key is saved, or choosing
-   OpenRouter, requires editing the `settings` row in DevTools. **OpenRouter has no
-   client** — `streamLLMResponse` returns an explicit "not yet implemented" error for
-   it. This kills the design doc's headline "compare models/personas side by side"
-   until a picker (and an OpenRouter client) exist.
+1. ~~**No provider-selector control (recommended follow-up #1).**~~ **RESOLVED
+   2026-08-31, post-plan** — see §9. The Settings modal now has a Provider dropdown
+   (Gemini / OpenRouter / Ollama) whose explicit choice wins over the key-based
+   fallback derivation, and `streamOpenRouter` is implemented (OpenAI-compatible SSE,
+   `Authorization: Bearer` header, incremental tokens + usage + cancel). The
+   "compare models/personas side by side" capability is now reachable from the UI.
 2. **Tree-level `defaultSystemPrompt` has no editor.** Every tree is seeded with
    "You are a helpful AI research assistant."; it can only be changed per node
    (override) or in DevTools.
@@ -294,8 +297,30 @@ Ollama endpoint. The entire §6 list — ~37 items including all four schema mig
 is unverified in a browser. Confidence is high (each has a passing headless proxy),
 but "the product works" is, formally, still a prediction rather than an observation.
 
-The one genuine product gap, not a bug, is the **provider selector** (limitation #1):
-until the Settings modal can choose a provider and an OpenRouter client exists, the
-design's side-by-side model/persona comparison is reachable only by editing IndexedDB.
-That is the #1 recommended post-plan follow-up, followed by a tree-level
+The one genuine product gap, not a bug, was the **provider selector** (limitation #1).
+It has since been closed (§9). The remaining recommended follow-ups are a tree-level
 `defaultSystemPrompt` editor and a bundle-splitting pass.
+
+---
+
+## 9. Post-report addendum — 2026-08-31
+
+Done directly after the plan, at the user's request, outside the five-phase structure.
+
+**OpenRouter provider + Settings provider selector.**
+
+| | |
+|---|---|
+| `src/lib/streamingClient.ts` | New `streamOpenRouter` reader: `POST https://openrouter.ai/api/v1/chat/completions`, `Authorization: Bearer <openRouterApiKey>` header (no secret in the URL), OpenAI-style `{model, messages, stream:true}` body. Reuses the shared cross-read buffer + streaming-decoder + final-flush pattern; skips `:` SSE keep-alive comments; emits `choices[0].delta.content`; reads `usage.{prompt_tokens,completion_tokens}`; surfaces inline `{"error":…}` frames through `onError`. The `openrouter` branch of `streamLLMResponse` now calls it instead of throwing. |
+| `src/components/ProviderSelect.tsx` | New 33-line presentational `<select>` (Gemini / OpenRouter / Ollama). |
+| `src/components/SettingsModal.tsx` | Adds a `provider` draft field seeded from `settings.provider`, renders `ProviderSelect` at the top of the form, and passes `provider` explicitly to `saveSettings` (149 lines, under the ceiling). |
+| Store | No change needed — `saveSettings` already honours an explicit `patch.provider` over key-based derivation; `submitPrompt` already threads `settings.provider` + the node's model into the streaming call. |
+| Tests | +3 net (183 total): OpenRouter happy-path (Bearer header, split-frame reassembly, `[DONE]`, usage), OpenRouter keep-alive-comment skipping, and two store tests pinning explicit-provider-wins vs key-derivation fallback. The removed test was the old "reports not-implemented for openrouter". |
+| Gate | `npm run check` green (183 tests); `npm run build` clean (~280 kB gzip, unchanged — no new deps). |
+| Commit | `feat: implement OpenRouter provider and a Settings provider selector` |
+
+**Still open:** OpenRouter has not been run against the live endpoint in a browser —
+add to the §6 PENDING HUMAN list: *Provider → OpenRouter, paste a real key, send a
+prompt; Network panel shows the request to `openrouter.ai/api/v1/chat/completions`
+with the key only in the `Authorization` header; response streams; token counts
+appear on the card.*

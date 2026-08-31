@@ -141,6 +141,22 @@ describe('useTreeStore', () => {
     // liveText should remain empty
     expect(useTreeStore.getState().liveText.size).toBe(0)
   })
+
+  it('5. saveSettings keeps an explicit provider even when a Gemini key is present', async () => {
+    await useTreeStore.getState().saveSettings({ geminiApiKey: 'g-key', provider: 'openrouter' })
+
+    expect(useTreeStore.getState().settings.provider).toBe('openrouter')
+    const row = await db.settings.get('global_settings')
+    expect(row?.provider).toBe('openrouter')
+  })
+
+  it('6. saveSettings derives the provider from keys when none is given', async () => {
+    await useTreeStore.getState().saveSettings({ geminiApiKey: '', openRouterApiKey: '' })
+    expect(useTreeStore.getState().settings.provider).toBe('ollama')
+
+    await useTreeStore.getState().saveSettings({ geminiApiKey: 'g-key' })
+    expect(useTreeStore.getState().settings.provider).toBe('gemini')
+  })
 })
 
 describe('throttled streaming writes', () => {

@@ -20,13 +20,17 @@
 > estimate + real token counts; per-tree canvas viewport persistence and keyboard
 > navigation.
 >
-> **Still not done:** no end-to-end human run against a live Gemini/Ollama endpoint
-> has occurred — every browser check (and all four schema migrations) is still on
-> the PENDING HUMAN list in `docs/re-engineer-final-report.md` §6. The one real
-> product gap (not a bug) is the **provider selector**: the Settings modal cannot
-> choose a provider (it self-derives `gemini` if a key exists, else `ollama`) and
-> OpenRouter has no client — the #1 recommended follow-up. Second follow-up: a
-> tree-level `defaultSystemPrompt` editor. Third: split the JS bundle.
+> **Post-plan addendum (2026-08-31):** the provider-selector gap is now closed — the
+> Settings modal has a Provider dropdown (Gemini / OpenRouter / Ollama) and
+> `streamOpenRouter` is implemented (OpenAI-compatible SSE, Bearer header, streaming
+> + usage + cancel). 185 tests. See `docs/re-engineer-final-report.md` §9.
+>
+> **Still not done:** no end-to-end human run against a live Gemini / OpenRouter /
+> Ollama endpoint has occurred — every browser check (and all four schema
+> migrations) is still on the PENDING HUMAN list in
+> `docs/re-engineer-final-report.md` §6, plus a new OpenRouter live-request check.
+> Remaining recommended follow-ups: a tree-level `defaultSystemPrompt` editor, then
+> split the JS bundle.
 >
 > The sections below are the **original Part 1 diagnosis**, kept as the historical
 > record of why the re-engineering happened. Read them as "the starting point",
