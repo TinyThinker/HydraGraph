@@ -2,8 +2,9 @@ import { memo, useState } from 'react'
 import { Handle, Position, NodeResizer, type NodeProps, type Node } from '@xyflow/react'
 import { Zap, GitBranch, Shield, Square } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useReaderPanel } from './useReaderPanel'
 import { useRenderTally } from '../lib/renderTally'
-import { MarkdownContent } from './MarkdownContent'
+import { ResponseArea } from './ResponseArea'
 import type { TurnNodeData } from '../types'
 
 // Bounds only the DOM render of response text; stored text is never truncated
@@ -18,6 +19,7 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
   const cancelGeneration = useTreeStore((s) => s.cancelGeneration)
   const defaultModel = useTreeStore((s) => s.settings.defaultModel)
   const liveText = useTreeStore((s) => s.liveText.get(data.id))
+  const openReader = useReaderPanel((s) => s.open)
   const [draft, setDraft] = useState('')
 
   // Compute responseText: use liveText if streaming, otherwise use stored response
@@ -51,7 +53,10 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
   }
 
   return (
-    <div className={`w-full h-full flex flex-col overflow-hidden rounded-xl bg-slate-900 border border-slate-700 shadow-xl ${ringClass[data.status] ?? ringClass.idle}`}>
+    <div
+      className={`w-full h-full flex flex-col overflow-hidden rounded-xl bg-slate-900 border border-slate-700 shadow-xl ${ringClass[data.status] ?? ringClass.idle}`}
+      onDoubleClick={() => openReader(data.id)}
+    >
       <NodeResizer minWidth={280} minHeight={200} isVisible={selected} lineClassName="!border-indigo-500" handleClassName="!bg-indigo-500 !border-slate-800" />
       <Handle type="target" position={Position.Top} className="!bg-indigo-500 !border-slate-800" />
 
@@ -100,26 +105,12 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
       </div>
 
       {/* Assistant response */}
-      {responseText && (
-        <div className="px-3 pb-3 border-t border-slate-700 pt-2 flex-1 min-h-0 flex flex-col">
-          <div className="text-xs text-slate-400 mb-1 font-medium">🤖 Assistant</div>
-          {isTruncated && (
-            <div className="text-xs text-slate-500 mb-2">
-              Showing the last {RENDERED_TEXT_CAP.toLocaleString()} characters of a longer response.
-              <button
-                disabled
-                title="Full-text view arrives in a later update"
-                className="ml-2 text-xs text-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed nodrag"
-              >
-                Open full text
-              </button>
-            </div>
-          )}
-          <div className="flex-1 min-h-0 overflow-y-auto text-sm text-slate-200 break-words">
-            <MarkdownContent markdown={visibleText} />
-          </div>
-        </div>
-      )}
+      <ResponseArea
+        responseText={responseText}
+        isTruncated={isTruncated}
+        visibleText={visibleText}
+        onOpenFullText={() => openReader(data.id)}
+      />
 
       {/* Error message */}
       {data.status === 'error' && data.errorMessage && (
