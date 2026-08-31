@@ -40,7 +40,13 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
   loadSettings: async () => {
     const saved = await db.settings.get('global_settings')
-    set({ settings: saved ?? DEFAULT_SETTINGS })
+    if (saved) {
+      set({ settings: saved })
+    } else {
+      const defaults = { ...DEFAULT_SETTINGS }
+      await db.settings.put(defaults)
+      set({ settings: defaults })
+    }
   },
 
   saveSettings: async (patch) => {
@@ -57,8 +63,9 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   loadTree: async (treeId) => {
     const nodeArray = await db.nodes.where('treeId').equals(treeId).toArray()
     const nodes = new Map(nodeArray.map((n) => [n.id, n]))
-    set({ nodes, activeTreeId: treeId })
-    await db.settings.update('global_settings', { activeTreeId: treeId })
+    const nextSettings = { ...get().settings, activeTreeId: treeId }
+    set({ nodes, activeTreeId: treeId, settings: nextSettings })
+    await db.settings.put(nextSettings)
   },
 
   createTree: async (title) => {
@@ -96,8 +103,9 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     })
 
     const nodes = new Map([[rootNodeId, rootNode]])
-    set((state) => ({ nodes, activeTreeId: treeId, trees: [tree, ...state.trees] }))
-    await db.settings.put({ ...get().settings, activeTreeId: treeId })
+    const nextSettings = { ...get().settings, activeTreeId: treeId }
+    set((state) => ({ nodes, activeTreeId: treeId, settings: nextSettings, trees: [tree, ...state.trees] }))
+    await db.settings.put(nextSettings)
     return tree
   },
 
