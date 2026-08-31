@@ -7,6 +7,8 @@ import { useRenderTally } from '../lib/renderTally'
 import { ResponseArea } from './ResponseArea'
 import { PromptSection } from './PromptSection'
 import { NodeFooter } from './NodeFooter'
+import { ContextMeter } from './ContextMeter'
+import { estimateContextTokens } from '../lib/contextEstimate'
 import type { TurnNodeData } from '../types'
 
 // Bounds only the DOM render of response text; stored text is never truncated
@@ -20,6 +22,7 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
   const openReader = useReaderPanel((s) => s.open)
   const toggleCollapse = useTreeStore((s) => s.toggleCollapse)
   const hiddenCount = useTreeStore((s) => (data.isCollapsed || data.childrenIds.length > 0 ? collectSubtreeIds(data.id, s.nodes).size - 1 : 0))
+  const contextTokens = useTreeStore((s) => estimateContextTokens(data.id, s.nodes))
 
   // Compute responseText: use liveText if streaming, otherwise use stored response
   const responseText = liveText !== undefined ? liveText : data.assistantResponse
@@ -62,6 +65,14 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
           <span>{data.isCollapsed ? `Show ${hiddenCount} hidden` : 'Collapse subtree'}</span>
         </button>
       )}
+
+      {/* Context meter */}
+      <ContextMeter
+        tokens={contextTokens}
+        inputTokens={data.inputTokens}
+        outputTokens={data.outputTokens}
+        status={data.status}
+      />
 
       {/* User prompt */}
       <PromptSection node={data} />

@@ -3,13 +3,17 @@ import { Copy, Check, X } from 'lucide-react'
 import { useReaderPanel } from './useReaderPanel'
 import { useTreeStore } from '../store/useTreeStore'
 import { MarkdownContent } from './MarkdownContent'
+import { estimateContextTokens, CONTEXT_WARN_TOKENS } from '../lib/contextEstimate'
 
 export function ReaderPanel() {
   const nodeId = useReaderPanel((s) => s.nodeId)
   const close = useReaderPanel((s) => s.close)
   const node = useTreeStore((s) => (nodeId ? s.nodes.get(nodeId) : undefined))
   const liveText = useTreeStore((s) => (nodeId ? s.liveText.get(nodeId) : undefined))
+  const nodes = useTreeStore((s) => s.nodes)
   const [copied, setCopied] = useState(false)
+
+  const estTokens = node ? estimateContextTokens(node.id, nodes) : 0
 
   // Close on Escape key
   useEffect(() => {
@@ -72,6 +76,17 @@ export function ReaderPanel() {
 
       {/* Body */}
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4">
+        {/* Context info */}
+        <div className="text-xs text-slate-400 space-y-1">
+          <div>Estimated context: ~{estTokens.toLocaleString()} tokens</div>
+          {node?.inputTokens != null && node?.outputTokens != null && (
+            <div>Last generation: {node.inputTokens.toLocaleString()} in · {node.outputTokens.toLocaleString()} out</div>
+          )}
+          {estTokens > CONTEXT_WARN_TOKENS && (
+            <div className="text-amber-400">Deep context — approaching typical model limits.</div>
+          )}
+        </div>
+
         {/* User prompt */}
         <div>
           <p className="text-xs font-medium text-slate-400 mb-1">User prompt</p>
