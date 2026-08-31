@@ -5,6 +5,9 @@ import { useTreeStore } from '../store/useTreeStore'
 import { useRenderTally } from '../lib/renderTally'
 import type { TurnNodeData } from '../types'
 
+// Bounds only the DOM render of response text; stored text is never truncated
+const RENDERED_TEXT_CAP = 2000
+
 const ringClass: Record<string, string> = {
   idle: 'ring-2 ring-indigo-500',
   streaming: 'ring-2 ring-cyan-400 animate-pulse',
@@ -22,6 +25,10 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
 
   // Compute responseText: use liveText if streaming, otherwise use stored response
   const responseText = liveText !== undefined ? liveText : data.assistantResponse
+
+  // Cap rendered text to last N characters; stored text is never truncated
+  const isTruncated = responseText.length > RENDERED_TEXT_CAP
+  const visibleText = isTruncated ? responseText.slice(-RENDERED_TEXT_CAP) : responseText
 
   const handleSend = () => {
     if (!draft.trim()) return
@@ -98,7 +105,19 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
       {responseText && (
         <div className="px-3 pb-3 border-t border-slate-700 pt-2">
           <div className="text-xs text-slate-400 mb-1 font-medium">🤖 Assistant</div>
-          <p className="text-sm text-slate-200 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">{responseText}</p>
+          {isTruncated && (
+            <div className="text-xs text-slate-500 mb-2">
+              Showing the last {RENDERED_TEXT_CAP.toLocaleString()} characters of a longer response.
+              <button
+                disabled
+                title="Full-text view arrives in a later update"
+                className="ml-2 text-xs text-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed nodrag"
+              >
+                Open full text
+              </button>
+            </div>
+          )}
+          <p className="text-sm text-slate-200 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">{visibleText}</p>
         </div>
       )}
 
