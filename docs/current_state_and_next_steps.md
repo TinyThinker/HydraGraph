@@ -72,3 +72,43 @@ Specified in `docs/architecture_design.md` but not implemented:
 ## Next
 
 See `docs/plans/re-engineer.md` for the active engineering plan, organized into five phases with concrete implementation tasks and verification steps.
+
+---
+
+## Phase 2 Update (2026-08-31) — "Make The Core Loop Actually Work"
+
+Branch `re-engineer`, commits `bf4a37e`..`234afda`. Full detail and grades in
+`docs/re-engineer-phase-2.md`. `npm run check` passes with 30 tests.
+
+**Now implemented and unit-tested (store/parser level); end-to-end browser runs are
+listed as PENDING HUMAN in the Phase 2 summary:**
+
+- **Settings UI + header** — masked-key settings modal (Gemini / OpenRouter keys, Ollama
+  URL, default model) and a header bar with the tree title and a settings gear; canvas
+  fills the remaining height. Keys stay in the IndexedDB row and the request header only.
+- **First-run banner** — persistent, dismiss-by-configuring, shown when no provider is set.
+- **Durable streaming** — throttled (~2–3/s) incremental writes of in-progress response
+  text; final synchronous flush on completion; partial text + terminal status written on
+  error.
+- **Stream errors surfaced** — `TurnNode.errorMessage` persisted and shown in a bounded
+  red panel as plain text; cleared when a node regenerates.
+- **Zombie recovery** — `loadTree` rewrites every stale `status: 'streaming'` row to
+  `error` (partial text kept) in one transaction; no card can pulse forever after a load.
+- **Cancel** — transient abort registry + `cancelGeneration` action + card Cancel button;
+  node returns to `idle` with partial text kept.
+- **Explicit provider routing** — `LLMProvider = 'gemini' | 'openrouter' | 'ollama'`;
+  `streamLLMResponse` routes strictly on the chosen provider; per-node `modelUsed` is
+  sent in the request. OpenRouter is an explicit unimplemented branch that errors
+  clearly. (No provider-picker UI yet — set via DevTools until a later task.)
+- **Stream parser correctness** — cross-read line buffering, streaming `TextDecoder`
+  (multi-byte safe), all Gemini parts extracted, `thought` parts skipped, malformed
+  frames reported instead of swallowed.
+- **Secret hygiene** — Gemini key moved from the URL query string to `x-goog-api-key`.
+- **DB schema** — now version 2; upgrade backfills `settings.provider`, `nodes.provider`,
+  `nodes.errorMessage`.
+- **README** — documents `OLLAMA_ORIGINS` setup for local models.
+
+**Still absent (Phase 3+):** the render-path fix (whole-canvas re-render on every token),
+markdown/code rendering, collapse/expand, system-prompt override editing, per-node model
+picker UI, provider-picker UI, auto-layout, tree switcher / search / export / import,
+node edit / retry / regenerate / delete, resizable cards.
