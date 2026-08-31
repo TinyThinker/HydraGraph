@@ -1188,6 +1188,160 @@ describe('delete node and subtree', () => {
   })
 })
 
+describe('tree updatedAt is honest', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+      liveText: new Map(),
+    })
+  })
+
+  // Helper to reset a tree's updatedAt to a stale value in both DB and memory
+  async function setTreeUpdatedAtStale(treeId: string) {
+    const staleTime = 1000
+    await db.trees.update(treeId, { updatedAt: staleTime })
+    useTreeStore.setState((s) => ({
+      trees: s.trees.map((t) => (t.id === treeId ? { ...t, updatedAt: staleTime } : t)),
+    }))
+  }
+
+  it('addNode advances updatedAt in both DB and memory', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+    await setTreeUpdatedAtStale(tree.id)
+
+    const child = createNode({
+      id: crypto.randomUUID(),
+      treeId: tree.id,
+      parentId: rootId,
+      childrenIds: [],
+    })
+
+    await useTreeStore.getState().addNode(child)
+
+    const dbTree = await db.trees.get(tree.id)
+    const memTree = useTreeStore.getState().trees.find((t) => t.id === tree.id)
+
+    expect(dbTree!.updatedAt).toBeGreaterThan(1000)
+    expect(memTree!.updatedAt).toBeGreaterThan(1000)
+  })
+
+  it('updateNode with positionX/positionY does NOT advance updatedAt', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+    await setTreeUpdatedAtStale(tree.id)
+
+    await useTreeStore.getState().updateNode(rootId, { positionX: 999, positionY: 999 })
+
+    const dbTree = await db.trees.get(tree.id)
+    const memTree = useTreeStore.getState().trees.find((t) => t.id === tree.id)
+
+    expect(dbTree!.updatedAt).toBe(1000)
+    expect(memTree!.updatedAt).toBe(1000)
+  })
+
+  it('updateNode with width/height does NOT advance updatedAt', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+    await setTreeUpdatedAtStale(tree.id)
+
+    await useTreeStore.getState().updateNode(rootId, { width: 500, height: 400 })
+
+    const dbTree = await db.trees.get(tree.id)
+    const memTree = useTreeStore.getState().trees.find((t) => t.id === tree.id)
+
+    expect(dbTree!.updatedAt).toBe(1000)
+    expect(memTree!.updatedAt).toBe(1000)
+  })
+
+  it('updateNode with modelUsed does NOT advance updatedAt', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+    await setTreeUpdatedAtStale(tree.id)
+
+    await useTreeStore.getState().updateNode(rootId, { modelUsed: 'other-model' })
+
+    const dbTree = await db.trees.get(tree.id)
+    const memTree = useTreeStore.getState().trees.find((t) => t.id === tree.id)
+
+    expect(dbTree!.updatedAt).toBe(1000)
+    expect(memTree!.updatedAt).toBe(1000)
+  })
+
+  it('updateNode with systemPromptOverride DOES advance updatedAt', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+    await setTreeUpdatedAtStale(tree.id)
+
+    await useTreeStore.getState().updateNode(rootId, { systemPromptOverride: 'Be terse.' })
+
+    const dbTree = await db.trees.get(tree.id)
+    const memTree = useTreeStore.getState().trees.find((t) => t.id === tree.id)
+
+    expect(dbTree!.updatedAt).toBeGreaterThan(1000)
+    expect(memTree!.updatedAt).toBeGreaterThan(1000)
+  })
+
+  it('appendTokenDelta does NOT advance updatedAt', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const rootId = tree.rootNodeId
+    await setTreeUpdatedAtStale(tree.id)
+
+    useTreeStore.getState().appendTokenDelta(rootId, 'hello')
+
+    const dbTree = await db.trees.get(tree.id)
+    const memTree = useTreeStore.getState().trees.find((t) => t.id === tree.id)
+
+    expect(dbTree!.updatedAt).toBe(1000)
+    expect(memTree!.updatedAt).toBe(1000)
+  })
+
+  it('tree ordering: adding to tree A after creating B reorders A ahead of B', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, _onError) => {
+        return () => {}
+      }
+    )
+
+    const treeA = await useTreeStore.getState().createTree('Tree A')
+    const treeB = await useTreeStore.getState().createTree('Tree B')
+
+    // Force both trees to the same stale updatedAt in DB and memory
+    await setTreeUpdatedAtStale(treeA.id)
+    await setTreeUpdatedAtStale(treeB.id)
+
+    // Load tree A to make it active
+    await useTreeStore.getState().loadTree(treeA.id)
+
+    // Add a child to A
+    const childA = createNode({
+      id: crypto.randomUUID(),
+      treeId: treeA.id,
+      parentId: treeA.rootNodeId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(childA)
+
+    // Check in-memory trees: A's updatedAt should now be > B's updatedAt
+    const memTrees = useTreeStore.getState().trees
+    const memA = memTrees.find((t) => t.id === treeA.id)
+    const memB = memTrees.find((t) => t.id === treeB.id)
+
+    expect(memA!.updatedAt).toBeGreaterThan(memB!.updatedAt)
+  })
+})
+
 describe('renameTree', () => {
   beforeEach(async () => {
     await db.delete()
