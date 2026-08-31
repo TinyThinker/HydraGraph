@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './index.css'
 import { useTreeStore } from './store/useTreeStore'
 import { Canvas } from './components/Canvas'
+import { HeaderBar } from './components/HeaderBar'
 
 export default function App() {
   const bootedRef = useRef(false)
@@ -30,5 +31,12 @@ export default function App() {
   }, [])
 
   if (!ready) return <div className="h-full bg-slate-950" />
-  return <Canvas />
+  return (
+    <div className="h-full flex flex-col">
+      <HeaderBar />
+      <div className="flex-1 min-h-0">
+        <Canvas />
+      </div>
+    </div>
+  )
 }
