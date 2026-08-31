@@ -27,7 +27,7 @@ async function streamGemini(
   onError: (err: Error) => void,
 ) {
   const model = settings.defaultModel || 'gemini-2.5-flash'
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${settings.geminiApiKey}`
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`
 
   // Gemini uses 'model' not 'assistant' for role
   const contents = payload.messages.map((m) => ({
@@ -38,7 +38,10 @@ async function streamGemini(
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': settings.geminiApiKey || '',
+      },
       body: JSON.stringify({
         contents,
         systemInstruction: { parts: [{ text: payload.systemPrompt }] },

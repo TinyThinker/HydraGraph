@@ -351,4 +351,58 @@ describe('streamingClient', () => {
     expect(errors).toHaveLength(0)
     expect(doneCount).toBe(1)
   })
+
+  it('sends the Gemini key in the x-goog-api-key header, not the URL', async () => {
+    const frameString = 'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}\n\n'
+    const frameBytes = new TextEncoder().encode(frameString)
+
+    const fakeResponse = createFakeResponse([frameBytes])
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const tokens: string[] = []
+    const errors: Error[] = []
+    let doneCount = 0
+
+    const secretSettings: AppSettings = {
+      id: 'global_settings',
+      geminiApiKey: 'SECRET-KEY-VALUE',
+      ollamaBaseUrl: 'http://localhost:11434',
+      defaultModel: 'gemini-2.5-flash',
+    }
+
+    const onToken = (chunk: string) => {
+      tokens.push(chunk)
+    }
+
+    const onError = (err: Error) => {
+      errors.push(err)
+    }
+
+    const done = new Promise<void>((resolve) => {
+      streamLLMResponse(
+        testPayload,
+        secretSettings,
+        onToken,
+        () => {
+          doneCount++
+          resolve()
+        },
+        onError,
+      )
+    })
+
+    await done
+
+    expect(doneCount).toBe(1)
+    expect(errors).toHaveLength(0)
+
+    const [url, init] = fetchMock.mock.calls[0]
+
+    expect(url).not.toContain('SECRET-KEY-VALUE')
+    expect(url).toContain('alt=sse')
+    expect(url).not.toContain('key=')
+    expect(init.headers['x-goog-api-key']).toBe('SECRET-KEY-VALUE')
+    expect(init.headers['Content-Type']).toBe('application/json')
+  })
 })
