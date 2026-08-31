@@ -1,5 +1,37 @@
 # Current State & Next Steps
 
+> **Post-Phase-5 status — 2026-08-31 (branch `re-engineer`).**
+> All five re-engineering phases are complete. `npm run check` passes with **180
+> tests** (types + `oxlint` clean + vitest); `npm run build` is clean (~280 kB gzip
+> JS). **DB schema is version 4.** Every structural defect in the Part 1 diagnosis
+> below has an implemented fix with headless test coverage — see the per-phase
+> update sections at the end of this file and the full rollup in
+> `docs/re-engineer-final-report.md`.
+>
+> **What is genuinely working (headless-verified):** durable incremental streaming
+> with zombie recovery, cancel, and surfaced errors; a render path that keeps
+> streaming isolated to one card on a large graph (`renderBudget.test.tsx` lock);
+> sanitized markdown/code rendering; resizable cards; the full-text reader panel;
+> edit / regenerate / delete-subtree / collapse-expand; per-node system-prompt
+> overrides and model selection; dagre auto-layout on branch + a manual "tidy"
+> command; a multi-tree switcher (create / switch / rename / delete) with an honest
+> `updatedAt`; active-tree search that pans/zooms and auto-expands; tree JSON
+> export (no secrets) and validated all-or-nothing import; per-node context-size
+> estimate + real token counts; per-tree canvas viewport persistence and keyboard
+> navigation.
+>
+> **Still not done:** no end-to-end human run against a live Gemini/Ollama endpoint
+> has occurred — every browser check (and all four schema migrations) is still on
+> the PENDING HUMAN list in `docs/re-engineer-final-report.md` §6. The one real
+> product gap (not a bug) is the **provider selector**: the Settings modal cannot
+> choose a provider (it self-derives `gemini` if a key exists, else `ollama`) and
+> OpenRouter has no client — the #1 recommended follow-up. Second follow-up: a
+> tree-level `defaultSystemPrompt` editor. Third: split the JS bundle.
+>
+> The sections below are the **original Part 1 diagnosis**, kept as the historical
+> record of why the re-engineering happened. Read them as "the starting point",
+> not the current state.
+
 This document describes the repository honestly, sorting every capability into one of three buckets derived from the diagnosis in `docs/plans/re-engineer.md`.
 
 ## A. Verified Working End to End
@@ -215,3 +247,65 @@ Phase 5.
 
 **Final DB schema:** `version(3)` — its upgrade backfills `width` (320),
 `height` (240) and `stale` (false) on existing node rows.
+
+
+---
+
+## Phase 5 Update (2026-08-31) — "Workspace & Scale"
+
+Branch `re-engineer`, commits `d8d0a4a`..`9fd610d` (9 task commits + the summary).
+Full detail, grades and the human-verification list are in
+`docs/re-engineer-phase-5.md`; the whole-effort rollup is in
+`docs/re-engineer-final-report.md`. `npm run check` passes with **180 tests**;
+`npm run build` clean (~280 kB gzip JS, +21 kB over the phase, ~16 kB of it dagre).
+
+**Now implemented (end-to-end browser confirmation is PENDING HUMAN per the phase-5 doc):**
+
+- **Auto-layout on branch (T5.1)** — `@dagrejs/dagre` + `src/lib/autoLayout.ts`
+  (`layoutTree`, `computeChildPosition`). New children are positioned top-down with
+  card-size-aware spacing, anchored to the parent's real on-canvas position; existing
+  nodes are never moved; layout runs only on node creation.
+- **Manual re-layout (T5.2)** — header `LayoutGrid` button → inline confirmation →
+  `relayoutActiveTree` rebuilds every position in one transaction and re-fits the
+  viewport via the new `CanvasFitter`. Never on load; never bumps `updatedAt`.
+- **Tree switcher (T5.3)** — `TreeSwitcher` / `TreeSwitcherRow` dropdown in the header:
+  list most-recent-first, select (`loadTree`), "New tree" (prompt), per-row rename and
+  delete. New store actions `renameTree` and `deleteTree` (cascade-deletes the tree's
+  nodes in one transaction; activates the next tree when the active one is deleted;
+  re-creates a fresh tree when the last one is deleted).
+- **Honest `updatedAt` (T5.4)** — an internal `touchActiveTree` bumps the active tree's
+  timestamp (DB **and** in-memory `trees`) on add-node / edit-prompt / finish-generation
+  / delete-node / override change, and on nothing else (not position, size, model,
+  token deltas, re-layout, rename or collapse).
+- **Search (T5.5)** — `SearchBar` in the header filters the active tree's prompts +
+  responses; selecting a result auto-expands collapsed ancestors and the new
+  `CanvasSearchFocus` pans/zooms to the node and flashes it. Only the loaded tree is
+  searched.
+- **Export (T5.6)** — `src/lib/treeExport.ts`: one tree + all nodes → versioned JSON,
+  **no secrets** (recursive key-scan + planted-secret tests). Header `Download` button.
+- **Import (T5.7)** — `parseImportDoc` validates schema + full structural integrity
+  before any write; `remapImportedTree` assigns fresh ids throughout; the `importTree`
+  store action writes all-or-nothing in one transaction then loads the tree. Header
+  `ImportButton` with an inline error panel. Same file imported twice → two independent
+  trees.
+- **Context size awareness (T5.8)** — `src/lib/contextEstimate.ts` +
+  `ContextMeter`: a ~4-chars/token estimate of the resolved payload shown above the
+  send control and in the reader panel, replaced by the real input/output token counts
+  once a generation finishes, with a non-blocking amber warning past ~6000 tokens.
+- **Viewport persistence + keyboard nav (T5.9)** — schema **version(4)** adds
+  `viewportX/Y/Zoom` to `trees` (backfilled 0/0/1). `CanvasViewport` restores the saved
+  per-tree pan/zoom on load (fitView only when there is none) and debounce-persists it;
+  `↑`/`↓`/`←`/`→` move the selection through parent/child/siblings with the viewport
+  following, `b` branches, `r` opens the reader — all ignored while a text field is
+  focused. Shortcuts documented in the README.
+
+**Still absent / carried forward:** the **provider-selector control** in Settings
+(provider self-derives; OpenRouter has no client) — #1 follow-up; a tree-level
+`defaultSystemPrompt` editor; JS bundle-splitting; a CI gate; live-browser
+verification of everything (see `docs/re-engineer-final-report.md` §6).
+
+**Final DB schema:** `version(4)` — its upgrade backfills `viewportX` (0),
+`viewportY` (0) and `viewportZoom` (1) on existing tree rows. History: v2 backfilled
+`nodes.provider` / `nodes.errorMessage` / `settings.provider`; v3 backfilled
+`nodes.width` (320) / `nodes.height` (240) / `nodes.stale` (false).
+
