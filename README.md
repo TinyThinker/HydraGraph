@@ -89,6 +89,26 @@ npm run build
 npm run preview
 ```
 
+### Using a local model (Ollama)
+
+To use Ollama models from the browser, you must allow the app's origin. Configure the `OLLAMA_ORIGINS` environment variable before starting Ollama.
+
+For development (Vite dev server at `http://localhost:5173`):
+
+```bash
+OLLAMA_ORIGINS=http://localhost:5173 ollama serve
+```
+
+On macOS with Ollama as a background service:
+
+```bash
+launchctl setenv OLLAMA_ORIGINS "http://localhost:5173"
+```
+
+Then restart Ollama. If the app is served from a different origin (e.g., `http://localhost:4173`), update the value accordingly; use comma-separated values for multiple origins.
+
+**If generations fail instantly:** Check the browser console for a network/CORS error (not a model error message) — this means `OLLAMA_ORIGINS` is not set or incorrect.
+
 ---
 
 ## Architecture
