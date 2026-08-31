@@ -16,7 +16,8 @@ import { TurnNodeComponent } from './TurnNode'
 const nodeTypes = { turnNode: TurnNodeComponent }
 
 export function Canvas() {
-  const { nodes, updateNode } = useTreeStore()
+  const nodes = useTreeStore((s) => s.nodes)
+  const updateNode = useTreeStore((s) => s.updateNode)
   const isDragging = useRef(false)
   const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 

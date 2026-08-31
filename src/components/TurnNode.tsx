@@ -13,7 +13,10 @@ const ringClass: Record<string, string> = {
 
 export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
   useRenderTally(data.id)
-  const { addNode, submitPrompt, cancelGeneration, settings } = useTreeStore()
+  const addNode = useTreeStore((s) => s.addNode)
+  const submitPrompt = useTreeStore((s) => s.submitPrompt)
+  const cancelGeneration = useTreeStore((s) => s.cancelGeneration)
+  const defaultModel = useTreeStore((s) => s.settings.defaultModel)
   const [draft, setDraft] = useState('')
 
   const handleSend = () => {
@@ -34,7 +37,7 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
       positionY: data.positionY + 250,
       isCollapsed: false,
       status: 'idle',
-      modelUsed: settings.defaultModel,
+      modelUsed: defaultModel,
       timestamp: Date.now(),
     })
   }
