@@ -619,6 +619,79 @@ describe('regenerate and edit prompts', () => {
   })
 })
 
+describe('collapse and expand', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+      liveText: new Map(),
+    })
+  })
+
+  it('toggleCollapse flips isCollapsed in memory and DB and is reversible', async () => {
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const r = tree.rootNodeId
+
+    // Initially not collapsed
+    expect(useTreeStore.getState().nodes.get(r)!.isCollapsed).toBe(false)
+    expect((await db.nodes.get(r))!.isCollapsed).toBe(false)
+
+    // Toggle to collapsed
+    await useTreeStore.getState().toggleCollapse(r)
+    expect(useTreeStore.getState().nodes.get(r)!.isCollapsed).toBe(true)
+    expect((await db.nodes.get(r))!.isCollapsed).toBe(true)
+
+    // Toggle back to expanded
+    await useTreeStore.getState().toggleCollapse(r)
+    expect(useTreeStore.getState().nodes.get(r)!.isCollapsed).toBe(false)
+    expect((await db.nodes.get(r))!.isCollapsed).toBe(false)
+  })
+
+  it('a hidden (collapsed-ancestor) node still streams and persists', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(async () => () => {})
+
+    const tree = await useTreeStore.getState().createTree('Test Tree')
+    const r = tree.rootNodeId
+
+    // Add child a under r
+    const a = crypto.randomUUID()
+    await useTreeStore.getState().addNode(createNode({ id: a, treeId: tree.id, parentId: r, childrenIds: [] }))
+
+    // Collapse r, so a is hidden on canvas
+    await useTreeStore.getState().toggleCollapse(r)
+    expect(useTreeStore.getState().nodes.get(r)!.isCollapsed).toBe(true)
+
+    // Submit prompt on a (while it's hidden)
+    await useTreeStore.getState().submitPrompt(a, 'q')
+
+    // Simulate streaming
+    useTreeStore.getState().appendTokenDelta(a, 'hello')
+
+    // Finalize the stream
+    await useTreeStore.getState().finalizeNode(a, { inputTokens: 1, outputTokens: 2 })
+
+    // Assert node a is still in memory
+    expect(useTreeStore.getState().nodes.has(a)).toBe(true)
+
+    // Assert response is persisted in memory and DB
+    expect(useTreeStore.getState().nodes.get(a)!.assistantResponse).toBe('hello')
+    expect((await db.nodes.get(a))!.assistantResponse).toBe('hello')
+
+    // Assert status is idle
+    expect(useTreeStore.getState().nodes.get(a)!.status).toBe('idle')
+  })
+})
+
 describe('delete node and subtree', () => {
   beforeEach(async () => {
     await db.delete()

@@ -28,6 +28,7 @@ interface TreeStoreActions {
   cancelGeneration: (id: string) => Promise<void>
   deleteNodeSubtree: (id: string) => Promise<void>
   markDescendantsStale: (id: string) => Promise<void>
+  toggleCollapse: (id: string) => Promise<void>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -494,6 +495,19 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         }
       }
       return { nodes: next }
+    })
+  },
+
+  toggleCollapse: async (id) => {
+    const existing = get().nodes.get(id)
+    if (!existing) return
+    const nextVal = !existing.isCollapsed
+    await db.nodes.update(id, { isCollapsed: nextVal })
+    set((state) => {
+      const m = new Map(state.nodes)
+      const n = m.get(id)
+      if (n) m.set(id, { ...n, isCollapsed: nextVal })
+      return { nodes: m }
     })
   },
 }))

@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Handle, Position, NodeResizer, type NodeProps, type Node } from '@xyflow/react'
-import { Shield, History } from 'lucide-react'
-import { useTreeStore } from '../store/useTreeStore'
+import { Shield, History, ChevronRight, ChevronDown } from 'lucide-react'
+import { useTreeStore, collectSubtreeIds } from '../store/useTreeStore'
 import { useReaderPanel } from './useReaderPanel'
 import { useRenderTally } from '../lib/renderTally'
 import { ResponseArea } from './ResponseArea'
@@ -18,6 +18,8 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
   useRenderTally(data.id)
   const liveText = useTreeStore((s) => s.liveText.get(data.id))
   const openReader = useReaderPanel((s) => s.open)
+  const toggleCollapse = useTreeStore((s) => s.toggleCollapse)
+  const hiddenCount = useTreeStore((s) => (data.isCollapsed || data.childrenIds.length > 0 ? collectSubtreeIds(data.id, s.nodes).size - 1 : 0))
 
   // Compute responseText: use liveText if streaming, otherwise use stored response
   const responseText = liveText !== undefined ? liveText : data.assistantResponse
@@ -48,6 +50,17 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selecte
           <History size={12} />
           <span>An ancestor changed after this answer was generated — it may be out of date.</span>
         </div>
+      )}
+
+      {/* Collapse/expand control */}
+      {(data.isCollapsed || data.childrenIds.length > 0) && (
+        <button
+          onClick={() => toggleCollapse(data.id)}
+          className="nodrag flex items-center gap-1 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 border-b border-slate-700 w-full"
+        >
+          {data.isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+          <span>{data.isCollapsed ? `Show ${hiddenCount} hidden` : 'Collapse subtree'}</span>
+        </button>
       )}
 
       {/* User prompt */}
