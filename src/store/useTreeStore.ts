@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { db } from '../db/ChatDatabase'
 import { resolveContextPayload } from '../lib/contextEngine'
 import { streamLLMResponse } from '../lib/streamingClient'
+import { computeChildPosition } from '../lib/autoLayout'
 import type { TurnNode, ConversationTree, AppSettings, NodeStatus, TokenUsage } from '../types'
 
 interface TreeStoreState {
@@ -216,17 +217,26 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   },
 
   addNode: async (node) => {
-    await db.nodes.add(node)
-
+    let placed = node
     if (node.parentId) {
       const parent = get().nodes.get(node.parentId)
       if (parent) {
-        const updatedParent = { ...parent, childrenIds: [...parent.childrenIds, node.id] }
-        await db.nodes.update(node.parentId, { childrenIds: updatedParent.childrenIds })
+        const pos = computeChildPosition(node.parentId, get().nodes)
+        placed = { ...node, positionX: pos.x, positionY: pos.y }
+      }
+    }
+
+    await db.nodes.add(placed)
+
+    if (placed.parentId) {
+      const parent = get().nodes.get(placed.parentId)
+      if (parent) {
+        const updatedParent = { ...parent, childrenIds: [...parent.childrenIds, placed.id] }
+        await db.nodes.update(placed.parentId, { childrenIds: updatedParent.childrenIds })
         set((state) => {
           const next = new Map(state.nodes)
-          next.set(node.parentId!, updatedParent)
-          next.set(node.id, node)
+          next.set(placed.parentId!, updatedParent)
+          next.set(placed.id, placed)
           return { nodes: next }
         })
         return
@@ -235,7 +245,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
     set((state) => {
       const next = new Map(state.nodes)
-      next.set(node.id, node)
+      next.set(placed.id, placed)
       return { nodes: next }
     })
   },
