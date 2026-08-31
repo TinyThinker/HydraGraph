@@ -238,7 +238,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
   setActiveTree: (treeId) => set({ activeTreeId: treeId }),
 
   submitPrompt: async (nodeId, userPrompt) => {
-    const { nodes, settings, activeTreeId, appendTokenDelta, finalizeNode, setNodeStatus } = get()
+    const { nodes, settings, activeTreeId, appendTokenDelta, finalizeNode } = get()
 
     const tree = activeTreeId ? await db.trees.get(activeTreeId) : null
     const defaultSystemPrompt = tree?.defaultSystemPrompt ?? 'You are a helpful AI research assistant.'
@@ -246,8 +246,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     // Persist prompt + set streaming status
     const existing = nodes.get(nodeId)
     if (!existing) return () => {}
-    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: settings.provider }
-    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: settings.provider })
+    const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: settings.provider, errorMessage: '' }
+    await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: settings.provider, errorMessage: '' })
     set((state) => {
       const next = new Map(state.nodes)
       next.set(nodeId, updated)
@@ -262,12 +262,17 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     // Local async function to persist error state: cancel pending flush, read current text, and write error + text to DB
     const persistError = async (err: unknown) => {
       console.error('[stream error]', err)
+      const message = err instanceof Error ? err.message : String(err)
       cancelThrottledFlush(nodeId)
       const currentNode = get().nodes.get(nodeId)
       if (currentNode) {
-        await db.nodes.update(nodeId, { status: 'error', assistantResponse: currentNode.assistantResponse })
+        await db.nodes.update(nodeId, { status: 'error', assistantResponse: currentNode.assistantResponse, errorMessage: message })
+        set((state) => {
+          const next = new Map(state.nodes)
+          next.set(nodeId, { ...currentNode, status: 'error', errorMessage: message })
+          return { nodes: next }
+        })
       }
-      setNodeStatus(nodeId, 'error')
     }
 
     try {

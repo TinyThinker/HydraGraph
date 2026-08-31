@@ -18,6 +18,7 @@ export interface TurnNode {
   outputTokens?: number
   timestamp: number
   provider?: LLMProvider
+  errorMessage?: string
 }
 
 export interface ConversationTree {

@@ -82,6 +82,14 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeP
         </div>
       )}
 
+      {/* Error message */}
+      {data.status === 'error' && data.errorMessage && (
+        <div className="bg-red-950/40 border border-red-800/50 rounded-lg mx-3 mb-2 p-2">
+          <div className="text-xs text-red-400 font-medium mb-1">⚠ Error</div>
+          <p className="max-h-32 overflow-y-auto text-xs text-red-300 whitespace-pre-wrap break-words">{data.errorMessage}</p>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-slate-700">
         <span className="flex items-center gap-1 text-xs text-slate-500">

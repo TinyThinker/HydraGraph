@@ -1,7 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useTreeStore } from './useTreeStore'
 import { db } from '../db/ChatDatabase'
 import type { TurnNode } from '../types'
+
+vi.mock('../lib/streamingClient', () => ({
+  streamLLMResponse: vi.fn(),
+}))
 
 // Helper factory to create a TurnNode with sensible defaults
 function createNode(overrides: Partial<TurnNode>): TurnNode {
@@ -219,5 +223,85 @@ describe('throttled streaming writes', () => {
     const dbNodeAfter = await db.nodes.get(rootId)
     expect(dbNodeAfter!.assistantResponse).toBe('x')
     expect(dbNodeAfter!.status).toBe('idle')
+  })
+})
+
+describe('stream error surfacing', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      settings: {
+        id: 'global_settings',
+        ollamaBaseUrl: 'http://localhost:11434',
+        defaultModel: 'gemini-2.5-flash',
+        provider: 'gemini',
+      },
+    })
+  })
+
+  it('persists error message to DB and in-memory state on stream error', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, onError) => {
+        onError(new Error('HTTP 401: invalid api key'))
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    await useTreeStore.getState().submitPrompt(rootId, 'hi')
+
+    // Check DB state
+    const dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.status).toBe('error')
+    expect(dbNode!.errorMessage).toContain('invalid api key')
+
+    // Check in-memory state
+    const memNode = useTreeStore.getState().nodes.get(rootId)
+    expect(memNode!.status).toBe('error')
+    expect(memNode!.errorMessage).toContain('invalid api key')
+  })
+
+  it('clears errorMessage when starting a new prompt', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, onError) => {
+        onError(new Error('HTTP 401: invalid api key'))
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    const rootId = tree.rootNodeId
+
+    await useTreeStore.getState().submitPrompt(rootId, 'hi')
+
+    // Verify error was persisted
+    let dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.errorMessage).toContain('invalid api key')
+
+    // Reconfigure mock to succeed this time
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, onDone, _onError) => {
+        onDone({ inputTokens: 0, outputTokens: 0 })
+        return () => {}
+      }
+    )
+
+    // Submit a new prompt
+    await useTreeStore.getState().submitPrompt(rootId, 'again')
+
+    // Check that errorMessage is cleared
+    dbNode = await db.nodes.get(rootId)
+    expect(dbNode!.errorMessage).toBe('')
+
+    const memNode = useTreeStore.getState().nodes.get(rootId)
+    expect(memNode!.errorMessage).toBe('')
   })
 })

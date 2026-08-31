@@ -32,13 +32,11 @@ class ChatDatabase extends Dexie {
         const settingsRow = allSettings[0]
         const inferredProvider: LLMProvider = settingsRow && settingsRow.geminiApiKey ? 'gemini' : 'ollama'
 
-        // Set provider on all existing nodes
+        // Set provider on all existing nodes, and default errorMessage
         const allNodes = await tx.table('nodes').toArray()
         for (const node of allNodes) {
-          await tx.table('nodes').update(node.id, { provider: inferredProvider })
+          await tx.table('nodes').update(node.id, { provider: inferredProvider, errorMessage: '' })
         }
-
-        // TODO: Add more field back-fills here (e.g., errorMessage default)
       })
   }
 }
