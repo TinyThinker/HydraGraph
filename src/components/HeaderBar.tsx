@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Settings, AlertTriangle, LayoutGrid } from 'lucide-react'
+import { Settings, AlertTriangle, LayoutGrid, Download } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
+import { downloadTreeExport } from '../lib/treeExport'
 import { SettingsModal } from './SettingsModal'
 import { TreeSwitcher } from './TreeSwitcher'
 import { SearchBar } from './SearchBar'
@@ -35,6 +36,19 @@ export function HeaderBar() {
             title="Re-run auto-layout for the whole tree"
           >
             <LayoutGrid size={20} />
+          </button>
+          <button
+            onClick={() => {
+              const id = useTreeStore.getState().activeTreeId
+              const tree = useTreeStore.getState().trees.find((t) => t.id === id)
+              if (!tree) return
+              const nodes = [...useTreeStore.getState().nodes.values()].filter((n) => n.treeId === tree.id)
+              downloadTreeExport(tree, nodes)
+            }}
+            title="Export this tree as JSON"
+            className="text-slate-400 hover:text-slate-200 transition-colors p-2"
+          >
+            <Download size={20} />
           </button>
           <button
             onClick={() => setModalOpen(true)}
