@@ -2,6 +2,7 @@ import { memo, useState } from 'react'
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
 import { Zap, GitBranch, Shield, Square } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useRenderTally } from '../lib/renderTally'
 import type { TurnNodeData } from '../types'
 
 const ringClass: Record<string, string> = {
@@ -11,6 +12,7 @@ const ringClass: Record<string, string> = {
 }
 
 export const TurnNodeComponent = memo(function TurnNodeComponent({ data }: NodeProps<Node<TurnNodeData>>) {
+  useRenderTally(data.id)
   const { addNode, submitPrompt, cancelGeneration, settings } = useTreeStore()
   const [draft, setDraft] = useState('')
 

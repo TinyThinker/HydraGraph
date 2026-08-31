@@ -3,10 +3,17 @@ import './index.css'
 import { useTreeStore } from './store/useTreeStore'
 import { Canvas } from './components/Canvas'
 import { HeaderBar } from './components/HeaderBar'
+import { installRenderHarness } from './lib/renderTally'
 
 export default function App() {
   const bootedRef = useRef(false)
   const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      installRenderHarness()
+    }
+  }, [])
 
   useEffect(() => {
     if (bootedRef.current) return
