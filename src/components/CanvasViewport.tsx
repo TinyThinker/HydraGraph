@@ -3,6 +3,7 @@ import { useReactFlow, useOnSelectionChange, useStore } from '@xyflow/react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useReaderPanel } from './useReaderPanel'
 import { resolveNavTarget, isTypingTarget } from '../lib/treeNav'
+import { NODE_WIDTH, NODE_HEIGHT } from '../lib/nodeDimensions'
 import { db } from '../db/ChatDatabase'
 
 export function CanvasViewport() {
@@ -129,7 +130,7 @@ export function CanvasViewport() {
         selectedRef.current = targetId
 
         const t = nodes.get(targetId)
-        if (t) setCenter(t.positionX + (t.width ?? 320) / 2, t.positionY + (t.height ?? 240) / 2, { zoom: getZoom(), duration: 300 })
+        if (t) setCenter(t.positionX + NODE_WIDTH / 2, t.positionY + NODE_HEIGHT / 2, { zoom: getZoom(), duration: 300 })
       }
     }
 

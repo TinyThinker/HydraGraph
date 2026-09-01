@@ -1,6 +1,5 @@
 import { ReactFlow, Background, BackgroundVariant, Controls } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useTreeStore } from '../store/useTreeStore'
 import { TurnNodeComponent } from './TurnNode'
 import { useCanvasGraph } from './useCanvasGraph'
 import { CanvasFitter } from './CanvasFitter'
@@ -11,8 +10,7 @@ import { CanvasViewport } from './CanvasViewport'
 const nodeTypes = { turnNode: TurnNodeComponent }
 
 export function Canvas() {
-  const updateNode = useTreeStore((s) => s.updateNode)
-  const { localNodes, edges, onNodesChange, draggingIdRef, debounceTimers } = useCanvasGraph()
+  const { localNodes, edges, onNodesChange } = useCanvasGraph()
 
   return (
     <div className="w-full h-full">
@@ -21,14 +19,15 @@ export function Canvas() {
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
-        onNodeDragStart={(_event, node) => { draggingIdRef.current = node.id }}
-        onNodeDragStop={(_event, node) => {
-          const existing = debounceTimers.current.get(node.id)
-          if (existing) clearTimeout(existing.timer)
-          updateNode(node.id, { positionX: node.position.x, positionY: node.position.y })
-          debounceTimers.current.delete(node.id)
-          draggingIdRef.current = null
-        }}
+        nodesDraggable={false}
+        panOnDrag
+        panOnScroll
+        panOnScrollSpeed={0.5}
+        zoomOnScroll
+        zoomOnPinch
+        zoomOnDoubleClick
+        minZoom={0.2}
+        maxZoom={2}
         deleteKeyCode={null}
         disableKeyboardA11y
         className="bg-slate-950"

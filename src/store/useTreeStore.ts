@@ -15,6 +15,12 @@ interface TreeStoreState {
   settings: AppSettings
   liveText: Map<string, string>
   fitViewNonce: number
+  /**
+   * Id of the most recently spawned child node (an actual branch off an
+   * existing parent, never a root). CanvasSelectionSync watches this to route
+   * a fresh spawn through the same select + auto-center path as a click.
+   */
+  lastSpawnedNodeId: string | null
 }
 
 interface TreeStoreActions {
@@ -85,6 +91,19 @@ function cancelThrottledFlush(nodeId: string) {
   }
 }
 
+// Recompute the full deterministic layout and return a NEW Map where every
+// reachable node is replaced with { ...node, positionX, positionY }. Nodes
+// absent from the layout result (orphans) are copied through unchanged.
+export function relayoutNodes(nodes: Map<string, TurnNode>): Map<string, TurnNode> {
+  const positions = layoutTree(nodes)
+  const next = new Map<string, TurnNode>()
+  for (const [id, node] of nodes) {
+    const pos = positions.get(id)
+    next.set(id, pos ? { ...node, positionX: pos.x, positionY: pos.y } : node)
+  }
+  return next
+}
+
 // Collect a node and all its descendants into a Set of ids.
 // Uses explicit stack to guard against cycles and missing entries.
 export function collectSubtreeIds(rootId: string, nodes: Map<string, TurnNode>): Set<string> {
@@ -114,6 +133,32 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     set({ trees: trees.map((t) => (t.id === activeTreeId ? { ...t, updatedAt: now } : t)) })
   }
 
+  // Persist every changed position from `next` to Dexie in one transaction,
+  // then commit `next` to state. `next` is expected to be the output of
+  // relayoutNodes (a fresh Map with new node references where positions changed).
+  const persistLayout = async (next: Map<string, TurnNode>) => {
+    const prev = get().nodes
+    const changed: Array<[string, TurnNode]> = []
+    for (const [id, node] of next) {
+      const before = prev.get(id)
+      if (before && before.positionX === node.positionX && before.positionY === node.positionY) continue
+      changed.push([id, node])
+    }
+    if (changed.length > 0) {
+      await db.transaction('rw', [db.nodes], async () => {
+        for (const [id, node] of changed) {
+          await db.nodes.update(id, { positionX: node.positionX, positionY: node.positionY })
+        }
+      })
+    }
+    set({ nodes: next })
+  }
+
+  const recomputeLayout = async () => {
+    const next = relayoutNodes(get().nodes)
+    await persistLayout(next)
+  }
+
   return {
     nodes: new Map(),
     trees: [],
@@ -121,6 +166,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     settings: DEFAULT_SETTINGS,
     liveText: new Map(),
     fitViewNonce: 0,
+    lastSpawnedNodeId: null,
 
     loadSettings: async () => {
       const saved = await db.settings.get('global_settings')
@@ -247,27 +293,32 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
       await db.nodes.add(placed)
 
-      if (placed.parentId) {
-        const parent = get().nodes.get(placed.parentId)
-        if (parent) {
-          const updatedParent = { ...parent, childrenIds: [...parent.childrenIds, placed.id] }
-          await db.nodes.update(placed.parentId, { childrenIds: updatedParent.childrenIds })
-          set((state) => {
-            const next = new Map(state.nodes)
-            next.set(placed.parentId!, updatedParent)
-            next.set(placed.id, placed)
-            return { nodes: next }
-          })
-          await touchActiveTree()
-          return
-        }
+      const parent = placed.parentId ? get().nodes.get(placed.parentId) : undefined
+      const isChildSpawn = !!(parent && placed.parentId)
+      if (isChildSpawn && parent && placed.parentId) {
+        const updatedParent = { ...parent, childrenIds: [...parent.childrenIds, placed.id] }
+        await db.nodes.update(placed.parentId, { childrenIds: updatedParent.childrenIds })
+        set((state) => {
+          const next = new Map(state.nodes)
+          next.set(placed.parentId!, updatedParent)
+          next.set(placed.id, placed)
+          return { nodes: next }
+        })
+      } else {
+        set((state) => {
+          const next = new Map(state.nodes)
+          next.set(placed.id, placed)
+          return { nodes: next }
+        })
       }
 
-      set((state) => {
-        const next = new Map(state.nodes)
-        next.set(placed.id, placed)
-        return { nodes: next }
-      })
+      // Positions are 100% derived from tree structure: recompute the full
+      // deterministic layout and persist it. Covers branching and forkAndSubmit.
+      await recomputeLayout()
+
+      // Only a real child spawn (existing parent) routes through select+center.
+      if (isChildSpawn) set({ lastSpawnedNodeId: placed.id })
+
       await touchActiveTree()
     },
 
@@ -532,6 +583,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         return { nodes: next, liveText: nextLiveText }
       })
 
+      // Remaining nodes' positions are derived from structure: recompute + persist.
+      await recomputeLayout()
       await touchActiveTree()
     },
 
@@ -584,26 +637,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       const { nodes, activeTreeId } = get()
       if (!activeTreeId || nodes.size === 0) return
 
-      const positions = layoutTree(nodes)
-
-      // Persist every position in one transaction
-      await db.transaction('rw', [db.nodes], async () => {
-        for (const [id, pos] of positions) {
-          await db.nodes.update(id, { positionX: pos.x, positionY: pos.y })
-        }
-      })
-
-      // Update memory immutably
-      set((state) => {
-        const nextNodes = new Map(state.nodes)
-        for (const [id, pos] of positions) {
-          const node = nextNodes.get(id)
-          if (node) {
-            nextNodes.set(id, { ...node, positionX: pos.x, positionY: pos.y })
-          }
-        }
-        return { nodes: nextNodes, fitViewNonce: state.fitViewNonce + 1 }
-      })
+      await persistLayout(relayoutNodes(nodes))
+      set((state) => ({ fitViewNonce: state.fitViewNonce + 1 }))
     },
 
     renameTree: async (treeId, title) => {

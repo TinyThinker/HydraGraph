@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { act } from 'react'
 import { Canvas } from './Canvas'
@@ -174,66 +174,6 @@ describe('renderBudget: render count regression lock', () => {
       expect(postStreamTally[childAId] ?? 0).toBeGreaterThan(childABaselineCount)
       // But sanity check: shouldn't be more than ~40 re-renders (roughly 2 per token)
       expect(postStreamTally[childAId] ?? 0).toBeLessThanOrEqual(childABaselineCount + 40)
-
-      unmount()
-    })
-  })
-
-  describe('Test B: card caps response text at 2000 characters', () => {
-    it('renders only last 2000 chars and shows truncation notice', async () => {
-      // Create one node with 40,000 character response
-      const nodeId = crypto.randomUUID()
-      const longText = 'a'.repeat(40000)
-
-      const node = createNode({
-        id: nodeId,
-        treeId: 'tree-test',
-        parentId: null,
-        childrenIds: [],
-        assistantResponse: longText,
-        status: 'idle',
-      })
-
-      useTreeStore.setState({
-        nodes: new Map([[nodeId, node]]),
-        activeTreeId: 'tree-test',
-      })
-
-      // Render Canvas
-      const { unmount, container } = render(
-        <ReactFlowProvider>
-          <Canvas />
-        </ReactFlowProvider>,
-      )
-
-      // Wait for render to settle
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
-      // Query all <p> elements and find the one with long text
-      const paragraphs = container.querySelectorAll('p')
-      let responseParagraph: HTMLParagraphElement | null = null
-
-      for (const p of paragraphs) {
-        // The response text paragraph will have lots of 'a' characters
-        if ((p.textContent?.match(/a/g) ?? []).length > 100) {
-          responseParagraph = p
-          break
-        }
-      }
-
-      // Verify we found the response paragraph
-      expect(responseParagraph).toBeDefined()
-
-      // ASSERTION: rendered text must be <= 2000 chars
-      if (responseParagraph) {
-        expect(responseParagraph.textContent!.length).toBeLessThanOrEqual(2000)
-      }
-
-      // ASSERTION: store still holds full 40k text
-      expect(useTreeStore.getState().nodes.get(nodeId)!.assistantResponse.length).toBe(40000)
-
-      // ASSERTION: truncation notice is visible
-      expect(screen.getByText(/Showing the last/i)).toBeDefined()
 
       unmount()
     })

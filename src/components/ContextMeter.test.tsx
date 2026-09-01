@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { ReactFlowProvider } from '@xyflow/react'
-import { TurnNodeComponent } from './TurnNode'
 import { ContextMeter } from './ContextMeter'
 import { estimateContextTokens, CONTEXT_WARN_TOKENS } from '../lib/contextEstimate'
 import { useTreeStore } from '../store/useTreeStore'
@@ -134,60 +132,7 @@ describe('ContextMeter', () => {
     })
   })
 
-  describe('TurnNode integration', () => {
-    it('deep node shows warning and send controls remain accessible', async () => {
-      const ids = Array.from({ length: 10 }, () => crypto.randomUUID())
-      const nodes = new Map<string, TurnNode>()
-
-      for (let i = 0; i < 10; i++) {
-        const node = createNode({
-          id: ids[i],
-          parentId: i === 0 ? null : ids[i - 1],
-          userPrompt: i === 9 ? '' : 'Prompt',
-          assistantResponse: 'a'.repeat(5000),
-        })
-        nodes.set(ids[i], node)
-      }
-
-      useTreeStore.setState({ nodes })
-
-      const { container } = render(
-        <ReactFlowProvider>
-          <TurnNodeComponent {...({ data: nodes.get(ids[9])!, selected: false } as any)} />
-        </ReactFlowProvider>,
-      )
-
-      // Warning should be visible
-      expect(screen.getByText(/approaching typical model limits/i)).toBeInTheDocument()
-
-      // Send button should be in document (multiple buttons exist, but at least one should be Send)
-      const allButtons = Array.from(container.querySelectorAll('button'))
-      const sendButton = allButtons.find((b) => b.textContent?.includes('Send'))
-      expect(sendButton).toBeDefined()
-    })
-
-    it('node with inputTokens and outputTokens shows actual counts', async () => {
-      const nodeId = crypto.randomUUID()
-      const node = createNode({
-        id: nodeId,
-        parentId: null,
-        userPrompt: 'Test',
-        assistantResponse: 'Response',
-        status: 'idle',
-        inputTokens: 42,
-        outputTokens: 99,
-      })
-
-      useTreeStore.setState({ nodes: new Map([[nodeId, node]]) })
-
-      const { container } = render(
-        <ReactFlowProvider>
-          <TurnNodeComponent {...({ data: node, selected: false } as any)} />
-        </ReactFlowProvider>,
-      )
-
-      expect(container.textContent).toMatch(/42 in/)
-      expect(container.textContent).toMatch(/99 out/)
-    })
-  })
+  // NOTE: the "TurnNode integration" block was removed in Task 3.3 — the canvas
+  // node is now a compact station pill and no longer renders ContextMeter or the
+  // Send controls. ContextMeter behaviour is covered by the component block above.
 })

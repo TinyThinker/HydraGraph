@@ -5,6 +5,7 @@ import { act } from 'react'
 import { Canvas } from './Canvas'
 import { useTreeStore } from '../store/useTreeStore'
 import { db } from '../db/ChatDatabase'
+import { NODE_WIDTH, NODE_HEIGHT } from '../lib/nodeDimensions'
 import type { TurnNode } from '../types'
 
 // Helper: create a node with sensible defaults
@@ -29,7 +30,7 @@ function createNode(overrides: Partial<TurnNode>): TurnNode {
   }
 }
 
-describe('resizableCard: T4.2 width/height', () => {
+describe('stationPill: fixed node dimensions', () => {
   beforeEach(async () => {
     // Reset database
     await db.delete()
@@ -50,7 +51,7 @@ describe('resizableCard: T4.2 width/height', () => {
     })
   })
 
-  it('(a) renders node with explicit width/height from store', async () => {
+  it('(a) ignores explicit width/height on the store node and renders at the fixed pill size', async () => {
     // Create one node with width: 500, height: 400
     const nodeId = crypto.randomUUID()
     const node = createNode({
@@ -85,17 +86,15 @@ describe('resizableCard: T4.2 width/height', () => {
     // ASSERTION: node element exists
     expect(rfNode).not.toBeNull()
 
-    // ASSERTION: inline style width is 500px
+    // ASSERTION: inline style uses the fixed pill dimensions, NOT 500/400
     const styleWidth = rfNode?.getAttribute('style') || ''
-    expect(styleWidth).toContain('500px')
-
-    // ASSERTION: inline style height is 400px
-    expect(styleWidth).toContain('400px')
+    expect(styleWidth).toContain(`${NODE_WIDTH}px`)
+    expect(styleWidth).toContain(`${NODE_HEIGHT}px`)
 
     unmount()
   })
 
-  it('(b) renders node with NO width/height and falls back to defaults', async () => {
+  it('(b) renders node with NO width/height at the fixed pill size', async () => {
     // Create one node WITHOUT width/height
     const nodeId = crypto.randomUUID()
     const node = createNode({
@@ -129,12 +128,10 @@ describe('resizableCard: T4.2 width/height', () => {
     // ASSERTION: node element exists (fallback path does not throw)
     expect(rfNode).not.toBeNull()
 
-    // ASSERTION: inline style width is 320px (DEFAULT_NODE_WIDTH)
+    // ASSERTION: inline style uses the fixed pill dimensions
     const styleWidth = rfNode?.getAttribute('style') || ''
-    expect(styleWidth).toContain('320px')
-
-    // ASSERTION: inline style height is 240px (DEFAULT_NODE_HEIGHT)
-    expect(styleWidth).toContain('240px')
+    expect(styleWidth).toContain(`${NODE_WIDTH}px`)
+    expect(styleWidth).toContain(`${NODE_HEIGHT}px`)
 
     unmount()
   })

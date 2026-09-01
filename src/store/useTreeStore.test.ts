@@ -44,6 +44,7 @@ describe('useTreeStore', () => {
         provider: 'gemini',
       },
       liveText: new Map(),
+      lastSpawnedNodeId: null,
     })
   })
 
@@ -100,6 +101,29 @@ describe('useTreeStore', () => {
     const dbChild = await db.nodes.get(child.id)
     expect(dbChild).toBeDefined()
     expect(dbChild!.id).toBe(child.id)
+  })
+
+  it('2b. addNode of a child records it as lastSpawnedNodeId; createTree leaves it null', async () => {
+    const tree = await useTreeStore.getState().createTree('My Tree')
+
+    // createTree does not go through addNode -> no spawn recorded
+    expect(useTreeStore.getState().lastSpawnedNodeId).toBeNull()
+
+    const child = createNode({
+      id: crypto.randomUUID(),
+      treeId: tree.id,
+      parentId: tree.rootNodeId,
+      childrenIds: [],
+    })
+    await useTreeStore.getState().addNode(child)
+
+    expect(useTreeStore.getState().lastSpawnedNodeId).toBe(child.id)
+  })
+
+  it('2c. addNode of a parent-less node does NOT set lastSpawnedNodeId', async () => {
+    const orphan = createNode({ id: crypto.randomUUID(), parentId: null })
+    await useTreeStore.getState().addNode(orphan)
+    expect(useTreeStore.getState().lastSpawnedNodeId).toBeNull()
   })
 
   it('3. appendTokenDelta writes live text without touching the node object', async () => {

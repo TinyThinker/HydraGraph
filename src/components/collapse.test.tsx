@@ -245,20 +245,12 @@ describe('collapse and expand: T4.8', () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
     })
 
-    // Check that "Collapse subtree" appears (for r, which has children)
-    expect(container.textContent).toContain('Collapse subtree')
-
-    // Check that leaf node a has no expand/collapse text
-    // Count "Collapse subtree" buttons — should be 1 (only r has it, not a)
-    const buttons = container.querySelectorAll('button')
-    let collapseButtonCount = 0
-    for (const btn of buttons) {
-      if (btn.textContent?.includes('Collapse subtree') || btn.textContent?.includes('Show') && btn.textContent?.includes('hidden')) {
-        collapseButtonCount++
-      }
-    }
-    // Should be 1 button (r has children, a is a leaf)
-    expect(collapseButtonCount).toBe(1)
+    // The collapse control is an icon button identified by its title attribute.
+    // Only r (which has a child) shows it; leaf a does not.
+    const collapseButtons = container.querySelectorAll(
+      'button[title="Collapse subtree"], button[title^="Show "]',
+    )
+    expect(collapseButtons.length).toBe(1)
 
     unmount()
   })

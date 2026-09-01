@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { layoutTree, computeChildPosition } from './autoLayout'
+import { NODE_WIDTH, NODE_HEIGHT } from './nodeDimensions'
 import type { TurnNode } from '../types'
 
+let seq = 0
 function createNode(overrides: Partial<TurnNode>): TurnNode {
   return {
-    id: 'node-' + Math.random(),
+    id: 'node-' + seq++,
     treeId: 'tree-1',
     parentId: null,
     childrenIds: [],
@@ -15,7 +17,7 @@ function createNode(overrides: Partial<TurnNode>): TurnNode {
     isCollapsed: false,
     status: 'idle',
     modelUsed: 'model',
-    timestamp: Date.now(),
+    timestamp: 0,
     ...overrides,
   }
 }
@@ -34,102 +36,120 @@ function overlaps(
 }
 
 describe('layoutTree', () => {
-  it('returns positions for every node with no overlaps', () => {
-    const nodeA = createNode({ id: 'a' })
-    const nodeB = createNode({ id: 'b', parentId: 'a' })
-    const nodeC = createNode({ id: 'c', parentId: 'a' })
-    const nodeD = createNode({ id: 'd', parentId: 'b' })
-
+  it('returns a position for every reachable node with no bounding-box overlaps', () => {
     const nodes = new Map<string, TurnNode>([
-      ['a', nodeA],
-      ['b', nodeB],
-      ['c', nodeC],
-      ['d', nodeD],
+      ['a', createNode({ id: 'a', childrenIds: ['b', 'c'], timestamp: 0 })],
+      ['b', createNode({ id: 'b', parentId: 'a', childrenIds: ['d'] })],
+      ['c', createNode({ id: 'c', parentId: 'a' })],
+      ['d', createNode({ id: 'd', parentId: 'b' })],
     ])
 
     const result = layoutTree(nodes)
-
     expect(result.size).toBe(4)
-    expect(result.has('a')).toBe(true)
-    expect(result.has('b')).toBe(true)
-    expect(result.has('c')).toBe(true)
-    expect(result.has('d')).toBe(true)
+    for (const id of ['a', 'b', 'c', 'd']) expect(result.has(id)).toBe(true)
 
-    const boxA = { ...result.get('a')!, w: 320, h: 240 }
-    const boxB = { ...result.get('b')!, w: 320, h: 240 }
-    const boxC = { ...result.get('c')!, w: 320, h: 240 }
-    const boxD = { ...result.get('d')!, w: 320, h: 240 }
-
-    const checkOverlap = [
-      [boxA, boxB],
-      [boxA, boxC],
-      [boxA, boxD],
-      [boxB, boxC],
-      [boxB, boxD],
-      [boxC, boxD],
-    ]
-
-    for (const [box1, box2] of checkOverlap) {
-      const hasOverlap = overlaps(box1.x, box1.y, box1.w, box1.h, box2.x, box2.y, box2.w, box2.h)
-      expect(hasOverlap).toBe(false)
+    const ids = ['a', 'b', 'c', 'd']
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const p1 = result.get(ids[i])!
+        const p2 = result.get(ids[j])!
+        expect(
+          overlaps(p1.x, p1.y, NODE_WIDTH, NODE_HEIGHT, p2.x, p2.y, NODE_WIDTH, NODE_HEIGHT),
+        ).toBe(false)
+      }
     }
   })
 
-  it('positions children below their parents (TB layout)', () => {
-    const nodeA = createNode({ id: 'a' })
-    const nodeB = createNode({ id: 'b', parentId: 'a' })
-    const nodeD = createNode({ id: 'd', parentId: 'b' })
-
+  it('positions children strictly below their parents', () => {
     const nodes = new Map<string, TurnNode>([
-      ['a', nodeA],
-      ['b', nodeB],
-      ['d', nodeD],
+      ['a', createNode({ id: 'a', childrenIds: ['b'], timestamp: 0 })],
+      ['b', createNode({ id: 'b', parentId: 'a', childrenIds: ['d'] })],
+      ['d', createNode({ id: 'd', parentId: 'b' })],
     ])
 
     const result = layoutTree(nodes)
+    expect(result.get('b')!.y).toBeGreaterThan(result.get('a')!.y)
+    expect(result.get('d')!.y).toBeGreaterThan(result.get('b')!.y)
+  })
 
-    const posA = result.get('a')!
-    const posB = result.get('b')!
-    const posD = result.get('d')!
+  it('is deterministic: two calls on the same map are deeply equal', () => {
+    const nodes = new Map<string, TurnNode>([
+      ['a', createNode({ id: 'a', childrenIds: ['b', 'c'], timestamp: 0 })],
+      ['b', createNode({ id: 'b', parentId: 'a' })],
+      ['c', createNode({ id: 'c', parentId: 'a' })],
+    ])
 
-    expect(posB.y).toBeGreaterThan(posA.y)
-    expect(posD.y).toBeGreaterThan(posB.y)
+    const first = layoutTree(nodes)
+    const second = layoutTree(nodes)
+    expect([...second.entries()]).toEqual([...first.entries()])
+  })
+
+  it('normalizes the layout so min x and min y are exactly 40', () => {
+    const nodes = new Map<string, TurnNode>([
+      ['a', createNode({ id: 'a', childrenIds: ['b', 'c'], timestamp: 0 })],
+      ['b', createNode({ id: 'b', parentId: 'a' })],
+      ['c', createNode({ id: 'c', parentId: 'a' })],
+    ])
+
+    const result = layoutTree(nodes)
+    const xs = [...result.values()].map((p) => p.x)
+    const ys = [...result.values()].map((p) => p.y)
+    expect(Math.min(...xs)).toBe(40)
+    expect(Math.min(...ys)).toBe(40)
+  })
+
+  it('does not throw on a broken parent pointer', () => {
+    const nodes = new Map<string, TurnNode>([
+      ['a', createNode({ id: 'a', childrenIds: ['b', 'ghost'], timestamp: 0 })],
+      ['b', createNode({ id: 'b', parentId: 'a' })],
+    ])
+
+    let result: Map<string, { x: number; y: number }> | undefined
+    expect(() => {
+      result = layoutTree(nodes)
+    }).not.toThrow()
+    expect(result!.has('a')).toBe(true)
+    expect(result!.has('b')).toBe(true)
+  })
+
+  it('does not throw on a cycle', () => {
+    const nodes = new Map<string, TurnNode>([
+      ['a', createNode({ id: 'a', childrenIds: ['b'], timestamp: 0 })],
+      ['b', createNode({ id: 'b', parentId: 'a', childrenIds: ['a'] })],
+    ])
+
+    expect(() => layoutTree(nodes)).not.toThrow()
+  })
+
+  it('returns an empty Map when there is no root', () => {
+    const nodes = new Map<string, TurnNode>([
+      ['a', createNode({ id: 'a', parentId: 'b' })],
+      ['b', createNode({ id: 'b', parentId: 'a' })],
+    ])
+
+    expect(layoutTree(nodes).size).toBe(0)
   })
 })
 
 describe('computeChildPosition', () => {
-  it('returns a position below parent when parent has existing siblings', () => {
-    const nodeA = createNode({ id: 'a' })
-    const nodeB = createNode({ id: 'b', parentId: 'a' })
-    const nodeC = createNode({ id: 'c', parentId: 'a' })
-
+  it('returns a spot below the parent when siblings already exist', () => {
     const nodes = new Map<string, TurnNode>([
-      ['a', nodeA],
-      ['b', nodeB],
-      ['c', nodeC],
+      ['a', createNode({ id: 'a', childrenIds: ['b', 'c'], timestamp: 0 })],
+      ['b', createNode({ id: 'b', parentId: 'a' })],
+      ['c', createNode({ id: 'c', parentId: 'a' })],
     ])
 
     const parentPos = layoutTree(nodes).get('a')!
     const newPos = computeChildPosition('a', nodes)
-
-    // New position should be below the parent (TB layout)
     expect(newPos.y).toBeGreaterThan(parentPos.y)
   })
 
   it('returns {x: 0, y: 0} when parentId is not in the map', () => {
-    const nodeA = createNode({ id: 'a' })
-    const nodes = new Map<string, TurnNode>([['a', nodeA]])
-
-    const result = computeChildPosition('nonexistent', nodes)
-
-    expect(result).toEqual({ x: 0, y: 0 })
+    const nodes = new Map<string, TurnNode>([['a', createNode({ id: 'a' })]])
+    expect(computeChildPosition('nonexistent', nodes)).toEqual({ x: 0, y: 0 })
   })
 
-  it('does not throw on missing parent', () => {
-    const nodes = new Map<string, TurnNode>()
-
-    expect(() => {
-      computeChildPosition('missing-parent', nodes)
-    }).not.toThrow()
+  it('does not throw on an empty map', () => {
+    expect(() => computeChildPosition('missing-parent', new Map())).not.toThrow()
   })
 })

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useSearchNav } from './useSearchNav'
+import { NODE_WIDTH, NODE_HEIGHT } from '../lib/nodeDimensions'
 
 export function CanvasSearchFocus() {
   const targetId = useSearchNav((s) => s.targetId)
@@ -14,10 +15,7 @@ export function CanvasSearchFocus() {
     const n = useTreeStore.getState().nodes.get(targetId)
     if (!n) return
 
-    const w = n.width ?? 320
-    const h = n.height ?? 240
-
-    setCenter(n.positionX + w / 2, n.positionY + h / 2, { zoom: 1.2, duration: 500 })
+    setCenter(n.positionX + NODE_WIDTH / 2, n.positionY + NODE_HEIGHT / 2, { zoom: 1.2, duration: 500 })
     setNodes((nds) => nds.map((x) => ({ ...x, selected: x.id === targetId })))
 
     const t = setTimeout(

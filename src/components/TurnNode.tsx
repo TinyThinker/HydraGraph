@@ -1,101 +1,103 @@
 import { memo } from 'react'
-import { Handle, Position, NodeResizer, type NodeProps, type Node } from '@xyflow/react'
-import { Shield, History, ChevronRight, ChevronDown } from 'lucide-react'
+import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
+import {
+  Shield,
+  TriangleAlert,
+  Loader,
+  Bot,
+  MessageCircle,
+  GitBranch,
+  ChevronRight,
+  ChevronDown,
+  History,
+} from 'lucide-react'
 import { useTreeStore, collectSubtreeIds } from '../store/useTreeStore'
 import { useReaderPanel } from './useReaderPanel'
 import { useRenderTally } from '../lib/renderTally'
-import { ResponseArea } from './ResponseArea'
-import { PromptSection } from './PromptSection'
-import { NodeFooter } from './NodeFooter'
-import { ContextMeter } from './ContextMeter'
-import { estimateContextTokens } from '../lib/contextEstimate'
+import { stationSummary } from '../lib/stationSummary'
+import { PillActions } from './PillActions'
 import type { TurnNodeData } from '../types'
 
-// Bounds only the DOM render of response text; stored text is never truncated
-const RENDERED_TEXT_CAP = 2000
+const STALE_SENTENCE =
+  'An ancestor changed after this answer was generated — it may be out of date.'
 
-const ringClass: Record<string, string> = { idle: 'ring-2 ring-indigo-500', streaming: 'ring-2 ring-cyan-400 animate-pulse', error: 'ring-2 ring-red-500' }
+const statusRing: Record<string, string> = {
+  idle: 'ring-1 ring-slate-700',
+  streaming: 'ring-2 ring-cyan-400 animate-pulse',
+  error: 'ring-2 ring-red-500',
+}
 
-export const TurnNodeComponent = memo(function TurnNodeComponent({ data, selected }: NodeProps<Node<TurnNodeData>>) {
+function RoleIcon({ data }: { data: TurnNodeData }) {
+  if (data.systemPromptOverride) return <Shield size={16} className="shrink-0 text-amber-400" />
+  if (data.status === 'error') return <TriangleAlert size={16} className="shrink-0 text-red-400" />
+  if (data.status === 'streaming')
+    return <Loader size={16} className="shrink-0 animate-spin text-cyan-400" />
+  if (data.parentId === null) return <Bot size={16} className="shrink-0 text-indigo-300" />
+  return <MessageCircle size={16} className="shrink-0 text-indigo-400" />
+}
+
+// Compact navigational "station pill". Prompt composition + full-text reading
+// live in the chat pane / ReaderPanel now, so this only renders wayfinding UI.
+export const TurnNodeComponent = memo(function TurnNodeComponent({
+  data,
+  selected,
+}: NodeProps<Node<TurnNodeData>>) {
   useRenderTally(data.id)
   const liveText = useTreeStore((s) => s.liveText.get(data.id))
   const openReader = useReaderPanel((s) => s.open)
   const toggleCollapse = useTreeStore((s) => s.toggleCollapse)
-  const hiddenCount = useTreeStore((s) => (data.isCollapsed || data.childrenIds.length > 0 ? collectSubtreeIds(data.id, s.nodes).size - 1 : 0))
-  const contextTokens = useTreeStore((s) => estimateContextTokens(data.id, s.nodes))
+  const hiddenCount = useTreeStore((s) =>
+    data.isCollapsed || data.childrenIds.length > 0
+      ? collectSubtreeIds(data.id, s.nodes).size - 1
+      : 0,
+  )
 
-  // Compute responseText: use liveText if streaming, otherwise use stored response
-  const responseText = liveText !== undefined ? liveText : data.assistantResponse
-
-  // Cap rendered text to last N characters; stored text is never truncated
-  const isTruncated = responseText.length > RENDERED_TEXT_CAP
-  const visibleText = isTruncated ? responseText.slice(-RENDERED_TEXT_CAP) : responseText
+  const roleLabel =
+    data.parentId === null ? 'Root' : data.userPrompt.trim() ? 'You' : 'Assistant'
+  const branchCount = data.childrenIds.length
+  const showCollapse = data.isCollapsed || branchCount > 0
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col overflow-hidden rounded-xl bg-slate-900 border border-slate-700 shadow-xl ${ringClass[data.status] ?? ringClass.idle} ${data.stale ? 'opacity-70' : ''}`}
       onDoubleClick={() => openReader(data.id)}
+      data-has-token={liveText ? 'true' : undefined}
+      className={`relative flex h-full w-full items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 shadow-lg ${
+        statusRing[data.status] ?? statusRing.idle
+      } ${selected ? 'ring-2 ring-indigo-400' : ''} ${data.stale ? 'opacity-70' : ''}`}
     >
-      <NodeResizer minWidth={280} minHeight={200} isVisible={selected} lineClassName="!border-indigo-500" handleClassName="!bg-indigo-500 !border-slate-800" />
-      <Handle type="target" position={Position.Top} className="!bg-indigo-500 !border-slate-800" />
+      <Handle type="target" position={Position.Top} className="!border-slate-800 !bg-indigo-500" />
 
-      {/* System prompt badge */}
-      {data.systemPromptOverride && (
-        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-700 text-amber-400 text-xs font-medium">
-          <Shield size={12} />
-          <span className="truncate">{data.systemPromptOverride}</span>
+      <RoleIcon data={data} />
+
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+          <span>{roleLabel}</span>
+          {data.stale && <History size={10} className="text-amber-400" />}
         </div>
+        <div className="truncate text-xs text-slate-200">{stationSummary(data)}</div>
+      </div>
+
+      {branchCount > 1 && (
+        <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">
+          <GitBranch size={10} /> {branchCount}
+        </span>
       )}
 
-      {/* Stale badge */}
-      {data.stale && (
-        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-amber-800/40 bg-amber-950/30 text-amber-300 text-xs font-medium">
-          <History size={12} />
-          <span>An ancestor changed after this answer was generated — it may be out of date.</span>
-        </div>
-      )}
-
-      {/* Collapse/expand control */}
-      {(data.isCollapsed || data.childrenIds.length > 0) && (
+      {showCollapse && (
         <button
           onClick={() => toggleCollapse(data.id)}
-          className="nodrag flex items-center gap-1 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 border-b border-slate-700 w-full"
+          title={data.isCollapsed ? `Show ${hiddenCount} hidden` : 'Collapse subtree'}
+          className="nodrag shrink-0 rounded p-1 text-slate-400 transition-colors hover:text-slate-200"
         >
-          {data.isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-          <span>{data.isCollapsed ? `Show ${hiddenCount} hidden` : 'Collapse subtree'}</span>
+          {data.isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
       )}
 
-      {/* Context meter */}
-      <ContextMeter
-        tokens={contextTokens}
-        inputTokens={data.inputTokens}
-        outputTokens={data.outputTokens}
-        status={data.status}
-      />
+      {data.stale && <span className="sr-only">{STALE_SENTENCE}</span>}
 
-      {/* User prompt */}
-      <PromptSection node={data} />
+      <PillActions node={data} selected={selected} />
 
-      {/* Assistant response */}
-      <ResponseArea
-        responseText={responseText}
-        isTruncated={isTruncated}
-        visibleText={visibleText}
-        onOpenFullText={() => openReader(data.id)}
-      />
-
-      {/* Error message */}
-      {data.status === 'error' && data.errorMessage && (
-        <div className="bg-red-950/40 border border-red-800/50 rounded-lg mx-3 mb-2 p-2">
-          <div className="text-xs text-red-400 font-medium mb-1">⚠ Error</div>
-          <p className="max-h-32 overflow-y-auto text-xs text-red-300 whitespace-pre-wrap break-words">{data.errorMessage}</p>
-        </div>
-      )}
-
-      <NodeFooter node={data} />
-
-      <Handle type="source" position={Position.Bottom} className="!bg-indigo-500 !border-slate-800" />
+      <Handle type="source" position={Position.Bottom} className="!border-slate-800 !bg-indigo-500" />
     </div>
   )
 })
