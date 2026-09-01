@@ -5,6 +5,7 @@ import { TurnNodeComponent } from './TurnNode'
 import { useCanvasGraph } from './useCanvasGraph'
 import { CanvasFitter } from './CanvasFitter'
 import { CanvasSearchFocus } from './CanvasSearchFocus'
+import { CanvasSelectionSync } from './CanvasSelectionSync'
 import { CanvasViewport } from './CanvasViewport'
 
 const nodeTypes = { turnNode: TurnNodeComponent }
@@ -36,6 +37,7 @@ export function Canvas() {
         <Controls className="[&>button]:bg-slate-800 [&>button]:border-slate-700 [&>button]:text-slate-300" />
         <CanvasFitter />
         <CanvasSearchFocus />
+        <CanvasSelectionSync />
         <CanvasViewport />
       </ReactFlow>
     </div>

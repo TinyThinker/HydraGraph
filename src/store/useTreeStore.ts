@@ -30,6 +30,7 @@ interface TreeStoreActions {
   setActiveTree: (treeId: string) => void
   loadAllTrees: () => Promise<void>
   submitPrompt: (nodeId: string, userPrompt: string) => Promise<() => void>
+  forkAndSubmit: (parentId: string, userPrompt: string) => Promise<string | null>
   cancelGeneration: (id: string) => Promise<void>
   deleteNodeSubtree: (id: string) => Promise<void>
   markDescendantsStale: (id: string) => Promise<void>
@@ -414,6 +415,36 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         await persistError(err)
         return () => {}
       }
+    },
+
+    // Fork a fresh child off `parentId` and immediately dispatch `userPrompt`
+    // into it. Sibling branches are untouched — addNode appends to the parent's
+    // childrenIds rather than replacing them. Returns the new child id (or null
+    // if the parent / active tree is missing).
+    forkAndSubmit: async (parentId, userPrompt) => {
+      const { activeTreeId, nodes, settings } = get()
+      const parent = nodes.get(parentId)
+      if (!activeTreeId || !parent) return null
+
+      const childId = crypto.randomUUID()
+      const child: TurnNode = {
+        id: childId,
+        treeId: activeTreeId,
+        parentId,
+        childrenIds: [],
+        userPrompt: '',
+        assistantResponse: '',
+        positionX: parent.positionX,
+        positionY: parent.positionY,
+        isCollapsed: false,
+        status: 'idle',
+        modelUsed: settings.defaultModel,
+        timestamp: Date.now(),
+      }
+
+      await get().addNode(child)
+      await get().submitPrompt(childId, userPrompt)
+      return childId
     },
 
     cancelGeneration: async (id) => {

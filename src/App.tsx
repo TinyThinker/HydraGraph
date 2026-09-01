@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './index.css'
 import { useTreeStore } from './store/useTreeStore'
 import { useSettingsStore } from './store/settingsStore'
-import { Canvas } from './components/Canvas'
+import { SplitLayout } from './components/SplitLayout'
 import { HeaderBar } from './components/HeaderBar'
 import { ReaderPanel } from './components/ReaderPanel'
 import { installRenderHarness } from './lib/renderTally'
@@ -47,9 +47,7 @@ export default function App() {
     <div className="h-full flex flex-col">
       <HeaderBar />
       <div className="flex-1 min-h-0 flex">
-        <div className="flex-1 min-h-0">
-          <Canvas />
-        </div>
+        <SplitLayout />
         <ReaderPanel />
       </div>
     </div>
