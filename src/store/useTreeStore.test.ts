@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useTreeStore } from './useTreeStore'
+import { useSettingsStore, DEFAULT_SETTINGS } from './settingsStore'
 import { db } from '../db/ChatDatabase'
 import type { TurnNode } from '../types'
 
@@ -612,6 +613,56 @@ describe('regenerate and edit prompts', () => {
     expect(vi.mocked(streamLLMResponse)).toHaveBeenCalledTimes(1)
     const call = vi.mocked(streamLLMResponse).mock.calls[0]
     expect(call[2]).toEqual({ provider: 'gemini', model: 'special-model-v9' })
+  })
+
+  describe('dispatch resolution against the global settings store', () => {
+    beforeEach(async () => {
+      const { streamLLMResponse } = await import('../lib/streamingClient')
+      vi.mocked(streamLLMResponse).mockClear()
+    })
+
+    afterEach(() => {
+      useSettingsStore.setState({ settings: DEFAULT_SETTINGS, hydrated: false })
+    })
+
+    it('picks up a provider switched in the settings store on the very next prompt', async () => {
+      const { streamLLMResponse } = await import('../lib/streamingClient')
+      vi.mocked(streamLLMResponse).mockImplementation(async () => () => {})
+
+      const tree = await useTreeStore.getState().createTree('My Tree')
+      const rootId = tree.rootNodeId
+
+      // Switch the global provider after the tree/node already exist.
+      useSettingsStore.setState({
+        settings: { ...DEFAULT_SETTINGS, provider: 'ollama' },
+      })
+
+      await useTreeStore.getState().submitPrompt(rootId, 'hi')
+
+      const call = vi.mocked(streamLLMResponse).mock.calls[0]
+      // Provider comes from the live settings store; the node's seeded model is
+      // still honoured as its own override.
+      expect(call[2].provider).toBe('ollama')
+      // The node is stamped with the resolved provider too.
+      expect(useTreeStore.getState().nodes.get(rootId)!.provider).toBe('ollama')
+      // The settings object handed to the client is the live one.
+      expect(call[1]).toBe(useSettingsStore.getState().settings)
+    })
+
+    it('lets a tree-level default override the global store', async () => {
+      const { streamLLMResponse } = await import('../lib/streamingClient')
+      vi.mocked(streamLLMResponse).mockImplementation(async () => () => {})
+
+      const tree = await useTreeStore.getState().createTree('My Tree')
+      const rootId = tree.rootNodeId
+      await useTreeStore.getState().updateNode(rootId, { modelUsed: '' })
+      await db.trees.update(tree.id, { defaultProvider: 'openrouter', defaultModel: 'tree-pinned' })
+
+      await useTreeStore.getState().submitPrompt(rootId, 'hi')
+
+      const call = vi.mocked(streamLLMResponse).mock.calls[0]
+      expect(call[2]).toEqual({ provider: 'openrouter', model: 'tree-pinned' })
+    })
   })
 
   it('editing/regenerating a parent leaves its children in place', async () => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
-import { useTreeStore } from '../store/useTreeStore'
+import { useSettingsStore } from '../store/settingsStore'
 import { MaskedInput } from './MaskedInput'
 import { ProviderSelect } from './ProviderSelect'
 import type { LLMProvider } from '../types'
@@ -11,8 +11,8 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
-  const settings = useTreeStore((s) => s.settings)
-  const saveSettings = useTreeStore((s) => s.saveSettings)
+  const settings = useSettingsStore((s) => s.settings)
+  const updateSettings = useSettingsStore((s) => s.updateSettings)
 
   const [draft, setDraft] = useState({
     provider: 'gemini' as LLMProvider,
@@ -45,7 +45,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await saveSettings({
+      await updateSettings({
         provider: draft.provider,
         geminiApiKey: draft.geminiApiKey.trim() || undefined,
         openRouterApiKey: draft.openRouterApiKey.trim() || undefined,

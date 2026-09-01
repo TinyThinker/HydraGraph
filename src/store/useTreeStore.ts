@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { db } from '../db/ChatDatabase'
 import { resolveContextPayload } from '../lib/contextEngine'
 import { streamLLMResponse } from '../lib/streamingClient'
+import { resolveDispatchForNode } from '../services/llm'
+import { useSettingsStore } from './settingsStore'
 import { computeChildPosition, layoutTree } from '../lib/autoLayout'
 import { parseImportDoc, remapImportedTree } from '../lib/treeExport'
 import type { TurnNode, ConversationTree, AppSettings, NodeStatus, TokenUsage } from '../types'
@@ -334,7 +336,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     setActiveTree: (treeId) => set({ activeTreeId: treeId }),
 
     submitPrompt: async (nodeId, userPrompt) => {
-      const { nodes, settings, activeTreeId, appendTokenDelta, finalizeNode } = get()
+      const { nodes, activeTreeId, appendTokenDelta, finalizeNode } = get()
 
       const tree = activeTreeId ? await db.trees.get(activeTreeId) : null
       const defaultSystemPrompt = tree?.defaultSystemPrompt ?? 'You are a helpful AI research assistant.'
@@ -343,8 +345,16 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       const existing = nodes.get(nodeId)
       if (!existing) return () => {}
       if (existing.status === 'streaming') return () => {}
-      const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: settings.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false }
-      await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: settings.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false })
+
+      // Resolve the dispatch target fresh on every submit: node override ->
+      // tree default -> global settings store. Reading the settings store here
+      // (rather than a cached copy) is what makes provider / API-key changes in
+      // Settings apply on the very next prompt without a reload.
+      const globalSettings = useSettingsStore.getState().settings
+      const target = resolveDispatchForNode(existing, tree, globalSettings)
+
+      const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: target.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false }
+      await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: target.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false })
       set((state) => {
         const next = new Map(state.nodes)
         next.set(nodeId, updated)
@@ -389,8 +399,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       try {
         const abort = await streamLLMResponse(
           payload,
-          settings,
-          { provider: settings.provider, model: existing.modelUsed || settings.defaultModel },
+          globalSettings,
+          target,
           (chunk) => appendTokenDelta(nodeId, chunk),
           (usage) => finalizeNode(nodeId, usage),
           (err) => {

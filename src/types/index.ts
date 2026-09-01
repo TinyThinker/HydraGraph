@@ -34,14 +34,22 @@ export interface ConversationTree {
   viewportX?: number
   viewportY?: number
   viewportZoom?: number
+  // Tree-scoped dispatch defaults. Sit between a node-level override and the
+  // global settings store when resolving which provider/model a prompt uses.
+  defaultProvider?: LLMProvider
+  defaultModel?: string
 }
+
+export type ProviderModelMap = Partial<Record<LLMProvider, string>>
 
 export interface AppSettings {
   id: 'global_settings'
   geminiApiKey?: string
   openRouterApiKey?: string
   ollamaBaseUrl: string
+  openRouterBaseUrl?: string
   defaultModel: string
+  defaultModels?: ProviderModelMap
   activeTreeId?: string
   provider: LLMProvider
 }

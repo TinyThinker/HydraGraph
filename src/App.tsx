@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './index.css'
 import { useTreeStore } from './store/useTreeStore'
+import { useSettingsStore } from './store/settingsStore'
 import { Canvas } from './components/Canvas'
 import { HeaderBar } from './components/HeaderBar'
 import { ReaderPanel } from './components/ReaderPanel'
@@ -23,6 +24,9 @@ export default function App() {
     async function boot() {
       const { loadSettings, loadAllTrees, loadTree, createTree } = useTreeStore.getState()
       await loadSettings()
+      // Hydrate the global settings store from the same persisted row so the
+      // Settings modal edits live values rather than defaults.
+      await useSettingsStore.getState().loadSettings()
       await loadAllTrees()
       const { settings } = useTreeStore.getState()
       if (settings.activeTreeId) {
