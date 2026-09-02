@@ -15,21 +15,22 @@ personas at turn 30 of a real problem, on identical inherited context, with the 
 ## Current State
 
 The engineering is largely done and tested (streaming, context engine, deterministic
-layout, 4 clean DB migrations, 3 provider clients, 253 tests). What blocks a launch is
-**product regression and first-run friction**, not missing infrastructure.
+layout, 4 clean DB migrations, 3 provider clients, 225 tests). Phase 1 is complete —
+the first-run friction and the retry/cancel regression are fixed. Next up is Phase 2,
+the demo that gives the project a reason to exist.
 
 ### Active blockers
 
-- [ ] **Six built capabilities are unreachable from the UI.** The subway-pill refactor
-  re-implemented only *delete*. `submitPrompt` and `cancelGeneration` are called only
-  from `PromptSection.tsx`, which nothing mounts. Result: an errored node cannot be
-  retried, a running generation cannot be cancelled, a submitted prompt cannot be
-  edited, per-node model and per-node system-prompt overrides have no UI at all.
-  Dead files: `PromptSection.tsx`, `SystemPromptEditor.tsx`, `ModelPicker.tsx`,
-  `NodeFooter.tsx`, `ResponseArea.tsx`, `ContextMeter.tsx`.
-- [ ] **Settings split-brain.** `useTreeStore.settings` and `useSettingsStore.settings`
-  are two copies of the same row; the modal writes only one, so the "no provider
-  configured" banner survives adding an API key until reload.
+- [x] **Six built capabilities are unreachable from the UI.** Retry / cancel /
+  regenerate are back via the new `MessageActions` control (chat stream + reader
+  panel). Per-node model and per-node persona are deliberately deferred to Phase 2,
+  where they are rebuilt into the reader panel rather than revived. The six dead
+  files (`PromptSection`, `SystemPromptEditor`, `ModelPicker`, `NodeFooter`,
+  `ResponseArea`, `ContextMeter`) and their tests are deleted.
+- [x] **Settings split-brain.** `useTreeStore` no longer holds a settings copy;
+  `useSettingsStore` is the only one. Last-open-tree persistence moved there via
+  `setActiveTreeId`. The "no provider configured" banner now clears the moment a
+  key is saved — no reload.
 
 ---
 
@@ -37,13 +38,15 @@ layout, 4 clean DB migrations, 3 provider clients, 253 tests). What blocks a lau
 
 Only the defects a stranger hits in their first two minutes.
 
-- [ ] Consolidate on `useSettingsStore`; delete the duplicate settings state in
+- [x] Consolidate on `useSettingsStore`; delete the duplicate settings state in
   `useTreeStore`. Fixes the first-run banner.
-- [ ] Retry on errored nodes; regenerate on idle ones (rewire `submitPrompt`).
-- [ ] Cancel while streaming (rewire `cancelGeneration`).
-- [ ] Delete the unused `@dagrejs/dagre` dependency; wire or remove `openRouterBaseUrl`.
+- [x] Retry on errored nodes; regenerate on idle ones (rewire `submitPrompt`).
+- [x] Cancel while streaming (rewire `cancelGeneration`).
+- [x] Delete the unused `@dagrejs/dagre` dependency; wire or remove `openRouterBaseUrl`
+  (wired: OpenRouter client reads it, Settings exposes it).
 
 **Gate:** a wrong key, a rate limit, or a bad answer can never permanently damage a node.
+✅ Retry always shows on an errored turn; Stop always shows while streaming.
 
 ---
 
@@ -110,7 +113,6 @@ Nothing here ships until Stop-4 evidence says which one matters. See
 - [ ] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measure first; likely degrades on long responses.
 - [ ] 200-node performance pass.
-- [ ] Remove the four dead components once their capabilities are rehomed (Phase 2).
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop them at
   the next schema bump.
 

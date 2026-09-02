@@ -8,6 +8,33 @@
 
 ---
 
+## v0.3.1 — 2026-09-02 — Phase 1: stop the bleeding
+
+Reconnected the capabilities the subway-pill refactor stranded and removed the
+first-run friction. No new infrastructure — this is repair.
+
+- **Settings consolidated.** `useTreeStore` no longer keeps its own copy of the
+  settings row; `useSettingsStore` is the single source of truth. Last-open-tree
+  persistence moved there as `setActiveTreeId`. `HeaderBar`'s "no provider
+  configured" banner reads that store, so saving a key clears it immediately —
+  no reload. Boot also recovers gracefully when the remembered tree is gone.
+- **Recovery controls back.** New `MessageActions` component: Stop while
+  streaming, Retry on an errored turn (always shown — an error is never a dead
+  end), Regenerate an idle turn. Mounted in the chat stream and the reader
+  panel; routes through the existing `submitPrompt` / `cancelGeneration` store
+  actions.
+- **`openRouterBaseUrl` wired.** The OpenRouter streaming client now reads it
+  (trailing slash tolerated, default preserved) and the Settings modal exposes
+  the field. Previously stored but ignored.
+- **`@dagrejs/dagre` removed** from dependencies and the lockfile — layout has
+  run on `d3-hierarchy` since v0.3.0.
+- **Dead code deleted:** `PromptSection`, `SystemPromptEditor`, `ModelPicker`,
+  `NodeFooter`, `ResponseArea`, `ContextMeter` and their tests. Per-node model /
+  persona are rebuilt into the reader panel in Phase 2, not revived from these.
+- Tests: 225 across 29 files (was 253/32 — dead-component suites removed, new
+  coverage for `MessageActions`, the `setActiveTreeId` action, and the reactive
+  banner). `tsc` and `oxlint` clean.
+
 ## v0.3.0 — 2026-09-01 — Dual-pane workspace & subway canvas
 
 The `poc_enhancements_1` track. Reshaped the UI from a single-pane full-card canvas

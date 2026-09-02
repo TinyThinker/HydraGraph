@@ -187,7 +187,7 @@ Two properties of this topology are load-bearing and easy to break:
 | Test Runner | Vitest + Testing Library + jsdom + fake-indexeddb | ^4.1 / ^16.3 / ^30.0 / ^6.2 | Component and store tests run against a real (in-memory) IndexedDB, so Dexie transactions are exercised rather than mocked. |
 | Linter | oxlint | ^1.71 | Fast Rust-based lint pass wired into `npm run check`. |
 
-**Dependency drift to be aware of:** `@dagrejs/dagre@^3.1` is still listed in `package.json` but is **no longer imported anywhere** — auto-layout migrated to `d3-hierarchy` in the Phase 3 enhancement pass. It is a safe removal candidate.
+**Auto-layout** runs on `d3-hierarchy` (migrated from `@dagrejs/dagre` in the Phase 3 enhancement pass). `@dagrejs/dagre` was removed from `package.json` in v0.3.1.
 
 **npm scripts:** `dev`, `build` (`tsc -b && vite build`), `typecheck` (`tsc -b`), `lint` (`oxlint`), `test` (`vitest run`), and `check` (typecheck + lint + test).
 
@@ -219,19 +219,21 @@ The running application is a three-region shell (header / split workspace / read
 
 | Store | File | Responsibility |
 |---|---|---|
-| `useTreeStore` | `src/store/useTreeStore.ts` | The central store: node map, tree list, active tree, in-flight `liveText`, and every mutating action (`addNode`, `submitPrompt`, `forkAndSubmit`, `cancelGeneration`, `deleteNodeSubtree`, `markDescendantsStale`, `toggleCollapse`, `relayoutActiveTree`, tree CRUD, `importTree`). |
-| `useSettingsStore` | `src/store/settingsStore.ts` | Single source of truth for provider configuration, persisted to the `global_settings` row. Backfills newly-added fields on load. |
+| `useTreeStore` | `src/store/useTreeStore.ts` | The central store: node map, tree list, active tree, in-flight `liveText`, and every mutating action (`addNode`, `submitPrompt`, `forkAndSubmit`, `cancelGeneration`, `deleteNodeSubtree`, `markDescendantsStale`, `toggleCollapse`, `relayoutActiveTree`, tree CRUD, `importTree`). Holds **no** settings copy — reads `useSettingsStore.getState()` when it needs the default model, and calls `setActiveTreeId` after a tree load/create. |
+| `useSettingsStore` | `src/store/settingsStore.ts` | Single source of truth for provider configuration **and the last-opened tree** (`activeTreeId`), persisted to the `global_settings` row. Backfills newly-added fields on load. |
 | `useSelectionStore` | `src/store/useSelectionStore.ts` | `selectedNodeId` plus a `focusNonce`; `setSelectedNodeId` (no re-center) vs `selectAndFocus` (re-center). |
 | `useReaderPanel` | `src/components/useReaderPanel.ts` | Which node, if any, the reader drawer is showing. |
 | `useSearchNav` | `src/components/useSearchNav.ts` | Search "fly to this node" target + nonce. |
 
-**Settings currently live in two places.** `useTreeStore` carries its own `settings: AppSettings` field with its own `loadSettings` / `saveSettings` pair, alongside the dedicated `useSettingsStore`. `App.tsx` hydrates both from the same `global_settings` row at boot, so they agree on load, but afterwards they drift:
-
-- `SettingsModal` writes **only** through `useSettingsStore`, so `useTreeStore.settings` keeps the pre-save values until a reload. Consumers of the tree store's copy — the header's "no provider configured" banner, the `b`-key branch default model, and the `modelUsed` stamped by `createTree` / `forkAndSubmit` — therefore lag a settings change by one page load.
-- `submitPrompt` deliberately reads `useSettingsStore.getState()` fresh on every dispatch, which is why *generation* picks up a new key or provider immediately even though the surrounding UI does not.
-- `useTreeStore.saveSettings` has no production callers at all (tests only), while `createTree` writes `activeTreeId` straight to the settings row through the tree store, bypassing `useSettingsStore`.
-
-Consolidating on `useSettingsStore` is the obvious cleanup; until then, treat `useTreeStore.settings` as a boot-time snapshot rather than live configuration.
+**Settings have one owner (`useSettingsStore`).** Since v0.3.1 `useTreeStore` no longer
+carries its own `settings` field or `loadSettings` / `saveSettings` pair. Everything that
+needs configuration reads `useSettingsStore` — `SettingsModal` writes it, `HeaderBar`'s
+"no provider configured" banner subscribes to it (so it clears the instant a key is
+saved), and `submitPrompt` / `createTree` / `forkAndSubmit` / the `b`-key branch read
+`useSettingsStore.getState()` fresh. The last-opened tree (`activeTreeId`) is persisted
+through `useSettingsStore.setActiveTreeId`, which `loadTree` / `createTree` call after
+committing their state. `App.tsx` hydrates `useSettingsStore` once at boot and, if the
+remembered tree is gone, falls back to the newest tree (or creates one).
 
 **Pure Library (`src/lib/`)** — no store access, no side effects, individually unit-tested:
 
@@ -251,7 +253,16 @@ Consolidating on `useSettingsStore` is the obvious cleanup; until then, treat `u
 | `viewportCenter.ts` | `centerTarget()` — never zooms an already zoomed-in user back out. |
 | `renderTally.ts` | Dev-only render counting + a synthetic-tree seeder installed on `window`. |
 
-**Known dead code:** `NodeFooter.tsx`, `PromptSection.tsx`, `ResponseArea.tsx`, and `ContextMeter.tsx` (plus their transitive-only dependents `ModelPicker.tsx` and `SystemPromptEditor.tsx`) are leftovers from the pre-pill full-card node. They have no importers outside their own tests and are not mounted anywhere in the running app. Their capabilities — per-node model picking and per-node system-prompt editing — currently have **no** replacement UI on the canvas.
+**Turn recovery UI.** `MessageActions.tsx` (mounted by `ChatMessage` and `ReaderPanel`)
+renders exactly one control per turn: **Stop** while it streams (`cancelGeneration`),
+**Retry** on an errored turn (always shown), **Regenerate** on the active idle turn —
+both the latter call `submitPrompt(node.id, node.userPrompt)`. This is the only live
+surface for those two store actions since the pill refactor.
+
+The six pre-pill full-card components (`NodeFooter`, `PromptSection`, `ResponseArea`,
+`ContextMeter`, `ModelPicker`, `SystemPromptEditor`) and their tests were **deleted** in
+v0.3.1. Per-node model picking and per-node system-prompt editing have no UI yet — they
+are rebuilt into the reader panel in Phase 2.
 
 ### 3.4 Schemas (Matrix Representation)
 
@@ -652,11 +663,14 @@ Verified on branch `poc_enhancements_1` (2026-09-01):
 
 ### 6.7 Open Items
 
-- **Settings split-brain (highest-value fix).** `useTreeStore.settings` and `useSettingsStore.settings` are two copies of the same row; the Settings modal updates only the latter, so the header's provider-warning banner and the default `modelUsed` for new nodes stay stale until reload. See §3.3.
-- `@dagrejs/dagre` is an unused dependency and can be dropped from `package.json`.
-- `NodeFooter` / `PromptSection` / `ResponseArea` / `ContextMeter` (and thereby `ModelPicker` / `SystemPromptEditor`) are unmounted dead code; per-node model selection and per-node system-prompt editing consequently have no live UI entry point.
-- `AppSettings.openRouterBaseUrl` is persisted and editable but ignored by `streamingClient.ts`, which hard-codes `https://openrouter.ai/api/v1/chat/completions`.
+Resolved in v0.3.1 (Phase 1): settings split-brain (one owner now, `useSettingsStore`);
+`@dagrejs/dagre` removed; the six dead full-card components deleted; `openRouterBaseUrl`
+wired through `streamingClient.ts` and exposed in `SettingsModal`; retry / cancel /
+regenerate reconnected via `MessageActions`.
+
 - `TurnNode.width` / `TurnNode.height` are vestigial since fixed-size pills landed; they are retained only for backward compatibility with existing rows and v1 exports.
+- Per-node model selection and per-node system-prompt editing have no UI (Phase 2 rebuilds them into the reader panel).
+- Editing a submitted prompt (as opposed to regenerating it) has no UI.
 - The split-pane ratio is component state and resets to 40/60 on reload, unlike the canvas viewport which is persisted per tree.
 
 ## 7. Claude Code / Agent Execution Workflow & Harness
