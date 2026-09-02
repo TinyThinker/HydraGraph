@@ -7,16 +7,16 @@
 
 ## Version
 
-Current: v0.3.1
-Last commit: 405cbee — 2026-09-02 02:01:30 -0700
-Last commit message: feat: Phase 1 — reconnect retry/cancel, unify settings, prune dead UI
+Current: v0.4.0
+Last commit: 06a34cb — 2026-09-02 03:14:51 -0700
+Last commit message: feat(phase2): compare columns + header entry point (Phase 2 complete)
 
 ---
 
 ## Phase Checklist
 
 ### Current State — Active blockers
-- [x] Six built capabilities are unreachable from the UI — retry / cancel / regenerate reconnected via `MessageActions`; per-node model / persona deferred to Phase 2; six dead files deleted
+- [x] Six built capabilities are unreachable from the UI — retry / cancel / regenerate reconnected via `MessageActions`; per-node model / persona rebuilt into the reader panel in Phase 2 (`NodeDispatchControls`)
 - [x] Settings split-brain — `useTreeStore` no longer holds a settings copy; the "no provider configured" banner clears the moment a key is saved
 
 ### Phase 1 — Stop the bleeding (days 1–4)
@@ -26,10 +26,10 @@ Last commit message: feat: Phase 1 — reconnect retry/cancel, unify settings, p
 - [x] Delete the unused `@dagrejs/dagre` dependency; wire or remove `openRouterBaseUrl` (wired)
 
 ### Phase 2 — Build the demo (days 5–9)
-- [ ] Per-node model picker and per-node persona, rehomed into the reader panel
-- [ ] Fan-out: one prompt → N branches, a different model or persona each, parallel from identical ancestry
-- [ ] Compare view: selected siblings column by column, shared-context guarantee visible on screen
-- [ ] Model pricing table → per-node, per-tree, and counterfactual cost in dollars
+- [x] Per-node model picker and per-node persona, rehomed into the reader panel
+- [x] Fan-out: one prompt → N branches, a different model or persona each, parallel from identical ancestry
+- [x] Compare view: selected siblings column by column, shared-context guarantee visible on screen
+- [x] Model pricing table → per-node, per-tree, and counterfactual cost in dollars
 
 ### Phase 3 — The front door (days 10–12)
 - [ ] Demo tree shipped with the app: canned responses, no key required, fully explorable
@@ -58,18 +58,19 @@ Last commit message: feat: Phase 1 — reconnect retry/cancel, unify settings, p
 
 ## Active Blockers
 
-None. Phase 1 cleared both — retry/cancel/regenerate have a live surface again
-(`MessageActions`), and the settings row has one owner (`useSettingsStore`), so
-first-run provider setup no longer needs a reload.
+None. Phase 1 cleared the two shipping blockers (retry/cancel surface, settings
+single-owner). Phase 2 built the demo — per-node model/persona overrides, parallel
+fan-out, the column-by-column compare view, and the dollar-cost receipt
+(actual vs. one-linear-thread counterfactual).
 
 ---
 
 ## Next Actions (priority order)
 
-1. [Phase 2] Per-node model picker and per-node persona, rehomed into the reader panel
-2. [Phase 2] Fan-out: one prompt → N branches, a different model or persona each, dispatched in parallel from identical ancestry
-3. [Phase 2] Compare view: selected siblings column by column, with the shared-context guarantee visible on screen
-4. [Phase 2] Model pricing table → per-node, per-tree, and counterfactual cost in dollars ("context you didn't pay for")
+1. [Phase 3] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers
+2. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
+3. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
+4. [Phase 3] One honest line about where data lives, plus an export nudge after real work
 
 ---
 
@@ -83,28 +84,36 @@ first-run provider setup no longer needs a reload.
 - `useSettingsStore` is the single in-memory copy of the `global_settings` row
   (provider config + last-open-tree). `useTreeStore` reads it via
   `useSettingsStore.getState()` and never caches it.
+- Dispatch resolution precedence: node override (`providerOverride` / `modelUsed`) →
+  tree default → global settings. Re-resolved on every submit; `submitPrompt` stamps
+  the resolved `provider` and `modelUsed` back onto the turn (`ARCHITECTURE.md` §5.2).
 - Ancestry traversal reads the in-memory Zustand node map, never IndexedDB; the only DB
   read on the submit path is the tree record (`ARCHITECTURE.md` §3.1, §5.1).
 - Canvas node positions are a pure function of tree structure — no manual placement to
   preserve; dragging and resizing are disabled (`ARCHITECTURE.md` §5.5).
 - Max 150 lines per component file; separate UI rendering from store logic (`CLAUDE.md`).
-- DB schema is at version 4; every bump only backfills new optional fields
-  (`ARCHITECTURE.md` §3.4).
+- DB schema is at version 4; new optional fields (`providerOverride`) need no migration
+  — same as the existing `systemPromptOverride` (`ARCHITECTURE.md` §3.4).
 
 ---
 
-## Last Built (v0.3.1 — 2026-09-02)
+## Last Built (v0.4.0 — 2026-09-02)
 
-Phase 1: stop the bleeding. Reconnected the capabilities the subway-pill refactor
-stranded and removed first-run friction — no new infrastructure, this is repair.
-`useTreeStore` no longer keeps its own settings copy; `useSettingsStore` is the
-single source of truth, with last-open-tree persistence moved there as
-`setActiveTreeId`. The "no provider configured" banner now reads that store and
-clears the moment a key is saved. New `MessageActions` component: Stop while
-streaming, Retry on an errored turn (always shown), Regenerate an idle one —
-mounted in the chat stream and reader panel, routed through the existing store
-actions. `openRouterBaseUrl` wired through the OpenRouter client and exposed in
-Settings. `@dagrejs/dagre` removed. Six dead components and their tests deleted
-(`PromptSection`, `SystemPromptEditor`, `ModelPicker`, `NodeFooter`,
-`ResponseArea`, `ContextMeter`). Verified: typecheck clean, oxlint clean, 225
-tests across 29 files passing.
+Phase 2: deep-context model arbitration. Per-node dispatch overrides are now
+plumbed end to end — `TurnNode.providerOverride` plus the existing `modelUsed`
+flow through `resolveDispatchForNode`, and `submitPrompt` records the resolved
+model on the turn. `NodeDispatchControls` in the reader panel exposes the
+provider override (with "Inherit"), a model field, and a persona / system-prompt
+editor backed by `personaPresets.ts`. A pure cost layer — `pricing.ts`
+(editable per-1M-token table, `resolvePrice` / `turnCostUSD` / `formatUSD`) and
+`treeCost.ts` (`treeCostSummary`: actual spend vs. the one-linear-thread
+counterfactual) — feeds per-turn dollar figures into the chat stream and reader
+panel, and a `CostReceipt` popover in the header shows "context you didn't pay
+for" in dollars and percent. `fanOutAndSubmit` forks N children off one parent,
+each with its own provider/model/persona, and dispatches the shared prompt into
+all of them in parallel from identical ancestry; the `Split` button in the chat
+input opens `FanOutModal` to compose 2–4 variants. `CompareView` (from
+`useCompareStore`, opened by the header "Compare" button when the active node has
+≥2 siblings) shows sibling answers column by column with a checkbox strip, a
+divergence line, and the shared-context guarantee on screen. Verified: typecheck
+clean, oxlint clean, 258 tests across 35 files passing.
