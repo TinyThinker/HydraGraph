@@ -15,6 +15,7 @@
 - **Cost model.** `pricing.ts` (editable per-1M-token table + `resolvePrice`/`turnCostUSD`/`formatUSD`) and `treeCost.ts` (`treeCostSummary`: actual vs. linear-thread counterfactual = "context you didn't pay for"). Pure, unit-tested.
 - **Per-turn cost shown.** The chat-stream telemetry line and the reader panel's "last generation" line now append the turn's dollar cost (`turnCostUSD` + `formatUSD`) whenever token counts and a known price are available.
 - **The receipt.** New `CostReceipt` (toggle from a `$` button in the header): this tree's actual spend vs. the one-linear-thread counterfactual, and "context you didn't pay for" in dollars + percent. ROADMAP item 4 complete.
+- **Fan-out action.** `useTreeStore.fanOutAndSubmit(parentId, prompt, variants[])` forks N children off one parent — each with its own provider/model/persona override — then dispatches the shared prompt into all of them in parallel from identical ancestry. `FanOutVariant` type in `services/llm.ts`.
 
 ## v0.3.1 — 2026-09-02 — Phase 1: stop the bleeding
 

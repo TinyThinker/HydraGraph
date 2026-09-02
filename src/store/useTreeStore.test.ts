@@ -1621,3 +1621,104 @@ describe('importTree', () => {
     expect(nodes2.length).toBe(sourceNodeCount)
   })
 })
+
+describe('fanOutAndSubmit', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      liveText: new Map(),
+      lastSpawnedNodeId: null,
+    })
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockReset()
+    vi.mocked(streamLLMResponse).mockImplementation(async () => () => {})
+  })
+
+  it('forks N children off one parent, each keeping its own variant overrides, then dispatches all', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+
+    const tree = await useTreeStore.getState().createTree('Fan Out')
+    const rootId = tree.rootNodeId
+
+    const variants = [
+      { provider: 'gemini' as const, model: 'model-a', systemPromptOverride: 'You are A.' },
+      { provider: 'ollama' as const, model: 'model-b', systemPromptOverride: 'You are B.' },
+      { provider: 'openrouter' as const, model: 'model-c' },
+    ]
+
+    const ids = await useTreeStore.getState().fanOutAndSubmit(rootId, 'shared prompt', variants)
+
+    // returns N child ids
+    expect(ids).toHaveLength(3)
+
+    const nodes = useTreeStore.getState().nodes
+
+    // all N nodes exist with parentId === parent
+    for (const id of ids) {
+      const n = nodes.get(id)
+      expect(n).toBeDefined()
+      expect(n!.parentId).toBe(rootId)
+    }
+
+    // parent's childrenIds contains all N
+    const parent = nodes.get(rootId)!
+    for (const id of ids) expect(parent.childrenIds).toContain(id)
+
+    // each child keeps its own variant overrides
+    expect(nodes.get(ids[0])!.providerOverride).toBe('gemini')
+    expect(nodes.get(ids[0])!.modelUsed).toBe('model-a')
+    expect(nodes.get(ids[0])!.systemPromptOverride).toBe('You are A.')
+
+    expect(nodes.get(ids[1])!.providerOverride).toBe('ollama')
+    expect(nodes.get(ids[1])!.modelUsed).toBe('model-b')
+    expect(nodes.get(ids[1])!.systemPromptOverride).toBe('You are B.')
+
+    expect(nodes.get(ids[2])!.providerOverride).toBe('openrouter')
+    expect(nodes.get(ids[2])!.modelUsed).toBe('model-c')
+    expect(nodes.get(ids[2])!.systemPromptOverride).toBeUndefined()
+
+    // submitPrompt ran for each child
+    expect(vi.mocked(streamLLMResponse)).toHaveBeenCalledTimes(3)
+    for (const id of ids) {
+      expect(nodes.get(id)!.status).toBe('streaming')
+    }
+  })
+
+  it('preserves existing siblings on the parent', async () => {
+    const tree = await useTreeStore.getState().createTree('Fan Out')
+    const rootId = tree.rootNodeId
+
+    const existingId = crypto.randomUUID()
+    await useTreeStore.getState().addNode(
+      createNode({ id: existingId, treeId: tree.id, parentId: rootId })
+    )
+
+    const ids = await useTreeStore.getState().fanOutAndSubmit(rootId, 'p', [
+      { model: 'm1' },
+      { model: 'm2' },
+    ])
+
+    const parent = useTreeStore.getState().nodes.get(rootId)!
+    expect(parent.childrenIds).toContain(existingId)
+    for (const id of ids) expect(parent.childrenIds).toContain(id)
+    expect(parent.childrenIds).toHaveLength(3)
+  })
+
+  it('empty variants -> returns [] and adds no nodes', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+
+    const tree = await useTreeStore.getState().createTree('Fan Out')
+    const rootId = tree.rootNodeId
+    const countBefore = useTreeStore.getState().nodes.size
+
+    const ids = await useTreeStore.getState().fanOutAndSubmit(rootId, 'p', [])
+
+    expect(ids).toEqual([])
+    expect(useTreeStore.getState().nodes.size).toBe(countBefore)
+    expect(vi.mocked(streamLLMResponse)).not.toHaveBeenCalled()
+  })
+})

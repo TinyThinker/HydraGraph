@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { db } from '../db/ChatDatabase'
 import { resolveContextPayload } from '../lib/contextEngine'
 import { streamLLMResponse } from '../lib/streamingClient'
-import { resolveDispatchForNode } from '../services/llm'
+import { resolveDispatchForNode, type FanOutVariant } from '../services/llm'
 import { useSettingsStore } from './settingsStore'
 import { computeChildPosition, layoutTree } from '../lib/autoLayout'
 import { parseImportDoc, remapImportedTree } from '../lib/treeExport'
@@ -34,6 +34,7 @@ interface TreeStoreActions {
   loadAllTrees: () => Promise<void>
   submitPrompt: (nodeId: string, userPrompt: string) => Promise<() => void>
   forkAndSubmit: (parentId: string, userPrompt: string) => Promise<string | null>
+  fanOutAndSubmit: (parentId: string, userPrompt: string, variants: FanOutVariant[]) => Promise<string[]>
   cancelGeneration: (id: string) => Promise<void>
   deleteNodeSubtree: (id: string) => Promise<void>
   markDescendantsStale: (id: string) => Promise<void>
@@ -453,6 +454,46 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       await get().addNode(child)
       await get().submitPrompt(childId, userPrompt)
       return childId
+    },
+
+    // Fan-out: fork N children off the SAME parent (identical ancestry), each
+    // carrying its own provider / model / persona override, then dispatch the
+    // same prompt into all of them in parallel. Children are ADDED sequentially
+    // (addNode mutates the parent's childrenIds and recomputes layout, so those
+    // calls must not race); only the dispatch is parallelised. Returns the new
+    // child ids in variant order (empty array if the parent / active tree is
+    // missing, or no variants were given).
+    fanOutAndSubmit: async (parentId, userPrompt, variants) => {
+      const { activeTreeId, nodes } = get()
+      const parent = nodes.get(parentId)
+      if (!activeTreeId || !parent || variants.length === 0) return []
+
+      const defaultModel = useSettingsStore.getState().settings.defaultModel
+
+      const children: TurnNode[] = variants.map((variant, i) => ({
+        id: crypto.randomUUID(),
+        treeId: activeTreeId,
+        parentId,
+        childrenIds: [],
+        userPrompt: '',
+        assistantResponse: '',
+        positionX: parent.positionX,
+        positionY: parent.positionY,
+        isCollapsed: false,
+        status: 'idle',
+        providerOverride: variant.provider ?? undefined,
+        modelUsed: variant.model?.trim() || defaultModel,
+        systemPromptOverride: variant.systemPromptOverride?.trim() || undefined,
+        timestamp: Date.now() + i,
+      }))
+
+      const childIds = children.map((c) => c.id)
+
+      for (const child of children) await get().addNode(child)
+
+      await Promise.all(childIds.map((id) => get().submitPrompt(id, userPrompt)))
+
+      return childIds
     },
 
     cancelGeneration: async (id) => {

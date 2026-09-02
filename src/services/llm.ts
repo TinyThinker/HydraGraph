@@ -14,6 +14,15 @@ export interface NodeDispatchOverride {
   model?: string | null
 }
 
+// One branch of a fan-out: the provider / model / persona a single forked
+// child should carry. All fields optional — an absent field falls back to the
+// tree / global defaults at dispatch time.
+export interface FanOutVariant {
+  provider?: LLMProvider | null
+  model?: string | null
+  systemPromptOverride?: string | null
+}
+
 function firstNonEmpty(...values: Array<string | null | undefined>): string | undefined {
   for (const value of values) {
     const trimmed = value?.trim()
