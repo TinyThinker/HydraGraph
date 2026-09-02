@@ -10,6 +10,13 @@
 
 ## v0.4.0 — 2026-09-02 — Phase 2: deep-context model arbitration
 
+Built the demo the positioning depends on: compare several models or personas at
+turn N of a real problem, on identical inherited context, with the cost. Per-node
+provider/model/persona overrides, parallel fan-out off one parent, a column-by-column
+compare overlay, and a per-turn / per-tree / counterfactual dollar receipt. No new
+infrastructure and no DB migration — `providerOverride` is an optional field.
+258 tests across 35 files; `tsc` and `oxlint` clean.
+
 - **Per-node dispatch override plumbing.** `TurnNode.providerOverride` added; `resolveDispatchForNode` now forwards both provider and model overrides; `submitPrompt` stamps the resolved `modelUsed` onto the turn (mirrors the existing `provider` stamp). No DB migration — optional field.
 - **Per-node model + persona controls.** New `NodeDispatchControls` in the reader panel: provider override (with "Inherit"), model field, and a system-prompt / persona editor with presets (`personaPresets.ts`). Edits persist via `updateNode`; apply on the next Regenerate.
 - **Cost model.** `pricing.ts` (editable per-1M-token table + `resolvePrice`/`turnCostUSD`/`formatUSD`) and `treeCost.ts` (`treeCostSummary`: actual vs. linear-thread counterfactual = "context you didn't pay for"). Pure, unit-tested.

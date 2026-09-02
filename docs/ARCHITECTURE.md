@@ -1,8 +1,8 @@
 # Software Design Document
 ## Spatial 2D Conversation Tree Architecture (CTA) for Deep LLM Research
 
-**Document Version:** 2.0.0  
-**Status:** As-built — reconciled against the source tree on 2026-09-01 (`main`, includes the merged `poc_enhancements_1` subway-layout work)  
+**Document Version:** 2.1.0  
+**Status:** As-built — reconciled against the source tree on 2026-09-02 (`main`, through v0.4.0 / Phase 2 — per-node dispatch overrides, fan-out, compare view, cost receipt)  
 **Target Audience:** Principal Systems Architects, Lead Engineers, AI CLI Agents (Claude Code, Antigravity CLI)  
 **Author:** Lead AI Systems Architect
 
@@ -116,7 +116,7 @@ The system supports global system instructions at the tree root while allowing a
 │  ┌────────────────────────────────────────────────┴─────────────────────┐                │
 │  │  ZUSTAND STORES                                                      │   STATE        │
 │  │  useTreeStore (nodes · trees · liveText) · useSettingsStore ·        │                │
-│  │  useSelectionStore · useReaderPanel · useSearchNav                   │                │
+│  │  useSelectionStore · useReaderPanel · useSearchNav · useCompareStore │                │
 │  └───────┬──────────────────────────────────┬───────────────────────────┘                │
 │          │ read/write (async, batched)      │ node map (in-memory, authoritative)        │
 │          ▼                                  ▼                                            │
@@ -205,25 +205,28 @@ The running application is a three-region shell (header / split workspace / read
 
 **Chat Pane:** `ChatStreamView` renders the active node's lineage (`getAncestryChain`) as an ordered list of `ChatMessage` bubbles with Markdown, live streaming text, and token telemetry; `ChatInputBar` submits a prompt by forking a fresh child off the active node.
 
-**Reader Panel:** `ReaderPanel` is a right-hand drawer showing one node's full prompt + response, an estimated-context read-out with an over-budget warning, and copy-to-clipboard.
+**Reader Panel:** `ReaderPanel` is a right-hand drawer showing one node's full prompt + response, an estimated-context read-out with an over-budget warning, per-turn dollar cost, and copy-to-clipboard. Since v0.4.0 it also mounts `NodeDispatchControls` — the per-node provider override (with an "Inherit" choice), model field, and persona / system-prompt editor with presets (`src/lib/personaPresets.ts`). Edits persist through `updateNode` and take effect on the next Regenerate.
+
+**Fan-out & Compare (v0.4.0).** `ChatInputBar`'s `Split` button opens `FanOutModal` (shared prompt + 2–4 `FanOutRow` variants, each a provider / model / persona), which calls `useTreeStore.fanOutAndSubmit` to fork N siblings off one parent and dispatch the same prompt into all of them in parallel. `HeaderBar`'s **Compare** button (enabled when the active node has ≥2 siblings) opens `CompareView` — a full-screen overlay laying selected siblings out column by column (`CompareColumn`), with the shared-ancestry context (inherited turn count + `estimateContextTokens`) stated on screen. `HeaderBar`'s **$** button toggles `CostReceipt`.
 
 **Context Builder Engine (`src/lib/contextEngine.ts`):** Pure graph traversal. Given a node id and the node map, it follows `parentId` pointers to the root, resolves the cascading system prompt (nearest ancestor override wins, else the tree default), and unfolds the chain into an ordered `MessagePayload[]`. The target node's own (in-progress) response is deliberately excluded.
 
-**Dispatch Resolver (`src/services/llm.ts`):** Resolves *which* provider and model a prompt uses, in precedence order node override → tree default → global settings (per-provider default, then flat fallback). Resolved fresh on every submit, so a Settings change applies on the very next prompt without a reload.
+**Dispatch Resolver (`src/services/llm.ts`):** Resolves *which* provider and model a prompt uses, in precedence order node override → tree default → global settings (per-provider default, then flat fallback). The node override is `TurnNode.providerOverride` (provider) and `TurnNode.modelUsed` (model); `resolveDispatchForNode` forwards both. Resolved fresh on every submit, so a Settings change applies on the very next prompt without a reload. `submitPrompt` stamps the resolved provider **and** model back onto the turn. `FanOutVariant` is the same override shape used by `fanOutAndSubmit`.
 
 **LLM Streaming Client (`src/lib/streamingClient.ts`):** One `streamLLMResponse()` entry point fanning out to three provider implementations (Gemini `:streamGenerateContent?alt=sse`, OpenRouter `/chat/completions`, Ollama `/api/chat`), each built on `fetch` + `ReadableStream` with a shared line-buffering pattern, `AbortController` cancellation, malformed-payload guards, and per-provider usage-metadata extraction.
 
 **Local Persistence Manager (`src/db/ChatDatabase.ts`):** Dexie subclass exposing `nodes`, `trees`, and `settings` tables with four versioned schema migrations (see §3.4). Streaming writes are throttled (~400 ms) and layout writes are batched into a single `rw` transaction.
 
-**State Layer (5 Zustand stores):**
+**State Layer (6 Zustand stores):**
 
 | Store | File | Responsibility |
 |---|---|---|
-| `useTreeStore` | `src/store/useTreeStore.ts` | The central store: node map, tree list, active tree, in-flight `liveText`, and every mutating action (`addNode`, `submitPrompt`, `forkAndSubmit`, `cancelGeneration`, `deleteNodeSubtree`, `markDescendantsStale`, `toggleCollapse`, `relayoutActiveTree`, tree CRUD, `importTree`). Holds **no** settings copy — reads `useSettingsStore.getState()` when it needs the default model, and calls `setActiveTreeId` after a tree load/create. |
+| `useTreeStore` | `src/store/useTreeStore.ts` | The central store: node map, tree list, active tree, in-flight `liveText`, and every mutating action (`addNode`, `submitPrompt`, `forkAndSubmit`, `fanOutAndSubmit`, `cancelGeneration`, `deleteNodeSubtree`, `markDescendantsStale`, `toggleCollapse`, `relayoutActiveTree`, tree CRUD, `importTree`). Holds **no** settings copy — reads `useSettingsStore.getState()` when it needs the default model, and calls `setActiveTreeId` after a tree load/create. |
 | `useSettingsStore` | `src/store/settingsStore.ts` | Single source of truth for provider configuration **and the last-opened tree** (`activeTreeId`), persisted to the `global_settings` row. Backfills newly-added fields on load. |
 | `useSelectionStore` | `src/store/useSelectionStore.ts` | `selectedNodeId` plus a `focusNonce`; `setSelectedNodeId` (no re-center) vs `selectAndFocus` (re-center). |
 | `useReaderPanel` | `src/components/useReaderPanel.ts` | Which node, if any, the reader drawer is showing. |
 | `useSearchNav` | `src/components/useSearchNav.ts` | Search "fly to this node" target + nonce. |
+| `useCompareStore` | `src/store/useCompareStore.ts` | Compare-view overlay: `open`, the `anchorId` whose siblings are compared, and the `excludedIds` set the user has unchecked. Added in v0.4.0. |
 
 **Settings have one owner (`useSettingsStore`).** Since v0.3.1 `useTreeStore` no longer
 carries its own `settings` field or `loadSettings` / `saveSettings` pair. Everything that
@@ -246,6 +249,9 @@ remembered tree is gone, falls back to the newest tree (or creates one).
 | `contextEstimate.ts` | ~4-chars-per-token heuristic + `CONTEXT_WARN_TOKENS` budget. |
 | `nodeDimensions.ts` | Shared `NODE_WIDTH = 240` / `NODE_HEIGHT = 72`. |
 | `pathHighlight.ts` | Active-path id set, edge styling, off-path dim class. |
+| `personaPresets.ts` | `PERSONA_PRESETS` — ready-made system-prompt personas for `NodeDispatchControls` and `FanOutRow`. Added v0.4.0. |
+| `pricing.ts` | `MODEL_PRICING` table (USD per 1M tokens, hand-maintained) + `resolvePrice` / `turnCostUSD` / `formatUSD`. Added v0.4.0. |
+| `treeCost.ts` | `treeCostSummary()` — this tree's actual spend vs. the one-linear-thread counterfactual ("context you didn't pay for"). Added v0.4.0. |
 | `stationSummary.ts` | 7-word / 48-char single-line pill label. |
 | `streamingClient.ts` | Provider SSE clients. |
 | `treeExport.ts` | Versioned JSON export doc, filename slug, download, parse + id-remapped import. |
@@ -261,8 +267,8 @@ surface for those two store actions since the pill refactor.
 
 The six pre-pill full-card components (`NodeFooter`, `PromptSection`, `ResponseArea`,
 `ContextMeter`, `ModelPicker`, `SystemPromptEditor`) and their tests were **deleted** in
-v0.3.1. Per-node model picking and per-node system-prompt editing have no UI yet — they
-are rebuilt into the reader panel in Phase 2.
+v0.3.1. Per-node model picking and per-node system-prompt editing were rebuilt in v0.4.0
+as `NodeDispatchControls` in the reader panel — not revived from the deleted files.
 
 ### 3.4 Schemas (Matrix Representation)
 
@@ -278,14 +284,15 @@ The canonical TypeScript definitions live in `src/types/index.ts`; the matrices 
 | childrenIds | Array\<String\> | No | Array of child node IDs branching directly from this node. | Downstream sub-tree traversal, layout, collapse mechanics, branch-count badge. |
 | userPrompt | String | No | Raw input text submitted by the human operator. | Extracted as `{ role: 'user', content: userPrompt }` in ancestry chain. |
 | assistantResponse | String | No | Markdown output generated by the LLM. | Extracted as `{ role: 'assistant', content: assistantResponse }` in ancestry chain. |
-| systemPromptOverride | String | Yes | Optional system prompt instruction specific to this branch. | Overrides upstream system prompts for this node and all descendant sub-trees; renders the amber shield icon on the pill. |
+| systemPromptOverride | String | Yes | Optional system prompt instruction specific to this branch. | Overrides upstream system prompts for this node and all descendant sub-trees; renders the amber shield icon on the pill. Editable via `NodeDispatchControls` (reader panel) since v0.4.0. |
+| providerOverride | Enum String | Yes | `'gemini' \| 'openrouter' \| 'ollama'` — explicit per-turn provider override (**input** to dispatch resolution). | Highest-precedence provider in `resolveDispatchForNode`. Distinct from `provider`, which records what actually ran. Set by `NodeDispatchControls` / `fanOutAndSubmit`. Optional field — no DB migration (like `systemPromptOverride`). Added v0.4.0. |
 | positionX | Number (Float) | No | X-coordinate on the 2D canvas plane. | Written by the deterministic layout, read by React Flow. Not user-editable (dragging is disabled). |
 | positionY | Number (Float) | No | Y-coordinate on the 2D canvas plane. | As above. |
 | isCollapsed | Boolean | No | Flag indicating if downstream child nodes are hidden from view. | Drives `computeHiddenIds()`; toggles the chevron and the "Show N hidden" tooltip. |
 | status | Enum String | No | Values: `'idle'`, `'streaming'`, `'error'`. | Controls pill status ring, spinner icon, and error styling. |
-| modelUsed | String | No | Identifier of the LLM model (e.g., `'gemini-2.5-flash'`). | Treated as the node-level model override by the dispatch resolver; shown in the chat telemetry line. |
-| inputTokens | Number | Yes | Token count of the upstream context payload sent to API. | Cost tracking, usage reporting, context window boundary warnings. |
-| outputTokens | Number | Yes | Token count of the response generated by the model. | Cost tracking and generation throughput metrics. |
+| modelUsed | String | No | Identifier of the LLM model (e.g., `'gemini-2.5-flash'`). | Doubles as the node-level model override (highest-precedence model input to the dispatch resolver) **and** the post-run record — `submitPrompt` writes the resolved model back here. Shown in the chat telemetry line and priced by `pricing.ts`. |
+| inputTokens | Number | Yes | Token count of the upstream context payload sent to API. | Cost tracking (`turnCostUSD`, `treeCostSummary`), usage reporting, context window boundary warnings. |
+| outputTokens | Number | Yes | Token count of the response generated by the model. | Cost tracking (`turnCostUSD`, `treeCostSummary`) and generation throughput metrics. |
 | timestamp | Number (Int64) | No | Epoch timestamp (milliseconds) of node creation. | Chronological sorting; also breaks ties when picking the layout root. |
 | provider | Enum String | Yes | `'gemini' \| 'openrouter' \| 'ollama'` — the provider that produced this turn. | Stamped on every submit by the dispatch resolver; auditing. Added in DB v2. |
 | errorMessage | String | Yes | Raw provider error text when `status === 'error'`. | Rendered verbatim in the chat bubble. Added in DB v2. |
@@ -380,10 +387,11 @@ On import, `remapImportedTree()` regenerates every id (tree, nodes, `parentId`, 
 
 | Region | Component | Notes |
 |---|---|---|
-| Header | `HeaderBar` | Tree switcher (rename/delete/new), full-text search over the active tree, re-layout (with a confirm banner), JSON export, JSON import, settings modal. Shows an amber "no provider configured" banner when no Gemini key, no OpenRouter key, and an untouched default Ollama URL. |
+| Header | `HeaderBar` | Tree switcher (rename/delete/new), full-text search, re-layout (with a confirm banner), JSON export, JSON import, **$** cost-receipt popover (`CostReceipt`), **Compare** button (`useCompareStore.openCompare`, enabled at ≥2 siblings), settings modal. Shows an amber "no provider configured" banner when no Gemini key, no OpenRouter key, and an untouched default Ollama URL. |
 | Graph pane | `SplitLayout` → `Canvas` | Default 40% width, resized by a pointer-driven vertical divider, clamped to 20–80%. Ratio is component state — not persisted. |
-| Chat pane | `ChatStreamView` + `ChatInputBar` | Ancestry-only stream for the active node; empty turns are filtered out; auto-scrolls while streaming. |
-| Reader panel | `ReaderPanel` | Right drawer, fixed `28rem` capped at `40vw`, mounted only when a node is open. |
+| Chat pane | `ChatStreamView` + `ChatInputBar` | Ancestry-only stream for the active node; empty turns are filtered out; auto-scrolls while streaming. `ChatInputBar` has a `Split` button opening `FanOutModal`. |
+| Reader panel | `ReaderPanel` | Right drawer, fixed `28rem` capped at `40vw`, mounted only when a node is open. Hosts `NodeDispatchControls` (per-node provider / model / persona) and per-turn cost. |
+| Compare overlay | `CompareView` + `CompareColumn` | Full-screen `z-40` overlay from `useCompareStore`; siblings of the anchor column-by-column with a checkbox strip, the shared-context guarantee line, and per-column cost. Escape closes. |
 
 ### 4.2 Station Pill Geometry (Canvas Node)
 
@@ -508,8 +516,8 @@ Implemented in `src/services/llm.ts`, re-resolved on **every** submit so Setting
 
 ```
              ┌──────────────────────────────┐
-  highest    │ 1. Node override             │  node.modelUsed (and an explicit
-  priority   │    (this turn)               │     per-turn provider, if ever set)
+  highest    │ 1. Node override             │  node.providerOverride +
+  priority   │    (this turn)               │     node.modelUsed
              ├──────────────────────────────┤
              │ 2. Tree default              │  tree.defaultProvider / tree.defaultModel
              ├──────────────────────────────┤
@@ -518,7 +526,7 @@ Implemented in `src/services/llm.ts`, re-resolved on **every** submit so Setting
              └──────────────────────────────┘
 ```
 
-Provider and model resolve independently: the provider is the first non-null of node → tree → `settings.provider`, then the model is the first non-empty of node → tree → `settings.defaultModels[resolvedProvider]` → `settings.defaultModel`. The resolved provider is stamped onto the node so a turn always records what actually generated it.
+Provider and model resolve independently: the provider is the first non-null of `node.providerOverride` → `tree.defaultProvider` → `settings.provider`, then the model is the first non-empty of `node.modelUsed` → `tree.defaultModel` → `settings.defaultModels[resolvedProvider]` → `settings.defaultModel`. The resolved provider **and** model are stamped back onto the node so a turn always records what actually generated it. `fanOutAndSubmit` seeds each child's `providerOverride` / `modelUsed` / `systemPromptOverride` from its `FanOutVariant` before dispatch, so N siblings resolve to N different targets off identical ancestry.
 
 ### 5.3 SSE Real-time Streaming & Synchronization Sequence
 
@@ -653,13 +661,15 @@ Both high-risk items were resolved structurally rather than by optimisation: str
 
 ### 6.6 Verification Status
 
-Verified on branch `poc_enhancements_1` (2026-09-01):
+Verified at v0.4.0 / Phase 2 (2026-09-02):
 
 | Check | Command | Result |
 |---|---|---|
 | Types | `npm run typecheck` | clean |
 | Lint | `npm run lint` | clean |
-| Tests | `npm test` | 32 files / 253 tests passing |
+| Tests | `npm test` | 35 files / 258 tests passing |
+
+(For reference: `poc_enhancements_1` was 32 files / 253 tests on 2026-09-01; v0.3.1 / Phase 1 was 29 files / 225 tests.)
 
 ### 6.7 Open Items
 
@@ -668,10 +678,16 @@ Resolved in v0.3.1 (Phase 1): settings split-brain (one owner now, `useSettingsS
 wired through `streamingClient.ts` and exposed in `SettingsModal`; retry / cancel /
 regenerate reconnected via `MessageActions`.
 
+Resolved in v0.4.0 (Phase 2): per-node model + persona UI (`NodeDispatchControls`);
+`TurnNode.providerOverride` and resolved-model stamping; fan-out (`fanOutAndSubmit` +
+`FanOutModal`); compare view (`useCompareStore` + `CompareView`); model pricing +
+per-turn / per-tree / counterfactual cost (`pricing.ts`, `treeCost.ts`, `CostReceipt`).
+
 - `TurnNode.width` / `TurnNode.height` are vestigial since fixed-size pills landed; they are retained only for backward compatibility with existing rows and v1 exports.
-- Per-node model selection and per-node system-prompt editing have no UI (Phase 2 rebuilds them into the reader panel).
 - Editing a submitted prompt (as opposed to regenerating it) has no UI.
 - The split-pane ratio is component state and resets to 40/60 on reload, unlike the canvas viewport which is persisted per tree.
+- `MODEL_PRICING` in `pricing.ts` is a hand-maintained table of approximate rates. No live catalog / model-list fetch yet (candidate: OpenRouter `GET /api/v1/models`, which carries pricing). Gemini has no pricing API; its figures stay bundled estimates.
+- `pricing.ts` / `treeCost.ts` counterfactual uses the ~4-chars-per-token heuristic for prior-transcript sizing, so the receipt's dollar figures are estimates, not billed amounts.
 
 ## 7. Claude Code / Agent Execution Workflow & Harness
 
