@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Settings, AlertTriangle, LayoutGrid, Download } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useSettingsStore } from '../store/settingsStore'
 import { downloadTreeExport } from '../lib/treeExport'
 import { SettingsModal } from './SettingsModal'
 import { TreeSwitcher } from './TreeSwitcher'
@@ -12,7 +13,7 @@ const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 export function HeaderBar() {
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmRelayout, setConfirmRelayout] = useState(false)
-  const settings = useTreeStore((s) => s.settings)
+  const settings = useSettingsStore((s) => s.settings)
   const relayoutActiveTree = useTreeStore((s) => s.relayoutActiveTree)
 
   // Banner is shown if no provider is configured: no Gemini key, no OpenRouter key,

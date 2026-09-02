@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { useTreeStore } from '../store/useTreeStore'
 import { MarkdownContent } from './MarkdownContent'
+import { MessageActions } from './MessageActions'
 import type { TurnNode } from '../types'
 
 interface ChatMessageProps {
@@ -38,7 +39,7 @@ export const ChatMessage = memo(function ChatMessage({ node, isActive, onSelect 
         </div>
       )}
 
-      {(answer || isStreaming || node.status === 'error') && (
+      {(answer || isStreaming || node.status === 'error' || node.userPrompt) && (
         <div className="flex justify-start">
           <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-slate-800 px-3 py-2 text-slate-200">
             {node.status === 'error' && node.errorMessage ? (
@@ -46,14 +47,17 @@ export const ChatMessage = memo(function ChatMessage({ node, isActive, onSelect 
             ) : (
               <MarkdownContent markdown={answer || '…'} />
             )}
-            <div className="mt-1 text-[10px] text-slate-500">
-              {node.modelUsed}
-              {isStreaming && <span className="ml-2 text-cyan-400 animate-pulse">streaming…</span>}
+            <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+              <span>{node.modelUsed}</span>
+              {isStreaming && <span className="text-cyan-400 animate-pulse">streaming…</span>}
               {!isStreaming && hasTokens && (
-                <span className="ml-2">
+                <span>
                   {node.inputTokens!.toLocaleString()} in · {node.outputTokens!.toLocaleString()} out tokens
                 </span>
               )}
+              <span className="ml-auto">
+                <MessageActions node={node} isActive={isActive} />
+              </span>
             </div>
           </div>
         </div>

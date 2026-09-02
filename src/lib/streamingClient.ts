@@ -125,7 +125,8 @@ async function streamOpenRouter(
   onDone: (usage: TokenUsage) => void,
   onError: (err: Error) => void,
 ) {
-  const url = 'https://openrouter.ai/api/v1/chat/completions'
+  const base = (settings.openRouterBaseUrl?.trim() || 'https://openrouter.ai/api/v1').replace(/\/+$/, '')
+  const url = `${base}/chat/completions`
 
   try {
     const res = await fetch(url, {

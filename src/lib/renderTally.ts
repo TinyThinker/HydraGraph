@@ -1,4 +1,5 @@
 import { useTreeStore } from '../store/useTreeStore'
+import { useSettingsStore } from '../store/settingsStore'
 import type { TurnNode } from '../types'
 
 // Module-level state
@@ -42,8 +43,9 @@ export function useRenderTally(id: string) {
 
 async function seedFiftyNodes() {
   const state = useTreeStore.getState()
-  const { activeTreeId, settings, nodes } = state
+  const { activeTreeId, nodes } = state
   const { addNode } = state
+  const { settings } = useSettingsStore.getState()
 
   if (!activeTreeId) {
     console.error('seedFiftyNodes: no active tree')

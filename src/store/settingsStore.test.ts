@@ -127,6 +127,15 @@ describe('settingsStore', () => {
       expect((await db.settings.get('global_settings'))?.defaultModels?.openrouter).toBe('openai/gpt-4o')
     })
 
+    it('setActiveTreeId remembers the last-opened tree in memory and DB', async () => {
+      await state().setActiveTreeId('tree-abc')
+      expect(state().settings.activeTreeId).toBe('tree-abc')
+      expect((await db.settings.get('global_settings'))?.activeTreeId).toBe('tree-abc')
+
+      await state().setActiveTreeId('tree-xyz')
+      expect(state().settings.activeTreeId).toBe('tree-xyz')
+    })
+
     it('resetSettings restores defaults in memory and DB', async () => {
       await state().updateSettings({ geminiApiKey: 'x', provider: 'ollama', defaultModel: 'y' })
       await state().resetSettings()

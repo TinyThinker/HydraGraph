@@ -18,6 +18,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     provider: 'gemini' as LLMProvider,
     geminiApiKey: '',
     openRouterApiKey: '',
+    openRouterBaseUrl: '',
     ollamaBaseUrl: '',
     defaultModel: '',
   })
@@ -32,6 +33,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         provider: settings.provider,
         geminiApiKey: settings.geminiApiKey ?? '',
         openRouterApiKey: settings.openRouterApiKey ?? '',
+        openRouterBaseUrl: settings.openRouterBaseUrl ?? '',
         ollamaBaseUrl: settings.ollamaBaseUrl,
         defaultModel: settings.defaultModel,
       })
@@ -49,6 +51,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         provider: draft.provider,
         geminiApiKey: draft.geminiApiKey.trim() || undefined,
         openRouterApiKey: draft.openRouterApiKey.trim() || undefined,
+        openRouterBaseUrl: draft.openRouterBaseUrl.trim() || undefined,
         ollamaBaseUrl: draft.ollamaBaseUrl.trim(),
         defaultModel: draft.defaultModel.trim(),
       })
@@ -99,6 +102,19 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             showPassword={showOpenRouterKey}
             onToggleShow={() => setShowOpenRouterKey(!showOpenRouterKey)}
           />
+
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-2">
+              OpenRouter base URL
+            </label>
+            <input
+              type="text"
+              value={draft.openRouterBaseUrl}
+              onChange={(e) => handleChange('openRouterBaseUrl', e.target.value)}
+              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder="https://openrouter.ai/api/v1"
+            />
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-2">

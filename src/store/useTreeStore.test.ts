@@ -37,12 +37,6 @@ describe('useTreeStore', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
       lastSpawnedNodeId: null,
     })
@@ -166,22 +160,6 @@ describe('useTreeStore', () => {
     // liveText should remain empty
     expect(useTreeStore.getState().liveText.size).toBe(0)
   })
-
-  it('5. saveSettings keeps an explicit provider even when a Gemini key is present', async () => {
-    await useTreeStore.getState().saveSettings({ geminiApiKey: 'g-key', provider: 'openrouter' })
-
-    expect(useTreeStore.getState().settings.provider).toBe('openrouter')
-    const row = await db.settings.get('global_settings')
-    expect(row?.provider).toBe('openrouter')
-  })
-
-  it('6. saveSettings derives the provider from keys when none is given', async () => {
-    await useTreeStore.getState().saveSettings({ geminiApiKey: '', openRouterApiKey: '' })
-    expect(useTreeStore.getState().settings.provider).toBe('ollama')
-
-    await useTreeStore.getState().saveSettings({ geminiApiKey: 'g-key' })
-    expect(useTreeStore.getState().settings.provider).toBe('gemini')
-  })
 })
 
 describe('throttled streaming writes', () => {
@@ -192,12 +170,6 @@ describe('throttled streaming writes', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -280,12 +252,6 @@ describe('stream error surfacing', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -361,12 +327,6 @@ describe('zombie streaming recovery on load', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -405,12 +365,6 @@ describe('zombie streaming recovery on load', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
     })
 
     // Load the tree (should trigger zombie recovery)
@@ -453,12 +407,6 @@ describe('cancel generation', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -516,12 +464,6 @@ describe('regenerate and edit prompts', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -737,12 +679,6 @@ describe('collapse and expand', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -810,12 +746,6 @@ describe('delete node and subtree', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -1287,12 +1217,6 @@ describe('tree updatedAt is honest', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -1441,12 +1365,6 @@ describe('renameTree', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -1492,12 +1410,6 @@ describe('deleteTree', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })
@@ -1589,12 +1501,6 @@ describe('importTree', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: null,
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
   })

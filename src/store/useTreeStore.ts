@@ -6,13 +6,12 @@ import { resolveDispatchForNode } from '../services/llm'
 import { useSettingsStore } from './settingsStore'
 import { computeChildPosition, layoutTree } from '../lib/autoLayout'
 import { parseImportDoc, remapImportedTree } from '../lib/treeExport'
-import type { TurnNode, ConversationTree, AppSettings, NodeStatus, TokenUsage } from '../types'
+import type { TurnNode, ConversationTree, NodeStatus, TokenUsage } from '../types'
 
 interface TreeStoreState {
   nodes: Map<string, TurnNode>
   trees: ConversationTree[]
   activeTreeId: string | null
-  settings: AppSettings
   liveText: Map<string, string>
   fitViewNonce: number
   /**
@@ -24,8 +23,6 @@ interface TreeStoreState {
 }
 
 interface TreeStoreActions {
-  loadSettings: () => Promise<void>
-  saveSettings: (patch: Partial<AppSettings>) => Promise<void>
   loadTree: (treeId: string) => Promise<void>
   createTree: (title: string) => Promise<ConversationTree>
   addNode: (node: TurnNode) => Promise<void>
@@ -45,13 +42,6 @@ interface TreeStoreActions {
   renameTree: (treeId: string, title: string) => Promise<void>
   deleteTree: (treeId: string) => Promise<void>
   importTree: (text: string) => Promise<{ ok: boolean; error?: string; treeId?: string }>
-}
-
-const DEFAULT_SETTINGS: AppSettings = {
-  id: 'global_settings',
-  ollamaBaseUrl: 'http://localhost:11434',
-  defaultModel: 'gemini-2.5-flash',
-  provider: 'gemini',
 }
 
 // Module-scope: map of node id → pending flush timer
@@ -163,40 +153,9 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     nodes: new Map(),
     trees: [],
     activeTreeId: null,
-    settings: DEFAULT_SETTINGS,
     liveText: new Map(),
     fitViewNonce: 0,
     lastSpawnedNodeId: null,
-
-    loadSettings: async () => {
-      const saved = await db.settings.get('global_settings')
-      if (saved) {
-        set({ settings: saved })
-      } else {
-        const defaults = { ...DEFAULT_SETTINGS }
-        await db.settings.put(defaults)
-        set({ settings: defaults })
-      }
-    },
-
-    saveSettings: async (patch) => {
-      const current = get().settings
-      const merged = { ...current, ...patch }
-
-      // Derive provider if not explicitly provided in patch
-      if (!patch.provider) {
-        if (merged.geminiApiKey) {
-          merged.provider = 'gemini'
-        } else if (merged.ollamaBaseUrl) {
-          merged.provider = 'ollama'
-        } else {
-          merged.provider = current.provider
-        }
-      }
-
-      await db.settings.put(merged)
-      set({ settings: merged })
-    },
 
     loadAllTrees: async () => {
       const trees = await db.trees.orderBy('createdAt').reverse().toArray()
@@ -235,9 +194,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       })
 
       const nodes = new Map(correctedArray.map((n) => [n.id, n]))
-      const nextSettings = { ...get().settings, activeTreeId: treeId }
-      set({ nodes, activeTreeId: treeId, settings: nextSettings })
-      await db.settings.put(nextSettings)
+      set({ nodes, activeTreeId: treeId })
+      await useSettingsStore.getState().setActiveTreeId(treeId)
     },
 
     createTree: async (title) => {
@@ -256,7 +214,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         positionY: 100,
         isCollapsed: false,
         status: 'idle',
-        modelUsed: get().settings.defaultModel,
+        modelUsed: useSettingsStore.getState().settings.defaultModel,
         timestamp: now,
       }
 
@@ -275,9 +233,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       })
 
       const nodes = new Map([[rootNodeId, rootNode]])
-      const nextSettings = { ...get().settings, activeTreeId: treeId }
-      set((state) => ({ nodes, activeTreeId: treeId, settings: nextSettings, trees: [tree, ...state.trees] }))
-      await db.settings.put(nextSettings)
+      set((state) => ({ nodes, activeTreeId: treeId, trees: [tree, ...state.trees] }))
+      await useSettingsStore.getState().setActiveTreeId(treeId)
       return tree
     },
 
@@ -473,7 +430,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
     // childrenIds rather than replacing them. Returns the new child id (or null
     // if the parent / active tree is missing).
     forkAndSubmit: async (parentId, userPrompt) => {
-      const { activeTreeId, nodes, settings } = get()
+      const { activeTreeId, nodes } = get()
       const parent = nodes.get(parentId)
       if (!activeTreeId || !parent) return null
 
@@ -489,7 +446,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         positionY: parent.positionY,
         isCollapsed: false,
         status: 'idle',
-        modelUsed: settings.defaultModel,
+        modelUsed: useSettingsStore.getState().settings.defaultModel,
         timestamp: Date.now(),
       }
 

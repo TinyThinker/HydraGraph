@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { db } from '../db/ChatDatabase'
 import type { AppSettings, LLMProvider, ProviderModelMap } from '../types'
 
-// Single source of truth for provider configuration. Persisted to the Dexie
-// `settings` table under the fixed `global_settings` key, mirroring the
-// load/save pattern used by useTreeStore.
+// Single source of truth for provider configuration and the last-opened tree.
+// Persisted to the Dexie `settings` table under the fixed `global_settings`
+// key. This is the only in-memory copy of the settings row — useTreeStore no
+// longer keeps its own.
 export const DEFAULT_SETTINGS: AppSettings = {
   id: 'global_settings',
   provider: 'gemini',
@@ -29,6 +30,8 @@ interface SettingsStoreActions {
   // Generic immutable merge-and-persist.
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>
   setActiveProvider: (provider: LLMProvider) => Promise<void>
+  // Remember the last-opened tree so a reload reopens it.
+  setActiveTreeId: (treeId: string) => Promise<void>
   // Empty string clears the key (stored as undefined).
   setApiKey: (provider: 'gemini' | 'openrouter', key: string) => Promise<void>
   setBaseUrl: (provider: 'ollama' | 'openrouter', url: string) => Promise<void>
@@ -64,6 +67,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setActiveProvider: async (provider) => {
     await get().updateSettings({ provider })
+  },
+
+  setActiveTreeId: async (treeId) => {
+    await get().updateSettings({ activeTreeId: treeId })
   },
 
   setApiKey: async (provider, key) => {

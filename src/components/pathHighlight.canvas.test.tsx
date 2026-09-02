@@ -68,12 +68,6 @@ describe('canvas path highlighting: T3.4', () => {
       nodes: new Map(),
       trees: [],
       activeTreeId: 'tree-test',
-      settings: {
-        id: 'global_settings',
-        ollamaBaseUrl: 'http://localhost:11434',
-        defaultModel: 'gemini-2.5-flash',
-        provider: 'gemini',
-      },
       liveText: new Map(),
     })
     seedTree()

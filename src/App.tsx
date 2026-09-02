@@ -22,20 +22,20 @@ export default function App() {
     bootedRef.current = true
 
     async function boot() {
-      const { loadSettings, loadAllTrees, loadTree, createTree } = useTreeStore.getState()
-      await loadSettings()
-      // Hydrate the global settings store from the same persisted row so the
-      // Settings modal edits live values rather than defaults.
+      const { loadAllTrees, loadTree, createTree } = useTreeStore.getState()
       await useSettingsStore.getState().loadSettings()
       await loadAllTrees()
-      const { settings } = useTreeStore.getState()
-      if (settings.activeTreeId) {
-        await loadTree(settings.activeTreeId)
+
+      const { activeTreeId } = useSettingsStore.getState().settings
+      const { trees } = useTreeStore.getState()
+      const remembered = trees.find((t) => t.id === activeTreeId)
+
+      if (remembered) {
+        await loadTree(remembered.id)
+      } else if (trees.length > 0) {
+        await loadTree(trees[0].id)
       } else {
-        const freshState = useTreeStore.getState()
-        if (!freshState.settings.activeTreeId && !freshState.activeTreeId) {
-          await createTree('New Research')
-        }
+        await createTree('New Research')
       }
       setReady(true)
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useReactFlow, useOnSelectionChange, useStore } from '@xyflow/react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useSettingsStore } from '../store/settingsStore'
 import { useReaderPanel } from './useReaderPanel'
 import { resolveNavTarget, isTypingTarget } from '../lib/treeNav'
 import { NODE_WIDTH, NODE_HEIGHT } from '../lib/nodeDimensions'
@@ -87,7 +88,7 @@ export function CanvasViewport() {
           if (!current) return
           const node = nodes.get(current)
           if (!node) return
-          const settings = useTreeStore.getState().settings
+          const settings = useSettingsStore.getState().settings
           useTreeStore.getState().addNode({
             id: crypto.randomUUID(),
             treeId: node.treeId,

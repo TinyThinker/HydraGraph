@@ -3,6 +3,7 @@ import { Copy, Check, X } from 'lucide-react'
 import { useReaderPanel } from './useReaderPanel'
 import { useTreeStore } from '../store/useTreeStore'
 import { MarkdownContent } from './MarkdownContent'
+import { MessageActions } from './MessageActions'
 import { estimateContextTokens, CONTEXT_WARN_TOKENS } from '../lib/contextEstimate'
 
 export function ReaderPanel() {
@@ -56,6 +57,7 @@ export function ReaderPanel() {
       <div className="shrink-0 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-200">Full text</h2>
         <div className="flex items-center gap-2">
+          <MessageActions node={node} isActive />
           <button
             onClick={handleCopy}
             title="Copy response"
