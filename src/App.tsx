@@ -5,6 +5,7 @@ import { useSettingsStore } from './store/settingsStore'
 import { SplitLayout } from './components/SplitLayout'
 import { HeaderBar } from './components/HeaderBar'
 import { ReaderPanel } from './components/ReaderPanel'
+import { CompareView } from './components/CompareView'
 import { installRenderHarness } from './lib/renderTally'
 
 export default function App() {
@@ -50,6 +51,7 @@ export default function App() {
         <SplitLayout />
         <ReaderPanel />
       </div>
+      <CompareView />
     </div>
   )
 }
