@@ -1,4 +1,9 @@
-# MVP Roadmap & Product Evaluation
+# MVP Strategy & Product Evaluation
+
+> **Where this fits.** This is the *reasoning* behind the plan — competitive scan,
+> positioning, assets/liabilities, instrumentation targets. The *actionable checklist*
+> lives in [`../ROADMAP.md`](../ROADMAP.md); tick boxes there, not here. This note is
+> updated only when the strategy itself changes.
 
 **Revision:** 2 — 2026-09-01
 **Assessed against:** branch `poc_enhancements_1` at `754bff0` · 87 source files · 253 tests across 32 files · typecheck and lint clean

@@ -41,12 +41,14 @@ Each branch maintains a clean, isolated context stack. Deep dives stay deep with
 
 ## Features
 
-- **Spatial canvas** — pan, zoom, drag nodes freely on a 2D plane
-- **Branching** — spawn child nodes from any turn; edges visualize ancestry
+- **Spatial canvas** — a "subway map" of compact station-pill nodes with deterministic auto-layout; pan and zoom to navigate
+- **Dual pane** — canvas for wayfinding on the left, a linear chat stream for reading and composing on the right
+- **Branching** — submit a prompt to fork a child off any turn; edges visualize ancestry, the active path is highlighted
 - **Context isolation** — each API call compiles only the direct ancestor chain
 - **Cascading system prompts** — set a persona at any node; all descendants inherit it unless overridden
 - **Local-first / BYOK** — all data in browser IndexedDB, your API key never leaves your machine
-- **Real-time streaming** — token-by-token SSE rendering directly from Gemini or Ollama
+- **Multi-provider** — stream token-by-token from Gemini, OpenRouter, or a local Ollama instance
+- **Workspace** — multiple trees, full-text search with fly-to, JSON export/import, per-tree viewport, keyboard navigation
 - **Session restore** — reopen the browser and pick up exactly where you left off
 
 ---
@@ -59,136 +61,48 @@ Each branch maintains a clean, isolated context stack. Deep dives stay deep with
 | Canvas | [@xyflow/react](https://reactflow.dev) v12 |
 | State | [Zustand](https://zustand-demo.pmnd.rs) v5 |
 | Storage | [Dexie.js](https://dexie.org) v4 (IndexedDB) |
+| Layout | [d3-hierarchy](https://github.com/d3/d3-hierarchy) v3 |
 | Styling | Tailwind CSS v4 |
-| LLM | Gemini API (Google AI Studio) · Ollama (local) |
+| LLM | Gemini API (Google AI Studio) · OpenRouter · Ollama (local) |
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- A [Google AI Studio](https://aistudio.google.com) API key, or a running [Ollama](https://ollama.ai) instance
-
-### Install
+## Quick Start
 
 ```bash
-git clone https://github.com/your-username/hydra-graph.git
-cd hydra-graph
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`, enter your API key in settings, and start a tree.
+Open `http://localhost:5173`, click the gear icon to pick a provider and enter your key, and start a tree.
 
-### Build
+For provider configuration, the Ollama `OLLAMA_ORIGINS` gotcha, and the full script list, see **[`docs/SETUP.md`](docs/SETUP.md)**.
 
-```bash
-npm run build
-npm run preview
-```
-
-### Using a local model (Ollama)
-
-To use Ollama models from the browser, you must allow the app's origin. Configure the `OLLAMA_ORIGINS` environment variable before starting Ollama.
-
-For development (Vite dev server at `http://localhost:5173`):
-
-```bash
-OLLAMA_ORIGINS=http://localhost:5173 ollama serve
-```
-
-On macOS with Ollama as a background service:
-
-```bash
-launchctl setenv OLLAMA_ORIGINS "http://localhost:5173"
-```
-
-Then restart Ollama. If the app is served from a different origin (e.g., `http://localhost:4173`), update the value accordingly; use comma-separated values for multiple origins.
-
-**If generations fail instantly:** Check the browser console for a network/CORS error (not a model error message) — this means `OLLAMA_ORIGINS` is not set or incorrect.
-
----
-
-## Keyboard Shortcuts
+### Keyboard Shortcuts
 
 | Key | Action |
 |---|---|
-| `↑` | Select the parent node |
-| `↓` | Select the first child |
+| `↑` / `↓` | Select the parent / first child |
 | `←` / `→` | Previous / next sibling |
 | `b` | Branch a new child from the selected node |
 | `r` | Open the reader panel for the selected node |
+| `Esc` | Close the reader panel |
 
 Shortcuts are ignored while a text field is focused.
 
-### Canvas Viewport
-
-The canvas remembers pan and zoom per tree and restores your last view when you reopen that tree, instead of always fitting the whole graph.
-
 ---
 
-## Architecture
+## Documentation
 
-```
-src/
-├── components/
-│   ├── Canvas.tsx        # React Flow container, node/edge mapping
-│   └── TurnNode.tsx      # Custom card node component
-├── db/
-│   └── ChatDatabase.ts   # Dexie schema (nodes, trees, settings)
-├── lib/
-│   ├── contextEngine.ts  # Ancestry chain traversal + system prompt resolution
-│   └── streamingClient.ts# Native SSE client for Gemini + Ollama
-├── store/
-│   └── useTreeStore.ts   # Zustand store with IndexedDB persistence
-└── types/
-    └── index.ts          # TurnNode, ConversationTree, AppSettings
-```
+| I want to know… | Read |
+|---|---|
+| Where the project is right now + what's next | [`docs/STATUS.md`](docs/STATUS.md) → [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+| What has shipped | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
+| How the system is built (design, schemas, data flow) | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| How to run it and configure a provider | [`docs/SETUP.md`](docs/SETUP.md) |
+| How the docs are organized / where a new doc goes | [`docs/README.md`](docs/README.md) |
 
-### Context Resolution
-
-When a prompt is submitted on any node, the context engine walks up the `parentId` chain to the root, assembles the message array in chronological order, and resolves the nearest ancestor's system prompt override. Sibling branches never appear in this traversal.
-
----
-
-## Roadmap
-
-### MVP (Phases 1–3)
-- [x] Phase 1 — Core foundation: Dexie schema, Zustand store, IndexedDB persistence
-- [x] Phase 2 — Canvas: React Flow integration, TurnNode component, drag/branch/edges
-- [ ] Phase 3 — Intelligence: context engine, SSE streaming client, live token rendering
-
-### Post-MVP (Phase 4)
-- [ ] Auto-layout with `@dagrejs/dagre`
-- [ ] Sub-tree collapse/expand with node count badges
-- [ ] JSON export/import for session backup
-- [ ] Settings panel for API keys and default model
-- [ ] System prompt override UI with amber badge
-
----
-
-## Data Model
-
-Each node on the canvas maps 1:1 to a `TurnNode` record in IndexedDB:
-
-```ts
-interface TurnNode {
-  id: string           // UUIDv4
-  treeId: string       // parent tree
-  parentId: string | null  // null = root node
-  userPrompt: string
-  assistantResponse: string
-  systemPromptOverride?: string
-  positionX: number
-  positionY: number
-  status: 'idle' | 'streaming' | 'error'
-  modelUsed: string
-  inputTokens?: number
-  outputTokens?: number
-}
-```
+Contributor and AI-agent coding constraints are in [`CLAUDE.md`](CLAUDE.md).
 
 ---
 

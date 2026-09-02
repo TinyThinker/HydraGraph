@@ -1,5 +1,8 @@
 # Hydra Graph — Setup & Run Guide
 
+> **Where this fits.** Permanent how-to-run reference. For how the system is built see
+> [`ARCHITECTURE.md`](ARCHITECTURE.md); for project state see [`STATUS.md`](STATUS.md).
+
 A quick guide to configuring an LLM provider and running the app locally.
 
 ---

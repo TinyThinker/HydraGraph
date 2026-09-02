@@ -1,0 +1,68 @@
+# Changelog
+
+> **Where this fits.** What shipped, newest first. One line per change. Add an entry
+> here whenever you tick a box in [`ROADMAP.md`](ROADMAP.md). `package.json` is still at
+> `0.0.0`; the `vX.Y.Z` headings below are a documentation convention, reconstructed
+> from git history up to the reorg. Full historical detail is under
+> [`archive/`](archive/).
+
+---
+
+## v0.3.0 — 2026-09-01 — Dual-pane workspace & subway canvas
+
+The `poc_enhancements_1` track. Reshaped the UI from a single-pane full-card canvas
+into a dual-pane layout: canvas for wayfinding, chat pane for reading and composing.
+
+- Dedicated `useSettingsStore` with layered dispatch resolution (node → tree → global).
+- `SplitLayout` — draggable 40/60 graph/chat split, ratio clamped 20–80%.
+- `ChatStreamView` + `ChatMessage` — the active node's ancestry rendered as chat
+  bubbles with Markdown, live streaming text, and token telemetry.
+- `ChatInputBar` + `forkAndSubmit` — submitting forks a fresh child off the active
+  node; siblings are never overwritten.
+- Two-way selection sync (`useSelectionStore`) — canvas ↔ chat, with viewport centering.
+- Deterministic auto-layout on `d3-hierarchy` (replaces dagre), recomputed on every
+  create / branch / delete; cycle- and broken-pointer-safe.
+- Compact 240×72 "station pill" canvas nodes (`stationSummary()`), replacing the full
+  prompt/response card. Manual dragging and resizing removed.
+- Active-path highlighting: cyan animated accent edges `root → selected`, off-path
+  nodes and edges dimmed.
+- Documentation reorg: three-tier model (permanent / living pointers / archive); this
+  changelog, `ROADMAP.md`, `STATUS.md`, and `docs/README.md` introduced; the
+  architecture doc reconciled against the real source as `ARCHITECTURE.md` v2.0.0.
+
+**Known regression (see [`ROADMAP.md`](ROADMAP.md)):** the pill refactor re-implemented
+only *delete*; retry / cancel / edit / per-node model / per-node persona have no live
+UI. Settings split-brain between the two stores keeps the first-run banner stale.
+
+## v0.2.0 — 2026-08-31 — Five-phase re-engineering
+
+Branch `re-engineer`, 59 task commits. Turned a clean-building demo into a working
+product. Full detail: [`archive/2026-08_re-engineering/`](archive/2026-08_re-engineering/).
+
+- **Ground truth & safety net:** Vitest + jsdom + fake-indexeddb runner; `npm run check`
+  gate; stack docs corrected to React 19 / Vite 8 / TS 6 / Zustand 5.
+- **Core loop:** masked-key Settings modal + header bar; durable throttled streaming
+  writes; zombie-node recovery on load; cancel; surfaced stream errors; explicit
+  provider routing; stream-parser correctness (cross-read buffering, multi-byte safe);
+  Gemini key moved to `x-goog-api-key` header. DB schema → v2.
+- **Render path:** whole-canvas re-render on every token eliminated — non-streaming
+  nodes take **0** renders during a stream (`renderBudget.test.tsx` regression lock);
+  narrow store selectors; in-flight text moved to a `liveText` map off node identity.
+- **Research surface:** sanitized Markdown + syntax-highlighted code; resizable cards;
+  full-text reader panel; edit prompt / regenerate; delete node + subtree; stale-
+  descendant marking; system-prompt override editor; collapse / expand; per-node model
+  picker. DB schema → v3.
+- **Workspace & scale:** dagre auto-layout + manual re-layout; multi-tree switcher
+  (create / switch / rename / delete); honest `updatedAt`; active-tree search with
+  fly-to; secret-free JSON export + validated all-or-nothing import; per-node context
+  estimate + real token counts; per-tree viewport persistence; keyboard navigation.
+  DB schema → v4.
+- **Post-plan:** OpenRouter provider (OpenAI-compatible SSE) + Settings provider selector.
+
+## v0.1.0 — 2026-07 — Initial proof of concept
+
+- Dexie `HydraGraphDB` schema: `nodes` / `trees` / `settings`.
+- Zustand `useTreeStore` with IndexedDB persistence.
+- `@xyflow/react` canvas with a custom `TurnNode` card; drag / branch / edges.
+- `resolveContextPayload()` ancestry traversal + cascading system-prompt resolution.
+- Native `fetch` + SSE streaming clients for Gemini and Ollama.
