@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { useTreeStore } from '../store/useTreeStore'
 import { MarkdownContent } from './MarkdownContent'
 import { MessageActions } from './MessageActions'
+import { turnCostUSD, formatUSD } from '../lib/pricing'
 import type { TurnNode } from '../types'
 
 interface ChatMessageProps {
@@ -21,6 +22,7 @@ export const ChatMessage = memo(function ChatMessage({ node, isActive, onSelect 
   const answer = liveText !== undefined ? liveText : node.assistantResponse
 
   const hasTokens = node.inputTokens != null && node.outputTokens != null
+  const cost = turnCostUSD(node)
 
   return (
     <div
@@ -53,6 +55,7 @@ export const ChatMessage = memo(function ChatMessage({ node, isActive, onSelect 
               {!isStreaming && hasTokens && (
                 <span>
                   {node.inputTokens!.toLocaleString()} in · {node.outputTokens!.toLocaleString()} out tokens
+                  {cost != null && ` · ${formatUSD(cost)}`}
                 </span>
               )}
               <span className="ml-auto">

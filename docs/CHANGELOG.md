@@ -13,6 +13,7 @@
 - **Per-node dispatch override plumbing.** `TurnNode.providerOverride` added; `resolveDispatchForNode` now forwards both provider and model overrides; `submitPrompt` stamps the resolved `modelUsed` onto the turn (mirrors the existing `provider` stamp). No DB migration — optional field.
 - **Per-node model + persona controls.** New `NodeDispatchControls` in the reader panel: provider override (with "Inherit"), model field, and a system-prompt / persona editor with presets (`personaPresets.ts`). Edits persist via `updateNode`; apply on the next Regenerate.
 - **Cost model.** `pricing.ts` (editable per-1M-token table + `resolvePrice`/`turnCostUSD`/`formatUSD`) and `treeCost.ts` (`treeCostSummary`: actual vs. linear-thread counterfactual = "context you didn't pay for"). Pure, unit-tested.
+- **Per-turn cost shown.** The chat-stream telemetry line and the reader panel's "last generation" line now append the turn's dollar cost (`turnCostUSD` + `formatUSD`) whenever token counts and a known price are available.
 
 ## v0.3.1 — 2026-09-02 — Phase 1: stop the bleeding
 

@@ -6,6 +6,7 @@ import { MarkdownContent } from './MarkdownContent'
 import { MessageActions } from './MessageActions'
 import { NodeDispatchControls } from './NodeDispatchControls'
 import { estimateContextTokens, CONTEXT_WARN_TOKENS } from '../lib/contextEstimate'
+import { turnCostUSD, formatUSD } from '../lib/pricing'
 
 export function ReaderPanel() {
   const nodeId = useReaderPanel((s) => s.nodeId)
@@ -41,6 +42,7 @@ export function ReaderPanel() {
   if (!nodeId || !node) return null
 
   const fullResponse = liveText ?? node.assistantResponse
+  const lastGenCost = turnCostUSD(node)
 
   const handleCopy = async () => {
     if (!navigator.clipboard) return
@@ -83,7 +85,10 @@ export function ReaderPanel() {
         <div className="text-xs text-slate-400 space-y-1">
           <div>Estimated context: ~{estTokens.toLocaleString()} tokens</div>
           {node?.inputTokens != null && node?.outputTokens != null && (
-            <div>Last generation: {node.inputTokens.toLocaleString()} in · {node.outputTokens.toLocaleString()} out</div>
+            <div>
+              Last generation: {node.inputTokens.toLocaleString()} in · {node.outputTokens.toLocaleString()} out
+              {lastGenCost != null && ` · ${formatUSD(lastGenCost)}`}
+            </div>
           )}
           {estTokens > CONTEXT_WARN_TOKENS && (
             <div className="text-amber-400">Deep context — approaching typical model limits.</div>

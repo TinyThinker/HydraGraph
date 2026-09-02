@@ -24,6 +24,8 @@ function createNode(overrides: Partial<TurnNode>): TurnNode {
     modelUsed: overrides.modelUsed ?? 'gemini-2.5-flash',
     timestamp: overrides.timestamp ?? Date.now(),
     provider: overrides.provider ?? 'gemini',
+    inputTokens: overrides.inputTokens,
+    outputTokens: overrides.outputTokens,
   }
 }
 
@@ -147,6 +149,28 @@ describe('ReaderPanel', () => {
 
       // Assert the empty state message is shown
       expect(screen.getByText('No response yet.')).toBeInTheDocument()
+    })
+  })
+
+  describe('Test G: Per-turn dollar cost on the last-generation line', () => {
+    it('appends the formatted turn cost when token counts and a known price exist', async () => {
+      const node = createNode({
+        id: 'node-cost',
+        modelUsed: 'gemini-2.5-flash',
+        provider: 'gemini',
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+      })
+
+      useTreeStore.setState({ nodes: new Map([['node-cost', node]]) })
+
+      await act(async () => {
+        useReaderPanel.getState().open('node-cost')
+      })
+
+      render(<ReaderPanel />)
+
+      expect(screen.getByText(/Last generation:.*\$2\.80/)).toBeInTheDocument()
     })
   })
 
