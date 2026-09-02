@@ -59,7 +59,7 @@ The five days that decide whether the project has a reason to exist.
   in parallel from identical ancestry.
 - [ ] Compare view: selected siblings column by column, with the shared-context
   guarantee visible on screen.
-- [ ] Model pricing table → per-node, per-tree, and counterfactual cost in dollars
+- [x] Model pricing table → per-node, per-tree, and counterfactual cost in dollars
   ("context you didn't pay for").
 
 **Gate:** a 30-second capture of comparing three models at turn 30 makes an experienced

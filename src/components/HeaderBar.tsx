@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings, AlertTriangle, LayoutGrid, Download } from 'lucide-react'
+import { Settings, AlertTriangle, LayoutGrid, Download, DollarSign } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useSettingsStore } from '../store/settingsStore'
 import { downloadTreeExport } from '../lib/treeExport'
@@ -7,12 +7,14 @@ import { SettingsModal } from './SettingsModal'
 import { TreeSwitcher } from './TreeSwitcher'
 import { SearchBar } from './SearchBar'
 import { ImportButton } from './ImportButton'
+import { CostReceipt } from './CostReceipt'
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 
 export function HeaderBar() {
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmRelayout, setConfirmRelayout] = useState(false)
+  const [showReceipt, setShowReceipt] = useState(false)
   const settings = useSettingsStore((s) => s.settings)
   const relayoutActiveTree = useTreeStore((s) => s.relayoutActiveTree)
 
@@ -31,7 +33,7 @@ export function HeaderBar() {
         <div className="flex-1 flex justify-center px-4">
           <SearchBar />
         </div>
-        <div className="flex items-center gap-1">
+        <div className="relative flex items-center gap-1">
           <button
             onClick={() => setConfirmRelayout(true)}
             className="text-slate-400 hover:text-slate-200 transition-colors p-2"
@@ -54,11 +56,25 @@ export function HeaderBar() {
           </button>
           <ImportButton />
           <button
+            onClick={() => setShowReceipt((v) => !v)}
+            title="Cost receipt for this tree"
+            className={`transition-colors p-2 ${
+              showReceipt ? 'text-slate-200' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <DollarSign size={20} />
+          </button>
+          <button
             onClick={() => setModalOpen(true)}
             className="text-slate-400 hover:text-slate-200 transition-colors p-2"
           >
             <Settings size={20} />
           </button>
+          {showReceipt && (
+            <div className="absolute right-0 top-full mt-1 z-20">
+              <CostReceipt />
+            </div>
+          )}
         </div>
       </div>
       {confirmRelayout && (
