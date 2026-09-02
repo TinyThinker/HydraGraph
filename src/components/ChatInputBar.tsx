@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { SendHorizontal } from 'lucide-react'
+import { SendHorizontal, Split } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useSelectionStore } from '../store/useSelectionStore'
 import { useActiveNodeId } from './useActiveNodeId'
+import { FanOutModal } from './FanOutModal'
 
 /**
  * Fixed bottom input for the chat pane. Submitting forks a fresh child off the
@@ -14,6 +15,7 @@ export function ChatInputBar() {
   const activeId = useActiveNodeId()
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
+  const [fanOpen, setFanOpen] = useState(false)
 
   const send = async () => {
     const text = draft.trim()
@@ -54,7 +56,17 @@ export function ChatInputBar() {
         >
           <SendHorizontal size={16} />
         </button>
+        <button
+          onClick={() => setFanOpen(true)}
+          disabled={!activeId}
+          title="Fan-out to several models"
+          data-testid="chat-fanout"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-700 text-slate-200 transition-colors hover:bg-slate-600 disabled:opacity-40"
+        >
+          <Split size={16} />
+        </button>
       </div>
+      <FanOutModal open={fanOpen} onClose={() => setFanOpen(false)} />
     </div>
   )
 }

@@ -16,6 +16,7 @@
 - **Per-turn cost shown.** The chat-stream telemetry line and the reader panel's "last generation" line now append the turn's dollar cost (`turnCostUSD` + `formatUSD`) whenever token counts and a known price are available.
 - **The receipt.** New `CostReceipt` (toggle from a `$` button in the header): this tree's actual spend vs. the one-linear-thread counterfactual, and "context you didn't pay for" in dollars + percent. ROADMAP item 4 complete.
 - **Fan-out action.** `useTreeStore.fanOutAndSubmit(parentId, prompt, variants[])` forks N children off one parent — each with its own provider/model/persona override — then dispatches the shared prompt into all of them in parallel from identical ancestry. `FanOutVariant` type in `services/llm.ts`.
+- **Fan-out composer.** `Split` button in the chat input opens `FanOutModal`: one shared prompt + 2–4 `FanOutRow`s (provider / model / persona preset), dispatched via `fanOutAndSubmit` into parallel sibling branches off the active node. ROADMAP item 2 complete.
 
 ## v0.3.1 — 2026-09-02 — Phase 1: stop the bleeding
 
