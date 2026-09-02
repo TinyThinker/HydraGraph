@@ -2,53 +2,9 @@ import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useCompareStore } from '../store/useCompareStore'
 import { useTreeStore } from '../store/useTreeStore'
-import { MarkdownContent } from './MarkdownContent'
+import { CompareColumn } from './CompareColumn'
 import { getAncestryChain } from '../lib/ancestry'
 import { estimateContextTokens } from '../lib/contextEstimate'
-import { turnCostUSD, formatUSD } from '../lib/pricing'
-import type { TurnNode } from '../types'
-
-function Column({ node, index }: { node: TurnNode; index: number }) {
-  const liveText = useTreeStore((s) => s.liveText)
-  const cost = turnCostUSD(node)
-  const body = liveText.get(node.id) ?? (node.assistantResponse || '…')
-  return (
-    <div className="w-80 shrink-0 flex flex-col border border-slate-800 rounded-lg bg-slate-900 overflow-hidden">
-      <div className="shrink-0 border-b border-slate-800 px-3 py-2">
-        <div className="text-sm font-medium text-slate-200 flex items-center gap-2 flex-wrap">
-          <span>{node.modelUsed || `#${index}`}</span>
-          {node.provider && <span className="text-xs text-slate-500">{node.provider}</span>}
-          {node.systemPromptOverride && (
-            <span
-              className="text-[10px] uppercase tracking-wide rounded bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5"
-              title={node.systemPromptOverride.slice(0, 120)}
-            >
-              persona
-            </span>
-          )}
-        </div>
-        {node.inputTokens != null && node.outputTokens != null && (
-          <div className="text-xs text-slate-500 mt-1">
-            {node.inputTokens.toLocaleString()} in · {node.outputTokens.toLocaleString()} out
-            {cost != null && ` · ${formatUSD(cost)}`}
-          </div>
-        )}
-      </div>
-      <p className="shrink-0 px-3 py-2 text-xs text-slate-500 whitespace-pre-wrap break-words border-b border-slate-800/60">
-        {node.userPrompt}
-      </p>
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-sm text-slate-200">
-        {node.status === 'error' ? (
-          <p className="text-red-400 whitespace-pre-wrap break-words">
-            {node.errorMessage || 'Generation failed.'}
-          </p>
-        ) : (
-          <MarkdownContent markdown={body} />
-        )}
-      </div>
-    </div>
-  )
-}
 
 export function CompareView() {
   const open = useCompareStore((s) => s.open)
@@ -81,6 +37,8 @@ export function CompareView() {
   const inheritedTurns = hasParent ? getAncestryChain(nodes, anchor.parentId).length : 0
   const sharedTokens = hasParent ? estimateContextTokens(anchor.parentId as string, nodes) : 0
   const columns = siblings.filter((n) => !excludedIds.has(n.id))
+  const allPromptsIdentical =
+    columns.length > 1 && columns.every((n) => n.userPrompt === columns[0].userPrompt)
 
   return (
     <div className="fixed inset-0 z-40 bg-slate-950/95 flex flex-col">
@@ -120,10 +78,22 @@ export function CompareView() {
           ))}
         </div>
       </div>
-      <div className="flex gap-4 overflow-x-auto p-4 flex-1 min-h-0">
-        {columns.map((n) => (
-          <Column key={n.id} node={n} index={siblings.indexOf(n)} />
-        ))}
+      <div className="flex flex-col flex-1 min-h-0">
+        <p className="shrink-0 px-4 pt-3 text-xs text-slate-500">
+          {allPromptsIdentical
+            ? 'Identical context through the parent turn — the prompt below is the same for every column; only the model / persona and the answer differ.'
+            : "Columns share the parent's context but were asked slightly different follow-ups."}
+        </p>
+        {allPromptsIdentical && (
+          <p className="shrink-0 mx-4 mt-2 px-3 py-2 rounded border border-slate-800 bg-slate-900 text-xs text-slate-400 whitespace-pre-wrap break-words">
+            {columns[0].userPrompt}
+          </p>
+        )}
+        <div className="flex gap-4 overflow-x-auto p-4 flex-1 min-h-0">
+          {columns.map((n) => (
+            <CompareColumn key={n.id} node={n} promptHidden={allPromptsIdentical} />
+          ))}
+        </div>
       </div>
     </div>
   )

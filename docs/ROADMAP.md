@@ -57,7 +57,7 @@ The five days that decide whether the project has a reason to exist.
 - [x] Per-node model picker and per-node persona, rehomed into the reader panel.
 - [x] Fan-out: one prompt → N branches, a different model or persona each, dispatched
   in parallel from identical ancestry.
-- [ ] Compare view: selected siblings column by column, with the shared-context
+- [x] Compare view: selected siblings column by column, with the shared-context
   guarantee visible on screen.
 - [x] Model pricing table → per-node, per-tree, and counterfactual cost in dollars
   ("context you didn't pay for").

@@ -18,6 +18,7 @@
 - **Fan-out action.** `useTreeStore.fanOutAndSubmit(parentId, prompt, variants[])` forks N children off one parent — each with its own provider/model/persona override — then dispatches the shared prompt into all of them in parallel from identical ancestry. `FanOutVariant` type in `services/llm.ts`.
 - **Fan-out composer.** `Split` button in the chat input opens `FanOutModal`: one shared prompt + 2–4 `FanOutRow`s (provider / model / persona preset), dispatched via `fanOutAndSubmit` into parallel sibling branches off the active node. ROADMAP item 2 complete.
 - **Compare view (shell).** New `useCompareStore` + `CompareView` full-screen overlay: sibling answers column by column with a checkbox strip, and the shared-context guarantee on screen (N inherited turns, ~X identical tokens). Entry point lands next.
+- **Compare view (complete).** `CompareColumn` extracted; a divergence line makes the shared-context guarantee explicit (identical prompt shown once when all columns match); "Compare" button in the header opens it, enabled when the active node has ≥2 siblings. ROADMAP item 3 complete — Phase 2 done.
 
 ## v0.3.1 — 2026-09-02 — Phase 1: stop the bleeding
 

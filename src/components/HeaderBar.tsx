@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { Settings, AlertTriangle, LayoutGrid, Download, DollarSign } from 'lucide-react'
+import { Settings, AlertTriangle, LayoutGrid, Download, DollarSign, Columns3 } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useSettingsStore } from '../store/settingsStore'
+import { useCompareStore } from '../store/useCompareStore'
+import { useActiveNodeId } from './useActiveNodeId'
 import { downloadTreeExport } from '../lib/treeExport'
 import { SettingsModal } from './SettingsModal'
 import { TreeSwitcher } from './TreeSwitcher'
@@ -17,6 +19,16 @@ export function HeaderBar() {
   const [showReceipt, setShowReceipt] = useState(false)
   const settings = useSettingsStore((s) => s.settings)
   const relayoutActiveTree = useTreeStore((s) => s.relayoutActiveTree)
+
+  const activeId = useActiveNodeId()
+  const siblingCount = useTreeStore((s) => {
+    const active = activeId ? s.nodes.get(activeId) : undefined
+    if (!active || active.parentId == null) return 0
+    let count = 0
+    for (const n of s.nodes.values()) if (n.parentId === active.parentId) count++
+    return count
+  })
+  const canCompare = siblingCount >= 2
 
   // Banner is shown if no provider is configured: no Gemini key, no OpenRouter key,
   // and Ollama is either unconfigured or still at the default untested URL
@@ -63,6 +75,16 @@ export function HeaderBar() {
             }`}
           >
             <DollarSign size={20} />
+          </button>
+          <button
+            onClick={() => activeId && useCompareStore.getState().openCompare(activeId)}
+            disabled={!canCompare}
+            title="Compare sibling branches"
+            className={`transition-colors p-2 ${
+              canCompare ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 opacity-40'
+            }`}
+          >
+            <Columns3 size={20} />
           </button>
           <button
             onClick={() => setModalOpen(true)}
