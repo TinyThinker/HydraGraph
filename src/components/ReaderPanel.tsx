@@ -4,6 +4,7 @@ import { useReaderPanel } from './useReaderPanel'
 import { useTreeStore } from '../store/useTreeStore'
 import { MarkdownContent } from './MarkdownContent'
 import { MessageActions } from './MessageActions'
+import { NodeDispatchControls } from './NodeDispatchControls'
 import { estimateContextTokens, CONTEXT_WARN_TOKENS } from '../lib/contextEstimate'
 
 export function ReaderPanel() {
@@ -88,6 +89,8 @@ export function ReaderPanel() {
             <div className="text-amber-400">Deep context — approaching typical model limits.</div>
           )}
         </div>
+
+        <NodeDispatchControls node={node} />
 
         {/* User prompt */}
         <div>

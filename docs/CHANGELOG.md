@@ -11,6 +11,7 @@
 ## v0.4.0 — 2026-09-02 — Phase 2: deep-context model arbitration
 
 - **Per-node dispatch override plumbing.** `TurnNode.providerOverride` added; `resolveDispatchForNode` now forwards both provider and model overrides; `submitPrompt` stamps the resolved `modelUsed` onto the turn (mirrors the existing `provider` stamp). No DB migration — optional field.
+- **Per-node model + persona controls.** New `NodeDispatchControls` in the reader panel: provider override (with "Inherit"), model field, and a system-prompt / persona editor with presets (`personaPresets.ts`). Edits persist via `updateNode`; apply on the next Regenerate.
 
 ## v0.3.1 — 2026-09-02 — Phase 1: stop the bleeding
 

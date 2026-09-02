@@ -54,7 +54,7 @@ Only the defects a stranger hits in their first two minutes.
 
 The five days that decide whether the project has a reason to exist.
 
-- [ ] Per-node model picker and per-node persona, rehomed into the reader panel.
+- [x] Per-node model picker and per-node persona, rehomed into the reader panel.
 - [ ] Fan-out: one prompt → N branches, a different model or persona each, dispatched
   in parallel from identical ancestry.
 - [ ] Compare view: selected siblings column by column, with the shared-context
