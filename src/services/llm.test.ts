@@ -82,4 +82,20 @@ describe('resolveDispatchForNode', () => {
       model: 'gemini-default',
     })
   })
+
+  it('forwards providerOverride as the per-turn provider, over the tree default', () => {
+    expect(
+      resolveDispatchForNode(
+        { modelUsed: 'x', providerOverride: 'openrouter' },
+        { defaultProvider: 'gemini' },
+        settings,
+      ),
+    ).toEqual({ provider: 'openrouter', model: 'x' })
+  })
+
+  it('falls through to the tree / settings provider when providerOverride is absent', () => {
+    expect(
+      resolveDispatchForNode({ modelUsed: 'x' }, { defaultProvider: 'openrouter' }, settings),
+    ).toEqual({ provider: 'openrouter', model: 'x' })
+  })
 })

@@ -362,8 +362,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       const globalSettings = useSettingsStore.getState().settings
       const target = resolveDispatchForNode(existing, tree, globalSettings)
 
-      const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: target.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false }
-      await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: target.provider, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false })
+      const updated = { ...existing, userPrompt, status: 'streaming' as NodeStatus, assistantResponse: '', provider: target.provider, modelUsed: target.model, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false }
+      await db.nodes.update(nodeId, { userPrompt, status: 'streaming', assistantResponse: '', provider: target.provider, modelUsed: target.model, errorMessage: '', inputTokens: undefined, outputTokens: undefined, stale: false })
       set((state) => {
         const next = new Map(state.nodes)
         next.set(nodeId, updated)

@@ -54,11 +54,17 @@ export function resolveDispatchTarget(
 }
 
 // Convenience overload for the common case of resolving straight from a stored
-// node. Reads only the fields that represent a genuine per-node override.
+// node. Reads only the fields that represent a genuine per-node override:
+// `providerOverride` (per-turn provider) and `modelUsed` (per-turn model), both
+// honored here at the highest precedence before the tree/settings fallbacks.
 export function resolveDispatchForNode(
-  node: Pick<TurnNode, 'modelUsed'> | null | undefined,
+  node: Pick<TurnNode, 'modelUsed' | 'providerOverride'> | null | undefined,
   tree: Pick<ConversationTree, 'defaultProvider' | 'defaultModel'> | null | undefined,
   settings: AppSettings,
 ): DispatchTarget {
-  return resolveDispatchTarget({ model: node?.modelUsed }, tree, settings)
+  return resolveDispatchTarget(
+    { provider: node?.providerOverride ?? null, model: node?.modelUsed },
+    tree,
+    settings,
+  )
 }

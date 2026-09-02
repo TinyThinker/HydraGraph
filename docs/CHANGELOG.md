@@ -8,6 +8,10 @@
 
 ---
 
+## v0.4.0 — 2026-09-02 — Phase 2: deep-context model arbitration
+
+- **Per-node dispatch override plumbing.** `TurnNode.providerOverride` added; `resolveDispatchForNode` now forwards both provider and model overrides; `submitPrompt` stamps the resolved `modelUsed` onto the turn (mirrors the existing `provider` stamp). No DB migration — optional field.
+
 ## v0.3.1 — 2026-09-02 — Phase 1: stop the bleeding
 
 Reconnected the capabilities the subway-pill refactor stranded and removed the

@@ -13,7 +13,12 @@ export interface TurnNode {
   positionY: number
   isCollapsed: boolean
   status: NodeStatus
+  // Doubles as the per-turn model override (highest-precedence dispatch input)
+  // and the post-run record of which model actually generated the turn.
   modelUsed: string
+  // Per-turn provider override (input to dispatch resolution); distinct from
+  // `provider` below, which records what actually ran.
+  providerOverride?: LLMProvider
   inputTokens?: number
   outputTokens?: number
   timestamp: number

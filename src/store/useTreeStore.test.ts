@@ -579,6 +579,8 @@ describe('regenerate and edit prompts', () => {
     expect(vi.mocked(streamLLMResponse)).toHaveBeenCalledTimes(1)
     const call = vi.mocked(streamLLMResponse).mock.calls[0]
     expect(call[2]).toEqual({ provider: 'gemini', model: 'special-model-v9' })
+    // The resolved model is stamped back onto the node (mirrors the provider stamp).
+    expect(useTreeStore.getState().nodes.get(rootId)!.modelUsed).toBe('special-model-v9')
   })
 
   describe('dispatch resolution against the global settings store', () => {
