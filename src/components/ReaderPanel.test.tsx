@@ -156,7 +156,7 @@ describe('ReaderPanel', () => {
     it('appends the formatted turn cost when token counts and a known price exist', async () => {
       const node = createNode({
         id: 'node-cost',
-        modelUsed: 'gemini-2.5-flash',
+        modelUsed: 'google/gemini-2.5-flash',
         provider: 'openrouter',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,

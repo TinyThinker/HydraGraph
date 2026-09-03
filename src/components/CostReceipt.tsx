@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useCatalogStore } from '../store/catalogStore'
 import { treeCostSummary } from '../lib/treeCost'
 import { formatUSD } from '../lib/pricing'
 
@@ -10,7 +11,8 @@ import { formatUSD } from '../lib/pricing'
  */
 export function CostReceipt() {
   const nodes = useTreeStore((s) => s.nodes)
-  const summary = useMemo(() => treeCostSummary(nodes), [nodes])
+  const models = useCatalogStore((s) => s.models)
+  const summary = useMemo(() => treeCostSummary(nodes, models), [nodes, models])
 
   const { turns, forks } = useMemo(() => {
     let turns = 0

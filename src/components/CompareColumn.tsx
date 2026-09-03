@@ -1,4 +1,5 @@
 import { useTreeStore } from '../store/useTreeStore'
+import { useCatalogStore } from '../store/catalogStore'
 import { MarkdownContent } from './MarkdownContent'
 import { turnCostUSD, formatUSD } from '../lib/pricing'
 import type { TurnNode } from '../types'
@@ -15,7 +16,8 @@ export function CompareColumn({
   promptHidden?: boolean
 }) {
   const live = useTreeStore((s) => s.liveText.get(node.id))
-  const cost = turnCostUSD(node)
+  const models = useCatalogStore((s) => s.models)
+  const cost = turnCostUSD(node, models)
   const body = live ?? (node.assistantResponse || '…')
 
   return (

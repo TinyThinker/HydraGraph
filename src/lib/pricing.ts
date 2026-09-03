@@ -1,13 +1,16 @@
-import type { TurnNode } from '../types'
+import type { TurnNode, LLMProvider } from '../types'
+import type { CatalogModel } from './openRouterCatalog'
+import { useCatalogStore } from '../store/catalogStore'
 
 /**
- * Model pricing table.
+ * Model pricing helpers.
  *
- * Figures are approximate, expressed as USD per 1,000,000 tokens, last checked
- * 2026-09. This table is the one place to update when published rates move — no
- * other module hard-codes a rate.
+ * Prices come from the live OpenRouter catalog (`catalogStore`), seeded from the
+ * bundled snapshot so a lookup always has data. There is no hand-maintained
+ * table here any more.
  *
- * Pure data + pure helpers: no store access, no Dexie, no React, no side effects.
+ * Pure helpers: the only store touch is the synchronous default argument to
+ * `resolvePrice`, read once per call. No Dexie, no React, no side effects.
  */
 
 export interface ModelPrice {
@@ -17,85 +20,58 @@ export interface ModelPrice {
   outputPerM: number
 }
 
-export const MODEL_PRICING: Record<string, ModelPrice> = {
-  // Google Gemini (native API names)
-  'gemini-2.5-flash': { inputPerM: 0.3, outputPerM: 2.5 },
-  'gemini-2.5-pro': { inputPerM: 1.25, outputPerM: 10 },
-  'gemini-1.5-flash': { inputPerM: 0.075, outputPerM: 0.3 },
-  'gemini-1.5-pro': { inputPerM: 1.25, outputPerM: 5 },
-
-  // OpenRouter-style vendor/model slugs
-  'openai/gpt-4o': { inputPerM: 2.5, outputPerM: 10 },
-  'openai/gpt-4o-mini': { inputPerM: 0.15, outputPerM: 0.6 },
-  'anthropic/claude-3.5-sonnet': { inputPerM: 3, outputPerM: 15 },
-  'anthropic/claude-3-opus': { inputPerM: 15, outputPerM: 75 },
-  'meta-llama/llama-3.1-70b-instruct': { inputPerM: 0.3, outputPerM: 0.3 },
-  'google/gemini-flash-1.5': { inputPerM: 0.075, outputPerM: 0.3 },
-}
-
-type Provider = 'gemini' | 'openrouter' | 'ollama'
-
-/** Exact key, then case-insensitive key. */
-function lookupInsensitive(key: string): ModelPrice | null {
-  if (Object.prototype.hasOwnProperty.call(MODEL_PRICING, key)) {
-    return MODEL_PRICING[key]
-  }
-  const lower = key.toLowerCase()
-  for (const tableKey of Object.keys(MODEL_PRICING)) {
-    if (tableKey.toLowerCase() === lower) return MODEL_PRICING[tableKey]
-  }
-  return null
-}
-
-/** Longest table key that `candidate` starts with (case-insensitive). */
-function longestPrefixMatch(candidate: string): ModelPrice | null {
-  const lower = candidate.toLowerCase()
-  let bestKey: string | null = null
-  for (const tableKey of Object.keys(MODEL_PRICING)) {
-    if (lower.startsWith(tableKey.toLowerCase())) {
-      if (bestKey === null || tableKey.length > bestKey.length) bestKey = tableKey
-    }
-  }
-  return bestKey === null ? null : MODEL_PRICING[bestKey]
+function priceOf(model: CatalogModel): ModelPrice {
+  return { inputPerM: model.inputPerM, outputPerM: model.outputPerM }
 }
 
 /**
- * Resolve a price for a model id.
+ * Resolve a price for a model id against a catalog.
  *
  * - `ollama` provider is always free ({ 0, 0 }) — local inference.
- * - otherwise: exact key -> case-insensitive -> strip a leading `vendor/`
- *   segment and retry -> longest table-key prefix match
- *   (`gemini-2.5-flash-preview-09` -> `gemini-2.5-flash`).
+ * - otherwise, against `catalog`: exact id -> case-insensitive id -> longest
+ *   catalog id that is a case-insensitive prefix of `model`
+ *   (`anthropic/claude-3.5-sonnet-20241022` -> `anthropic/claude-3.5-sonnet`).
+ *   Catalog ids are `vendor/model` and kept whole.
  * - no match -> `null`.
+ *
+ * `catalog` defaults to the current `catalogStore` models (synchronous read).
  */
-export function resolvePrice(model: string, provider?: Provider): ModelPrice | null {
+export function resolvePrice(
+  model: string,
+  provider?: LLMProvider,
+  catalog: CatalogModel[] = useCatalogStore.getState().models,
+): ModelPrice | null {
   if (provider === 'ollama') return { inputPerM: 0, outputPerM: 0 }
 
-  const candidates = [model]
-  const slash = model.indexOf('/')
-  if (slash !== -1) candidates.push(model.slice(slash + 1))
+  const exact = catalog.find((m) => m.id === model)
+  if (exact !== undefined) return priceOf(exact)
 
-  for (const candidate of candidates) {
-    const hit = lookupInsensitive(candidate)
-    if (hit !== null) return hit
+  const lower = model.toLowerCase()
+
+  const caseless = catalog.find((m) => m.id.toLowerCase() === lower)
+  if (caseless !== undefined) return priceOf(caseless)
+
+  let best: CatalogModel | null = null
+  for (const m of catalog) {
+    if (lower.startsWith(m.id.toLowerCase())) {
+      if (best === null || m.id.length > best.id.length) best = m
+    }
   }
-  for (const candidate of candidates) {
-    const hit = longestPrefixMatch(candidate)
-    if (hit !== null) return hit
-  }
-  return null
+  return best === null ? null : priceOf(best)
 }
 
 /**
  * Dollar cost of a single turn from its recorded token counts.
  *
  * `null` when either token count is missing or the model has no known price.
+ * `catalog` is forwarded to {@link resolvePrice} (defaults to the store).
  */
 export function turnCostUSD(
   node: Pick<TurnNode, 'modelUsed' | 'inputTokens' | 'outputTokens' | 'provider'>,
+  catalog?: CatalogModel[],
 ): number | null {
   if (node.inputTokens === undefined || node.outputTokens === undefined) return null
-  const price = resolvePrice(node.modelUsed, node.provider)
+  const price = resolvePrice(node.modelUsed, node.provider, catalog)
   if (price === null) return null
   return (node.inputTokens / 1e6) * price.inputPerM + (node.outputTokens / 1e6) * price.outputPerM
 }

@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useCatalogStore } from '../store/catalogStore'
 import { MarkdownContent } from './MarkdownContent'
 import { MessageActions } from './MessageActions'
 import { turnCostUSD, formatUSD } from '../lib/pricing'
@@ -21,8 +22,9 @@ export const ChatMessage = memo(function ChatMessage({ node, isActive, onSelect 
   const isStreaming = liveText !== undefined || node.status === 'streaming'
   const answer = liveText !== undefined ? liveText : node.assistantResponse
 
+  const models = useCatalogStore((s) => s.models)
   const hasTokens = node.inputTokens != null && node.outputTokens != null
-  const cost = turnCostUSD(node)
+  const cost = turnCostUSD(node, models)
 
   return (
     <div

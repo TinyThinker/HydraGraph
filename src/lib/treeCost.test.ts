@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { treeCostSummary } from './treeCost'
 import type { TurnNode } from '../types'
+import type { CatalogModel } from './openRouterCatalog'
+
+// Explicit fixture so the math never rides on BUNDLED_CATALOG values.
+// gpt-4o-mini priced at 0.15 / 0.60 USD per 1M.
+const CATALOG: CatalogModel[] = [
+  {
+    id: 'openai/gpt-4o-mini',
+    label: 'OpenAI: GPT-4o-mini',
+    inputPerM: 0.15,
+    outputPerM: 0.6,
+    tier: 'cheap',
+  },
+]
 
 function makeTurn(overrides: Partial<TurnNode>): TurnNode {
   return {
@@ -77,7 +90,7 @@ const EXPECT_SAVED_PCT = 0.0004725 / 0.00234
 
 describe('treeCostSummary', () => {
   it('actual vs. linear-thread counterfactual for a hand-built 3-turn tree', () => {
-    const summary = treeCostSummary(buildMap(threeTurns()))
+    const summary = treeCostSummary(buildMap(threeTurns()), CATALOG)
 
     expect(summary.actual).toBeCloseTo(EXPECT_ACTUAL, 8)
     expect(summary.counterfactual).toBeCloseTo(EXPECT_CF, 8)
@@ -101,7 +114,7 @@ describe('treeCostSummary', () => {
       }),
     )
 
-    const summary = treeCostSummary(buildMap(nodes))
+    const summary = treeCostSummary(buildMap(nodes), CATALOG)
 
     expect(summary.pricedTurns).toBe(3)
     expect(summary.unpricedTurns).toBe(1)
@@ -122,14 +135,14 @@ describe('treeCostSummary', () => {
       }),
     )
 
-    const summary = treeCostSummary(buildMap(nodes))
+    const summary = treeCostSummary(buildMap(nodes), CATALOG)
     expect(summary.pricedTurns).toBe(3)
     expect(summary.unpricedTurns).toBe(0)
     expect(summary.actual).toBeCloseTo(EXPECT_ACTUAL, 8)
   })
 
   it('empty map -> all zeros, savedPct 0', () => {
-    expect(treeCostSummary(new Map())).toEqual({
+    expect(treeCostSummary(new Map(), CATALOG)).toEqual({
       actual: 0,
       counterfactual: 0,
       saved: 0,

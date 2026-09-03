@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Copy, Check, X } from 'lucide-react'
 import { useReaderPanel } from './useReaderPanel'
 import { useTreeStore } from '../store/useTreeStore'
+import { useCatalogStore } from '../store/catalogStore'
 import { MarkdownContent } from './MarkdownContent'
 import { MessageActions } from './MessageActions'
 import { NodeDispatchControls } from './NodeDispatchControls'
@@ -14,6 +15,7 @@ export function ReaderPanel() {
   const node = useTreeStore((s) => (nodeId ? s.nodes.get(nodeId) : undefined))
   const liveText = useTreeStore((s) => (nodeId ? s.liveText.get(nodeId) : undefined))
   const nodes = useTreeStore((s) => s.nodes)
+  const models = useCatalogStore((s) => s.models)
   const [copied, setCopied] = useState(false)
 
   const estTokens = node ? estimateContextTokens(node.id, nodes) : 0
@@ -42,7 +44,7 @@ export function ReaderPanel() {
   if (!nodeId || !node) return null
 
   const fullResponse = liveText ?? node.assistantResponse
-  const lastGenCost = turnCostUSD(node)
+  const lastGenCost = turnCostUSD(node, models)
 
   const handleCopy = async () => {
     if (!navigator.clipboard) return

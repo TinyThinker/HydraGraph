@@ -1,4 +1,5 @@
 import type { TurnNode } from '../types'
+import type { CatalogModel } from './openRouterCatalog'
 import { resolvePrice, turnCostUSD } from './pricing'
 
 /**
@@ -36,7 +37,10 @@ export interface TreeCostSummary {
   unpricedTurns: number
 }
 
-export function treeCostSummary(nodes: Map<string, TurnNode>): TreeCostSummary {
+export function treeCostSummary(
+  nodes: Map<string, TurnNode>,
+  catalog?: CatalogModel[],
+): TreeCostSummary {
   const turns = realTurns(nodes)
 
   let actual = 0
@@ -45,7 +49,7 @@ export function treeCostSummary(nodes: Map<string, TurnNode>): TreeCostSummary {
   const priced: TurnNode[] = []
 
   for (const turn of turns) {
-    const cost = turnCostUSD(turn)
+    const cost = turnCostUSD(turn, catalog)
     if (cost === null) {
       unpricedTurns++
     } else {
@@ -58,7 +62,7 @@ export function treeCostSummary(nodes: Map<string, TurnNode>): TreeCostSummary {
   let counterfactual = 0
   let priorTranscriptTokens = 0
   for (const turn of priced) {
-    const price = resolvePrice(turn.modelUsed, turn.provider)
+    const price = resolvePrice(turn.modelUsed, turn.provider, catalog)
     if (price === null) continue // unreachable — priced turns resolve by construction
     const cfInput = priorTranscriptTokens + approxTokens(turn.userPrompt)
     counterfactual +=
