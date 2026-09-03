@@ -7,6 +7,8 @@ interface MaskedInputProps {
   placeholder?: string
   showPassword: boolean
   onToggleShow: () => void
+  /** Optional id, wired to the label's `htmlFor` for accessible lookup. */
+  id?: string
 }
 
 export function MaskedInput({
@@ -16,14 +18,16 @@ export function MaskedInput({
   placeholder,
   showPassword,
   onToggleShow,
+  id,
 }: MaskedInputProps) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-400 mb-2">
+      <label htmlFor={id} className="block text-xs font-medium text-slate-400 mb-2">
         {label}
       </label>
       <div className="flex gap-2 items-center">
         <input
+          id={id}
           type={showPassword ? 'text' : 'password'}
           value={value}
           onChange={(e) => onChange(e.target.value)}
