@@ -1,8 +1,8 @@
 # Software Design Document
 ## Spatial 2D Conversation Tree Architecture (CTA) for Deep LLM Research
 
-**Document Version:** 2.1.0  
-**Status:** As-built — reconciled against the source tree on 2026-09-02 (`main`, through v0.4.0 / Phase 2 — per-node dispatch overrides, fan-out, compare view, cost receipt)  
+**Document Version:** 2.2.0  
+**Status:** As-built — reconciled against the source tree on 2026-09-03 (`main`, through v0.5.0 — OpenRouter + Ollama only, live OpenRouter price catalog, searchable model pickers; and v0.4.0 / Phase 2 — per-node dispatch overrides, fan-out, compare view, cost receipt)  
 **Target Audience:** Principal Systems Architects, Lead Engineers, AI CLI Agents (Claude Code, Antigravity CLI)  
 **Author:** Lead AI Systems Architect
 
@@ -91,7 +91,7 @@ The system supports global system instructions at the tree root while allowing a
 ### 2.4 Local-First BYOK Model
 
 - **$0 Infrastructure Cost:** Runs 100% client-side in the browser.
-- **Direct Inference:** Talks directly to Google AI Studio (Gemini), OpenRouter, or local runners (Ollama / vLLM) via user-provided API keys.
+- **Direct Inference:** Talks directly to OpenRouter (one key for every hosted model, including Gemini via `google/*`, GPT, Claude, Llama, …) or a local runner (Ollama / vLLM) via a user-provided API key.
 - **Absolute Privacy:** All conversation history, graph positions, and settings are stored locally in browser IndexedDB.
 
 ---
@@ -123,7 +123,7 @@ The system supports global system instructions at the tree root while allowing a
 │  ┌────────────────────────┐    ┌──────────────────────────────────────┐                  │
 │  │  IndexedDB (Dexie.js)  │    │  PURE LOGIC (src/lib, src/services)  │   LOGIC          │
 │  │  nodes · trees ·       │───►│  contextEngine · dispatch resolver · │                  │
-│  │  settings   (v4)       │    │  autoLayout · ancestry · collapse    │                  │
+│  │  settings·catalog (v5) │    │  autoLayout · ancestry · collapse    │                  │
 │  └────────────────────────┘    └───────────────────┬──────────────────┘                  │
 │      ▲ defaultSystemPrompt +                       │ resolved payload + target           │
 │      │ tree dispatch defaults                      ▼                                     │
@@ -135,7 +135,7 @@ The system supports global system instructions at the tree root while allowing a
                                                        ▼
                                        ┌──────────────────────────────────────┐
                                        │        External Cloud / Local        │
-                                       │  Gemini API · OpenRouter · Ollama    │
+                                       │      OpenRouter · Ollama             │
                                        └──────────────────────────────────────┘
 ```
 
@@ -155,7 +155,7 @@ graph TD
     ContextEng -->|6. Compiled messages + resolved system prompt| APIClient[lib/streamingClient]
     Dispatch -->|provider + model| APIClient
 
-    APIClient -->|7. POST stream request| Cloud[Gemini · OpenRouter · Ollama]
+    APIClient -->|7. POST stream request| Cloud[OpenRouter · Ollama]
     Cloud -->|8. SSE / NDJSON chunks| APIClient
 
     APIClient -->|9. appendTokenDelta| Store
@@ -195,9 +195,9 @@ _This table records the versions actually installed in `package.json`. Update it
 
 ### 3.3 Main Architectural System Components
 
-The running application is a three-region shell (header / split workspace / reader panel) sitting on top of five Zustand stores and a pure-function library. Nothing renders server-side; every module below ships to the browser.
+The running application is a three-region shell (header / split workspace / reader panel) sitting on top of seven Zustand stores and a pure-function library. Nothing renders server-side; every module below ships to the browser.
 
-**Application Shell (`src/App.tsx`, `src/main.tsx`):** Owns the one-time boot sequence — load persisted settings into *both* stores, load the tree index, restore `activeTreeId` (or create a `New Research` tree on first run) — then renders `HeaderBar`, `SplitLayout`, and `ReaderPanel`. In dev builds it also installs the render-tally harness on `window`.
+**Application Shell (`src/App.tsx`, `src/main.tsx`):** Owns the one-time boot sequence — load persisted settings into *both* stores, kick off `useCatalogStore.loadCatalog()` (price catalog, non-blocking), load the tree index, restore `activeTreeId` (or create a `New Research` tree on first run) — then renders `HeaderBar`, `SplitLayout`, and `ReaderPanel`. In dev builds it also installs the render-tally harness on `window`.
 
 **Canvas View Engine (React Flow layer):** `Canvas.tsx` is a thin JSX shell; all store→graph derivation lives in the `useCanvasGraph` hook (node wrappers, edge list, hidden-node filtering, active-path dimming, and a referentially-stable wrapper cache that prevents one node's change from re-rendering every other node). Four headless components mounted inside `<ReactFlow>` own the imperative viewport behaviours: `CanvasFitter` (fit-view on nonce), `CanvasSearchFocus` (pan + flash a search hit), `CanvasSelectionSync` (the single auto-center path shared by canvas clicks, chat clicks, and fresh spawns), and `CanvasViewport` (viewport persistence + keyboard navigation). Manual node dragging and manual node resizing are **disabled** — positions are 100% derived from tree structure.
 
@@ -213,11 +213,13 @@ The running application is a three-region shell (header / split workspace / read
 
 **Dispatch Resolver (`src/services/llm.ts`):** Resolves *which* provider and model a prompt uses, in precedence order node override → tree default → global settings (per-provider default, then flat fallback). The node override is `TurnNode.providerOverride` (provider) and `TurnNode.modelUsed` (model); `resolveDispatchForNode` forwards both. Resolved fresh on every submit, so a Settings change applies on the very next prompt without a reload. `submitPrompt` stamps the resolved provider **and** model back onto the turn. `FanOutVariant` is the same override shape used by `fanOutAndSubmit`.
 
-**LLM Streaming Client (`src/lib/streamingClient.ts`):** One `streamLLMResponse()` entry point fanning out to three provider implementations (Gemini `:streamGenerateContent?alt=sse`, OpenRouter `/chat/completions`, Ollama `/api/chat`), each built on `fetch` + `ReadableStream` with a shared line-buffering pattern, `AbortController` cancellation, malformed-payload guards, and per-provider usage-metadata extraction.
+**LLM Streaming Client (`src/lib/streamingClient.ts`):** One `streamLLMResponse()` entry point fanning out to two provider implementations (OpenRouter `/chat/completions`, Ollama `/api/chat`), each built on `fetch` + `ReadableStream` with a shared line-buffering pattern, `AbortController` cancellation, malformed-payload guards, and per-provider usage-metadata extraction. The native Gemini client (`:streamGenerateContent?alt=sse`, `x-goog-api-key`) was removed in v0.5.0 — Gemini models now route through OpenRouter as `google/*`.
 
-**Local Persistence Manager (`src/db/ChatDatabase.ts`):** Dexie subclass exposing `nodes`, `trees`, and `settings` tables with four versioned schema migrations (see §3.4). Streaming writes are throttled (~400 ms) and layout writes are batched into a single `rw` transaction.
+**Model Catalog (`src/lib/openRouterCatalog.ts` + `src/store/catalogStore.ts`):** `fetchOpenRouterModels()` reads OpenRouter's public `GET /api/v1/models` and `normalizeCatalog()` maps it to `CatalogModel[]` (`inputPerM` / `outputPerM` per 1M tokens, a `tier` of `cheap | mid | frontier` from output-price percentiles). `useCatalogStore.loadCatalog(force?)` refetches on load when online (in-session `TTL_MS` = 1 h), caches the list to the Dexie `catalog` store, and on failure falls back to that cache, then to the committed `BUNDLED_CATALOG` (`src/lib/bundledCatalog.ts`, regenerated by `scripts/refresh-catalog.mjs`). `source` / `fetchedAt` / `status` are shown in Settings. This catalog is the single price source for `pricing.ts`. Added v0.5.0.
 
-**State Layer (6 Zustand stores):**
+**Local Persistence Manager (`src/db/ChatDatabase.ts`):** Dexie subclass exposing `nodes`, `trees`, `settings`, and (since v5) `catalog` tables with five versioned schema migrations (see §3.4). Streaming writes are throttled (~400 ms) and layout writes are batched into a single `rw` transaction.
+
+**State Layer (7 Zustand stores):**
 
 | Store | File | Responsibility |
 |---|---|---|
@@ -227,6 +229,7 @@ The running application is a three-region shell (header / split workspace / read
 | `useReaderPanel` | `src/components/useReaderPanel.ts` | Which node, if any, the reader drawer is showing. |
 | `useSearchNav` | `src/components/useSearchNav.ts` | Search "fly to this node" target + nonce. |
 | `useCompareStore` | `src/store/useCompareStore.ts` | Compare-view overlay: `open`, the `anchorId` whose siblings are compared, and the `excludedIds` set the user has unchecked. Added in v0.4.0. |
+| `useCatalogStore` | `src/store/catalogStore.ts` | The OpenRouter price catalog: `models`, `fetchedAt`, `status`, `source` (`live` / `cache` / `bundled`), and `loadCatalog(force?)` (1 h TTL, IndexedDB cache, `BUNDLED_CATALOG` fallback). The price source for `pricing.ts`; cost components subscribe to it. Added in v0.5.0. |
 
 **Settings have one owner (`useSettingsStore`).** Since v0.3.1 `useTreeStore` no longer
 carries its own `settings` field or `loadSettings` / `saveSettings` pair. Everything that
@@ -250,8 +253,13 @@ remembered tree is gone, falls back to the newest tree (or creates one).
 | `nodeDimensions.ts` | Shared `NODE_WIDTH = 240` / `NODE_HEIGHT = 72`. |
 | `pathHighlight.ts` | Active-path id set, edge styling, off-path dim class. |
 | `personaPresets.ts` | `PERSONA_PRESETS` — ready-made system-prompt personas for `NodeDispatchControls` and `FanOutRow`. Added v0.4.0. |
-| `pricing.ts` | `MODEL_PRICING` table (USD per 1M tokens, hand-maintained) + `resolvePrice` / `turnCostUSD` / `formatUSD`. Added v0.4.0. |
-| `treeCost.ts` | `treeCostSummary()` — this tree's actual spend vs. the one-linear-thread counterfactual ("context you didn't pay for"). Added v0.4.0. |
+| `pricing.ts` | `resolvePrice(model, provider?, catalog?)` / `turnCostUSD(node, catalog?)` / `formatUSD`. Since v0.5.0 the static `MODEL_PRICING` table is gone — `catalog` defaults to `useCatalogStore.getState().models` (the live OpenRouter catalog); Ollama turns price `{0,0}`. Still synchronous and pure. Added v0.4.0. |
+| `openRouterCatalog.ts` | `fetchOpenRouterModels()` + `normalizeCatalog()` — OpenRouter `/api/v1/models` → `CatalogModel[]` with per-1M prices and a derived `tier`. Fetch + transform only; no store. Added v0.5.0. |
+| `bundledCatalog.ts` | `BUNDLED_CATALOG` — a committed catalog snapshot for offline / first-run / the no-key demo; regenerated by `scripts/refresh-catalog.mjs`. Added v0.5.0. |
+| `providerOptions.ts` | `providerOptions({ inherit? })` — the two-entry provider list (OpenRouter, Ollama) shared by every provider `<select>`. Added v0.5.0. |
+| `tierSpread.ts` | `tierSpread(models, configured, n)` — picks `n` models walking cheap→mid→frontier of the live catalog for the fan-out "spread across price tiers" fill. Added v0.5.0. |
+| `formatModelRef.ts` | `formatModelRef()` — `provider/model` helper text for fan-out rows. Added v0.5.0. |
+| `treeCost.ts` | `treeCostSummary(nodes, catalog?)` — this tree's actual spend vs. the one-linear-thread counterfactual ("context you didn't pay for"). Added v0.4.0. |
 | `stationSummary.ts` | 7-word / 48-char single-line pill label. |
 | `streamingClient.ts` | Provider SSE clients. |
 | `treeExport.ts` | Versioned JSON export doc, filename slug, download, parse + id-remapped import. |
@@ -285,16 +293,16 @@ The canonical TypeScript definitions live in `src/types/index.ts`; the matrices 
 | userPrompt | String | No | Raw input text submitted by the human operator. | Extracted as `{ role: 'user', content: userPrompt }` in ancestry chain. |
 | assistantResponse | String | No | Markdown output generated by the LLM. | Extracted as `{ role: 'assistant', content: assistantResponse }` in ancestry chain. |
 | systemPromptOverride | String | Yes | Optional system prompt instruction specific to this branch. | Overrides upstream system prompts for this node and all descendant sub-trees; renders the amber shield icon on the pill. Editable via `NodeDispatchControls` (reader panel) since v0.4.0. |
-| providerOverride | Enum String | Yes | `'gemini' \| 'openrouter' \| 'ollama'` — explicit per-turn provider override (**input** to dispatch resolution). | Highest-precedence provider in `resolveDispatchForNode`. Distinct from `provider`, which records what actually ran. Set by `NodeDispatchControls` / `fanOutAndSubmit`. Optional field — no DB migration (like `systemPromptOverride`). Added v0.4.0. |
+| providerOverride | Enum String | Yes | `'openrouter' \| 'ollama'` — explicit per-turn provider override (**input** to dispatch resolution). | Highest-precedence provider in `resolveDispatchForNode`. Distinct from `provider`, which records what actually ran. Set by `NodeDispatchControls` / `fanOutAndSubmit`. Optional field — no DB migration (like `systemPromptOverride`). Added v0.4.0; `'gemini'` remapped to `'openrouter'` by DB v5. |
 | positionX | Number (Float) | No | X-coordinate on the 2D canvas plane. | Written by the deterministic layout, read by React Flow. Not user-editable (dragging is disabled). |
 | positionY | Number (Float) | No | Y-coordinate on the 2D canvas plane. | As above. |
 | isCollapsed | Boolean | No | Flag indicating if downstream child nodes are hidden from view. | Drives `computeHiddenIds()`; toggles the chevron and the "Show N hidden" tooltip. |
 | status | Enum String | No | Values: `'idle'`, `'streaming'`, `'error'`. | Controls pill status ring, spinner icon, and error styling. |
-| modelUsed | String | No | Identifier of the LLM model (e.g., `'gemini-2.5-flash'`). | Doubles as the node-level model override (highest-precedence model input to the dispatch resolver) **and** the post-run record — `submitPrompt` writes the resolved model back here. Shown in the chat telemetry line and priced by `pricing.ts`. |
+| modelUsed | String | No | Identifier of the LLM model (e.g., `'google/gemini-2.5-flash'`, `'openai/gpt-4o-mini'`). | Doubles as the node-level model override (highest-precedence model input to the dispatch resolver) **and** the post-run record — `submitPrompt` writes the resolved model back here. Shown in the chat telemetry line and priced against the live catalog by `pricing.ts`. DB v5 best-effort remaps historical bare `gemini-*` ids to `google/*`. |
 | inputTokens | Number | Yes | Token count of the upstream context payload sent to API. | Cost tracking (`turnCostUSD`, `treeCostSummary`), usage reporting, context window boundary warnings. |
 | outputTokens | Number | Yes | Token count of the response generated by the model. | Cost tracking (`turnCostUSD`, `treeCostSummary`) and generation throughput metrics. |
 | timestamp | Number (Int64) | No | Epoch timestamp (milliseconds) of node creation. | Chronological sorting; also breaks ties when picking the layout root. |
-| provider | Enum String | Yes | `'gemini' \| 'openrouter' \| 'ollama'` — the provider that produced this turn. | Stamped on every submit by the dispatch resolver; auditing. Added in DB v2. |
+| provider | Enum String | Yes | `'openrouter' \| 'ollama'` — the provider that produced this turn. | Stamped on every submit by the dispatch resolver; auditing. Added in DB v2; `'gemini'` remapped to `'openrouter'` by DB v5. |
 | errorMessage | String | Yes | Raw provider error text when `status === 'error'`. | Rendered verbatim in the chat bubble. Added in DB v2. |
 | width | Number | Yes | Legacy per-node width. | **Vestigial.** Manual resize was removed; every pill renders at `NODE_WIDTH`. Retained only so old rows and old exports still parse. Added in DB v3. |
 | height | Number | Yes | Legacy per-node height. | **Vestigial**, as above (`NODE_HEIGHT`). Added in DB v3. |
@@ -321,18 +329,17 @@ The canonical TypeScript definitions live in `src/types/index.ts`; the matrices 
 | Field Name | Data Type | Nullable | Description | Architectural Usage |
 |---|---|---|---|---|
 | id | String | No | Constant key (always `'global_settings'`). | Single-row local config store. |
-| provider | Enum String | No | Active provider: `'gemini' \| 'openrouter' \| 'ollama'`. | Last-resort provider in dispatch resolution. Defaults to `'gemini'`. |
-| geminiApiKey | String | Yes | User's personal Google AI Studio API key. | Sent as the `x-goog-api-key` header. |
-| openRouterApiKey | String | Yes | User's personal OpenRouter API key. | Sent as `Authorization: Bearer …`. |
+| provider | Enum String | No | Active provider: `'openrouter' \| 'ollama'`. | Last-resort provider in dispatch resolution. Defaults to `'openrouter'`. `geminiApiKey` and the `'gemini'` value were removed in v0.5.0 (DB v5 drops the key and remaps the value). |
+| openRouterApiKey | String | Yes | User's personal OpenRouter API key. | Sent as `Authorization: Bearer …`. The one credential the Settings screen shows when `provider === 'openrouter'`. |
 | ollamaBaseUrl | String | No | Endpoint URL for local LLM (default `http://localhost:11434`). | Target host for local inference streaming. |
-| openRouterBaseUrl | String | Yes | OpenRouter endpoint (default `https://openrouter.ai/api/v1`). | **Currently stored and editable in the store but not read by `streamingClient.ts`, which hard-codes the public URL.** Wire-up gap to close if self-hosted proxies are ever supported. |
+| openRouterBaseUrl | String | Yes | OpenRouter endpoint (default `https://openrouter.ai/api/v1`). | Read by `streamingClient.ts` (since v0.3.1) and by `fetchOpenRouterModels()` for the price catalog; trailing slash tolerated. Editable under Settings → `Advanced`. |
 | defaultModel | String | No | Flat fallback model. | Last resort when no per-provider default matches. |
-| defaultModels | Map\<Provider, String\> | Yes | Per-provider default model map. | Preferred model source once a provider is known. Seeded with `gemini-2.5-flash` / `openai/gpt-4o-mini` / `llama3`. |
+| defaultModels | Map\<Provider, String\> | Yes | Per-provider default model map. | Preferred model source once a provider is known. Seeded with `openai/gpt-4o-mini` / `llama3` (the `gemini` slot was dropped in v0.5.0 / DB v5). |
 | activeTreeId | String (UUIDv4) | Yes | Currently open conversation tree ID. | Restores session state automatically on application startup. |
 
 **Schema Matrix 4: Dexie Database Versions (`HydraGraphDB`)**
 
-The three object stores and their indexes are unchanged across all versions; every bump exists to backfill new optional fields onto rows written by an older build.
+The `nodes` / `trees` / `settings` stores and their indexes were unchanged through v4 — every bump to that point backfilled new optional fields onto rows written by an older build. v5 is the first to add a store (`catalog`) and the first to rewrite existing field values.
 
 | Version | Stores / Indexes | Upgrade Behaviour |
 |---|---|---|
@@ -340,6 +347,7 @@ The three object stores and their indexes are unchanged across all versions; eve
 | 2 | unchanged | Infers `settings.provider` from the presence of `geminiApiKey`; stamps that provider plus an empty `errorMessage` onto every existing node. |
 | 3 | unchanged | Backfills `width: 320`, `height: 240`, `stale: false` on existing nodes. (The width/height defaults predate fixed-size pills and are now inert.) |
 | 4 | unchanged | Backfills `viewportX: 0`, `viewportY: 0`, `viewportZoom: 1` on existing trees. |
+| 5 | adds `catalog: key` (cached OpenRouter model list, one row per source key) | Native Gemini removal. Settings: `provider: 'gemini' → 'openrouter'`, delete `geminiApiKey`, drop `defaultModels.gemini`, remap `defaultModel` `gemini-*` → `google/*`. Nodes: `provider` / `providerOverride` `'gemini' → 'openrouter'`, best-effort remap `modelUsed` bare `gemini-*` ids → `google/*`. Best-effort / lossy by design (pre-launch, dev's own data). |
 
 **Schema Matrix 5: TreeExportDoc (Backup Interchange Format)**
 
@@ -387,7 +395,7 @@ On import, `remapImportedTree()` regenerates every id (tree, nodes, `parentId`, 
 
 | Region | Component | Notes |
 |---|---|---|
-| Header | `HeaderBar` | Tree switcher (rename/delete/new), full-text search, re-layout (with a confirm banner), JSON export, JSON import, **$** cost-receipt popover (`CostReceipt`), **Compare** button (`useCompareStore.openCompare`, enabled at ≥2 siblings), settings modal. Shows an amber "no provider configured" banner when no Gemini key, no OpenRouter key, and an untouched default Ollama URL. |
+| Header | `HeaderBar` | Tree switcher (rename/delete/new), full-text search, re-layout (with a confirm banner), JSON export, JSON import, **$** cost-receipt popover (`CostReceipt`), **Compare** button (`useCompareStore.openCompare`, enabled at ≥2 siblings), settings modal. Shows an amber "no provider configured" banner when there is no OpenRouter key and the Ollama URL is still the untouched default. |
 | Graph pane | `SplitLayout` → `Canvas` | Default 40% width, resized by a pointer-driven vertical divider, clamped to 20–80%. Ratio is component state — not persisted. |
 | Chat pane | `ChatStreamView` + `ChatInputBar` | Ancestry-only stream for the active node; empty turns are filtered out; auto-scrolls while streaming. `ChatInputBar` has a `Split` button opening `FanOutModal`. |
 | Reader panel | `ReaderPanel` | Right drawer, fixed `28rem` capped at `40vw`, mounted only when a node is open. Hosts `NodeDispatchControls` (per-node provider / model / persona) and per-turn cost. |
@@ -526,7 +534,9 @@ Implemented in `src/services/llm.ts`, re-resolved on **every** submit so Setting
              └──────────────────────────────┘
 ```
 
-Provider and model resolve independently: the provider is the first non-null of `node.providerOverride` → `tree.defaultProvider` → `settings.provider`, then the model is the first non-empty of `node.modelUsed` → `tree.defaultModel` → `settings.defaultModels[resolvedProvider]` → `settings.defaultModel`. The resolved provider **and** model are stamped back onto the node so a turn always records what actually generated it. `fanOutAndSubmit` seeds each child's `providerOverride` / `modelUsed` / `systemPromptOverride` from its `FanOutVariant` before dispatch, so N siblings resolve to N different targets off identical ancestry.
+Provider and model resolve independently: the provider is the first non-null of `node.providerOverride` → `tree.defaultProvider` → `settings.provider` (only `'openrouter'` or `'ollama'` since v0.5.0), then the model is the first non-empty of `node.modelUsed` → `tree.defaultModel` → `settings.defaultModels[resolvedProvider]` → `settings.defaultModel`. The resolved provider **and** model are stamped back onto the node so a turn always records what actually generated it. `fanOutAndSubmit` seeds each child's `providerOverride` / `modelUsed` / `systemPromptOverride` from its `FanOutVariant` before dispatch, so N siblings resolve to N different targets off identical ancestry.
+
+Model ids are still free text — the `ModelSelect` combobox surfaces the live OpenRouter catalog (`useCatalogStore`) as priced suggestions for `provider === 'openrouter'` and a plain input for Ollama, but a hand-typed id is always accepted. The catalog only feeds suggestions and pricing (`pricing.ts`), never resolution itself; an unknown `modelUsed` dispatches unchanged and simply shows no cost.
 
 ### 5.3 SSE Real-time Streaming & Synchronization Sequence
 
@@ -539,7 +549,7 @@ sequenceDiagram
     participant Store as Zustand Store (useTreeStore)
     participant Ctx as Context Engine + Dispatch Resolver
     participant API as streamLLMResponse()
-    participant Provider as Gemini / OpenRouter / Ollama
+    participant Provider as OpenRouter / Ollama
     participant DB as Dexie.js (IndexedDB)
 
     User->>Store: submitPrompt(Node_X, text)  ·  (chat bar forks a child first)
@@ -628,7 +638,7 @@ Both high-risk items were resolved structurally rather than by optimisation: str
 ### 6.1 Phase 1: Core Foundation & Storage Setup — ✅ delivered
 
 - Vite + React + TypeScript + Tailwind project (`vite.config.ts`, `src/main.tsx`).
-- Dexie schema `HydraGraphDB` with `nodes` / `trees` / `settings` (`src/db/ChatDatabase.ts`), now at version 4.
+- Dexie schema `HydraGraphDB` with `nodes` / `trees` / `settings` / `catalog` (`src/db/ChatDatabase.ts`), now at version 5.
 - Central Zustand store with Dexie persistence (`src/store/useTreeStore.ts`).
 
 ### 6.2 Phase 2: Canvas Integration & Turn Node Component — ✅ delivered
@@ -640,7 +650,7 @@ Both high-risk items were resolved structurally rather than by optimisation: str
 ### 6.3 Phase 3: Context Engine & Streaming API Client — ✅ delivered
 
 - `resolveContextPayload()` ancestry traversal and cascading system-prompt resolution (`src/lib/contextEngine.ts`).
-- Native `fetch` + `ReadableStream` clients for Gemini, Ollama, **and OpenRouter** (`src/lib/streamingClient.ts`).
+- Native `fetch` + `ReadableStream` clients for Ollama **and OpenRouter** (`src/lib/streamingClient.ts`). *(A native Gemini client also shipped here originally; it was removed in v0.5.0 once every hosted model routed through OpenRouter.)*
 - Streaming deltas wired through `appendTokenDelta` → `liveText` → chat pane, with throttled persistence and abort support.
 
 ### 6.4 Phase 4: Advanced Features & Polish — ✅ delivered (with one substitution)
@@ -661,15 +671,15 @@ Both high-risk items were resolved structurally rather than by optimisation: str
 
 ### 6.6 Verification Status
 
-Verified at v0.4.0 / Phase 2 (2026-09-02):
+Verified at v0.5.0 (2026-09-03):
 
 | Check | Command | Result |
 |---|---|---|
 | Types | `npm run typecheck` | clean |
 | Lint | `npm run lint` | clean |
-| Tests | `npm test` | 35 files / 258 tests passing |
+| Tests | `npm test` | 41 files / 292 tests passing |
 
-(For reference: `poc_enhancements_1` was 32 files / 253 tests on 2026-09-01; v0.3.1 / Phase 1 was 29 files / 225 tests.)
+(For reference: v0.4.0 / Phase 2 was 35 files / 258 tests on 2026-09-02; `poc_enhancements_1` was 32 files / 253 tests on 2026-09-01; v0.3.1 / Phase 1 was 29 files / 225 tests.)
 
 ### 6.7 Open Items
 
@@ -683,10 +693,17 @@ Resolved in v0.4.0 (Phase 2): per-node model + persona UI (`NodeDispatchControls
 `FanOutModal`); compare view (`useCompareStore` + `CompareView`); model pricing +
 per-turn / per-tree / counterfactual cost (`pricing.ts`, `treeCost.ts`, `CostReceipt`).
 
+Resolved in v0.5.0: the hand-maintained `MODEL_PRICING` table is gone — prices come
+from the live OpenRouter catalog (`openRouterCatalog.ts` + `catalogStore.ts`, 1 h TTL,
+IndexedDB cache, `BUNDLED_CATALOG` fallback); native Gemini removed (`LLMProvider` is
+`'openrouter' | 'ollama'`, DB v5 migration); hand-typed model-id inputs replaced by the
+`ModelSelect` combobox in the reader panel, fan-out, and Settings; two-provider
+Settings with one credential field; fan-out price-tier spread.
+
 - `TurnNode.width` / `TurnNode.height` are vestigial since fixed-size pills landed; they are retained only for backward compatibility with existing rows and v1 exports.
 - Editing a submitted prompt (as opposed to regenerating it) has no UI.
 - The split-pane ratio is component state and resets to 40/60 on reload, unlike the canvas viewport which is persisted per tree.
-- `MODEL_PRICING` in `pricing.ts` is a hand-maintained table of approximate rates. No live catalog / model-list fetch yet (candidate: OpenRouter `GET /api/v1/models`, which carries pricing). Gemini has no pricing API; its figures stay bundled estimates.
+- The live catalog fetch assumes `openrouter.ai/api/v1/models` serves permissive CORS for a browser `fetch`; if that ever changes, the fallback is the bundled snapshot plus a manual refresh.
 - `pricing.ts` / `treeCost.ts` counterfactual uses the ~4-chars-per-token heuristic for prior-transcript sizing, so the receipt's dollar figures are estimates, not billed amounts.
 
 ## 7. Claude Code / Agent Execution Workflow & Harness

@@ -8,6 +8,24 @@
 
 ---
 
+## v0.5.0 — 2026-09-03 — Live model catalog & OpenRouter-only providers
+
+Made the cost receipt honest. Providers collapse to **OpenRouter + Ollama** (native
+Gemini removed), and prices are no longer a hand-maintained table — they come from
+OpenRouter's live `GET /api/v1/models` catalog, IndexedDB-cached with a 1 h TTL and a
+committed bundled snapshot for offline / first-run / the no-key demo. The hand-typed
+model-id inputs are replaced by searchable priced pickers everywhere. Dexie **v5**
+migrates existing `gemini` data to `google/*` OpenRouter slugs. Lands ahead of the
+Phase 3 demo tree, whose receipt depends on real prices. 292 tests across 41 files;
+`tsc` and `oxlint` clean.
+
+- **Gemini removed; Dexie v5.** `LLMProvider` is now `'openrouter' | 'ollama'`. `streamGemini` and the `x-goog-api-key` path are gone; `geminiApiKey` dropped from `AppSettings`; `DEFAULT_SETTINGS.provider` is `'openrouter'`. `ChatDatabase` v5 adds a `catalog` object store and remaps old rows best-effort (pre-launch, lossy by design): settings + nodes `provider: 'gemini' → 'openrouter'`, `defaultModels.gemini` dropped, `defaultModel` / `modelUsed` gemini ids → `google/*`.
+- **Live price catalog.** `src/lib/openRouterCatalog.ts` (`fetchOpenRouterModels` + `normalizeCatalog`; tier derived from output-price percentiles) and `src/store/catalogStore.ts` (`useCatalogStore`, `loadCatalog(force?)`, `TTL_MS` = 1 h): refetch on load when online, an IndexedDB cache that never hard-expires, then `BUNDLED_CATALOG` (`src/lib/bundledCatalog.ts`, regen via `scripts/refresh-catalog.mjs`) as the last fallback. `source` / `fetchedAt` / `status` surfaced in Settings.
+- **Pricing off the catalog.** The static `MODEL_PRICING` literal is deleted. `resolvePrice(model, provider?, catalog = useCatalogStore.getState().models)`, `turnCostUSD(node, catalog?)`, and `treeCostSummary(nodes, catalog?)` read the live catalog — still pure and synchronous (the catalog is an optional arg defaulting to the store). Ollama turns priced `{0,0}`. `CostReceipt` / `CompareColumn` / `ReaderPanel` / `ChatMessage` subscribe to `useCatalogStore`.
+- **Searchable model pickers.** New `src/components/ModelSelect.tsx` — a priced combobox (`<datalist>` over the catalog for OpenRouter, plain input for Ollama, free-typed ids still accepted). Replaces the hand-typed model-id `<input>`s in `NodeDispatchControls`, `FanOutRow`, and the Settings default-model field. `src/lib/providerOptions.ts` `providerOptions()` replaces the duplicated provider arrays.
+- **Two-provider Settings.** One credential control that follows the selected provider (`src/components/SettingsCredentialField.tsx`); an `Advanced` `<details>` for the base URL; a "Refresh prices" button that calls `loadCatalog(true)` and shows `source` + a relative `fetchedAt`.
+- **Fan-out price-tier spread.** One-click "Fill: spread across price tiers" (`src/lib/tierSpread.ts` + `configuredProviders` in `settingsStore.ts`) seeds 2–4 variants walking cheap → frontier of the live catalog; disabled until a provider is configured. Per-row `provider/model` helper text via `src/lib/formatModelRef.ts`.
+
 ## v0.4.0 — 2026-09-02 — Phase 2: deep-context model arbitration
 
 Built the demo the positioning depends on: compare several models or personas at

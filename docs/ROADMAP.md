@@ -15,9 +15,10 @@ personas at turn 30 of a real problem, on identical inherited context, with the 
 ## Current State
 
 The engineering is largely done and tested (streaming, context engine, deterministic
-layout, 4 clean DB migrations, 3 provider clients, 225 tests). Phase 1 is complete —
-the first-run friction and the retry/cancel regression are fixed. Next up is Phase 2,
-the demo that gives the project a reason to exist.
+layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 292 tests).
+Phases 1–2 are complete — the first-run friction and the retry/cancel regression are
+fixed, and the deep-context arbitration demo (fan-out, compare, cost receipt) is
+built. The model-catalog work under Phase 3 is done; next up is the front door.
 
 ### Active blockers
 
@@ -71,6 +72,15 @@ LLM user say "wait, do that again."
 
 Nobody installs anything, ever. That is the whole advantage — spend it.
 
+- [x] OpenRouter + Ollama are the only providers (native Gemini removed; Dexie v5
+  remaps old `gemini` rows to `google/*` slugs). Prices come from a live OpenRouter
+  `/api/v1/models` catalog — IndexedDB-cached, 1 h TTL, with a committed bundled
+  snapshot as the offline / first-run fallback. Searchable priced model pickers
+  replace the hand-typed model-id inputs in the reader panel, fan-out, and Settings;
+  one provider-linked credential field; fan-out can auto-fill a cheap→frontier price
+  spread.
+  - The demo tree's cost receipt (below) depends on these real prices, and the
+    bundled snapshot is the catalog the no-key demo runs against.
 - [ ] Demo tree shipped with the app: canned responses, no key required, fully
   explorable, receipt already showing numbers.
 - [ ] Static deploy; the landing page *is* the app with the demo preloaded.
