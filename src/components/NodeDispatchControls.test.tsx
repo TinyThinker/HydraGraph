@@ -33,7 +33,7 @@ beforeEach(() => {
 
 describe('NodeDispatchControls', () => {
   it('persists a provider override, using undefined for Inherit', () => {
-    render(<NodeDispatchControls node={node({ providerOverride: 'gemini' })} />)
+    render(<NodeDispatchControls node={node({ providerOverride: 'openrouter' })} />)
     const select = screen.getByRole('combobox')
     fireEvent.change(select, { target: { value: 'ollama' } })
     expect(updateNode).toHaveBeenCalledWith('n1', { providerOverride: 'ollama' })

@@ -5,7 +5,6 @@ import type { LLMProvider, TurnNode } from '../types'
 
 const PROVIDERS: { value: '' | LLMProvider; label: string }[] = [
   { value: '', label: 'Inherit (tree/global default)' },
-  { value: 'gemini', label: 'Gemini' },
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'ollama', label: 'Ollama' },
 ]

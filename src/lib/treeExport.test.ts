@@ -269,7 +269,7 @@ describe('treeExport', () => {
         userPrompt: 'Question',
         assistantResponse: 'Answer',
         systemPromptOverride: 'Custom system',
-        provider: 'gemini',
+        provider: 'openrouter',
         errorMessage: 'Some error',
         inputTokens: 100,
         outputTokens: 200,
@@ -284,7 +284,7 @@ describe('treeExport', () => {
 
       expect(parsed.nodes[0]).toEqual(node)
       expect(parsed.nodes[0].systemPromptOverride).toBe('Custom system')
-      expect(parsed.nodes[0].provider).toBe('gemini')
+      expect(parsed.nodes[0].provider).toBe('openrouter')
       expect(parsed.nodes[0].inputTokens).toBe(100)
     })
   })

@@ -12,7 +12,6 @@ interface FanOutRowProps {
 
 const PROVIDERS: { value: string; label: string }[] = [
   { value: '', label: 'Inherit' },
-  { value: 'gemini', label: 'Gemini' },
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'ollama', label: 'Ollama' },
 ]

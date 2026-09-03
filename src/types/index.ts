@@ -1,5 +1,5 @@
 export type NodeStatus = 'idle' | 'streaming' | 'error'
-export type LLMProvider = 'gemini' | 'openrouter' | 'ollama'
+export type LLMProvider = 'openrouter' | 'ollama'
 
 export interface TurnNode {
   id: string
@@ -49,7 +49,6 @@ export type ProviderModelMap = Partial<Record<LLMProvider, string>>
 
 export interface AppSettings {
   id: 'global_settings'
-  geminiApiKey?: string
   openRouterApiKey?: string
   ollamaBaseUrl: string
   openRouterBaseUrl?: string

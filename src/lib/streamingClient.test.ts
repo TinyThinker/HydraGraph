@@ -31,6 +31,36 @@ function createFakeResponse(chunks: Uint8Array[]) {
   }
 }
 
+const enc = (s: string) => new TextEncoder().encode(s)
+
+function runStream(
+  settings: AppSettings,
+  target: { provider: 'openrouter' | 'ollama'; model: string },
+  payload: ContextResolutionResult,
+) {
+  const tokens: string[] = []
+  const errors: Error[] = []
+  let usage: { inputTokens: number; outputTokens: number } | null = null
+  let doneCount = 0
+
+  const done = new Promise<void>((resolve) => {
+    streamLLMResponse(
+      payload,
+      settings,
+      target,
+      (chunk) => tokens.push(chunk),
+      (u) => {
+        usage = u
+        doneCount++
+        resolve()
+      },
+      (err) => errors.push(err),
+    )
+  })
+
+  return { done, tokens, errors, get usage() { return usage }, get doneCount() { return doneCount } }
+}
+
 describe('streamingClient', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -38,10 +68,11 @@ describe('streamingClient', () => {
 
   const testSettings: AppSettings = {
     id: 'global_settings',
-    geminiApiKey: 'test-key',
+    openRouterApiKey: 'or-secret',
+    openRouterBaseUrl: 'https://openrouter.ai/api/v1',
     ollamaBaseUrl: 'http://localhost:11434',
-    defaultModel: 'gemini-2.5-flash',
-    provider: 'gemini',
+    defaultModel: 'openai/gpt-4o-mini',
+    provider: 'openrouter',
   }
 
   const testPayload: ContextResolutionResult = {
@@ -49,458 +80,154 @@ describe('streamingClient', () => {
     messages: [{ role: 'user', content: 'hi' }],
   }
 
+  const orTarget = { provider: 'openrouter' as const, model: 'openai/gpt-4o-mini' }
+
   it('reassembles a frame split across two reads', async () => {
-    const frameString = 'data: {"candidates":[{"content":{"parts":[{"text":"Hello world"}]}}]}\n\n'
-    const frameBytes = new TextEncoder().encode(frameString)
+    const frame = 'data: {"choices":[{"delta":{"content":"Hello world"}}]}\n\n'
+    const bytes = enc(frame)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createFakeResponse([bytes.slice(0, 20), bytes.slice(20)])))
 
-    // Split at byte 15, which is roughly mid-JSON
-    const chunk1 = frameBytes.slice(0, 15)
-    const chunk2 = frameBytes.slice(15)
+    const r = runStream(testSettings, orTarget, testPayload)
+    await r.done
 
-    const fakeResponse = createFakeResponse([chunk1, chunk2])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
-
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let doneCount = 0
-
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const done = new Promise<void>((resolve, reject) => {
-      streamLLMResponse(
-        testPayload,
-        testSettings,
-        { provider: 'gemini', model: 'gemini-2.5-flash' },
-        onToken,
-        () => {
-          doneCount++
-          resolve()
-        },
-        (err) => {
-          errors.push(err)
-          reject(err)
-        },
-      )
-    })
-
-    await done
-
-    expect(tokens.join('')).toBe('Hello world')
-    expect(errors).toHaveLength(0)
-    expect(doneCount).toBe(1)
+    expect(r.tokens.join('')).toBe('Hello world')
+    expect(r.errors).toHaveLength(0)
+    expect(r.doneCount).toBe(1)
   })
 
   it('preserves a multi-byte character split across two reads', async () => {
-    const frameString = 'data: {"candidates":[{"content":{"parts":[{"text":"party 🎉 done"}]}}]}\n\n'
-    const frameBytes = new TextEncoder().encode(frameString)
+    const frame = 'data: {"choices":[{"delta":{"content":"party 🎉 done"}}]}\n\n'
+    const bytes = enc(frame)
+    const emojiByteStart = enc(frame.slice(0, frame.indexOf('🎉'))).length
+    const splitPoint = emojiByteStart + 2 // mid-emoji (🎉 is 4 UTF-8 bytes)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createFakeResponse([bytes.slice(0, splitPoint), bytes.slice(splitPoint)])))
 
-    // Find the emoji in the string and split in the middle of its UTF-8 bytes
-    const emojiIndex = frameString.indexOf('🎉')
-    let byteOffset = 0
+    const r = runStream(testSettings, orTarget, testPayload)
+    await r.done
 
-    for (let i = 0; i < frameString.length; i++) {
-      if (i === emojiIndex) break
-      byteOffset += new TextEncoder().encode(frameString[i]).length
-    }
-
-    // The 🎉 emoji is 4 bytes in UTF-8, split it at byte 2
-    const splitPoint = byteOffset + 2
-
-    const chunk1 = frameBytes.slice(0, splitPoint)
-    const chunk2 = frameBytes.slice(splitPoint)
-
-    const fakeResponse = createFakeResponse([chunk1, chunk2])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
-
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let doneCount = 0
-
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
-
-    const done = new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        testSettings,
-        { provider: 'gemini', model: 'gemini-2.5-flash' },
-        onToken,
-        () => {
-          doneCount++
-          resolve()
-        },
-        onError,
-      )
-    })
-
-    await done
-
-    expect(tokens.join('')).toBe('party 🎉 done')
-    expect(errors).toHaveLength(0)
-    expect(doneCount).toBe(1)
+    expect(r.tokens.join('')).toBe('party 🎉 done')
+    expect(r.errors).toHaveLength(0)
+    expect(r.doneCount).toBe(1)
   })
 
   it('emits a final frame that has no trailing newline', async () => {
-    const frameString = 'data: {"candidates":[{"content":{"parts":[{"text":"tail"}]}}]}'
-    const frameBytes = new TextEncoder().encode(frameString)
+    const frame = 'data: {"choices":[{"delta":{"content":"tail"}}]}'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createFakeResponse([enc(frame)])))
 
-    const fakeResponse = createFakeResponse([frameBytes])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
+    const r = runStream(testSettings, orTarget, testPayload)
+    await r.done
 
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let doneCount = 0
-
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
-
-    const done = new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        testSettings,
-        { provider: 'gemini', model: 'gemini-2.5-flash' },
-        onToken,
-        () => {
-          doneCount++
-          resolve()
-        },
-        onError,
-      )
-    })
-
-    await done
-
-    expect(tokens.join('')).toBe('tail')
-    expect(errors).toHaveLength(0)
-    expect(doneCount).toBe(1)
+    expect(r.tokens.join('')).toBe('tail')
+    expect(r.errors).toHaveLength(0)
+    expect(r.doneCount).toBe(1)
   })
 
   it('reports a malformed data frame through onError without aborting', async () => {
-    const line1 = 'data: {"candidates":[{"content":{"parts":[{"text":"good"}]}}]}'
-    const line2 = 'data: {oops not json'
-    const frameString = `${line1}\n${line2}\n`
-    const frameBytes = new TextEncoder().encode(frameString)
+    const frame = 'data: {"choices":[{"delta":{"content":"good"}}]}\ndata: {oops not json\n'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createFakeResponse([enc(frame)])))
 
-    const fakeResponse = createFakeResponse([frameBytes])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
+    const r = runStream(testSettings, orTarget, testPayload)
+    await r.done
 
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let doneCount = 0
-
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
-
-    const done = new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        testSettings,
-        { provider: 'gemini', model: 'gemini-2.5-flash' },
-        onToken,
-        () => {
-          doneCount++
-          resolve()
-        },
-        onError,
-      )
-    })
-
-    await done
-
-    expect(tokens.join('')).toContain('good')
-    expect(errors.length).toBeGreaterThanOrEqual(1)
-    expect(errors[0]).toBeInstanceOf(Error)
-    expect(errors[0].message).toContain('Malformed stream payload')
-    expect(doneCount).toBe(1)
-  })
-
-  it('emits every text part of a multi-part chunk in order', async () => {
-    const frameString = 'data: {"candidates":[{"content":{"parts":[{"text":"first "},{"text":"second"}]}}]}\n\n'
-    const frameBytes = new TextEncoder().encode(frameString)
-
-    const fakeResponse = createFakeResponse([frameBytes])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
-
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let doneCount = 0
-
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
-
-    const done = new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        testSettings,
-        { provider: 'gemini', model: 'gemini-2.5-flash' },
-        onToken,
-        () => {
-          doneCount++
-          resolve()
-        },
-        onError,
-      )
-    })
-
-    await done
-
-    expect(tokens).toHaveLength(2)
-    expect(tokens[0]).toBe('first ')
-    expect(tokens[1]).toBe('second')
-    expect(tokens.join('')).toBe('first second')
-    expect(errors).toHaveLength(0)
-    expect(doneCount).toBe(1)
-  })
-
-  it('skips parts flagged as thought', async () => {
-    const frameString = 'data: {"candidates":[{"content":{"parts":[{"thought":true,"text":"MY HIDDEN REASONING"},{"text":"visible answer"}]}}]}\n\n'
-    const frameBytes = new TextEncoder().encode(frameString)
-
-    const fakeResponse = createFakeResponse([frameBytes])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
-
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let doneCount = 0
-
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
-
-    const done = new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        testSettings,
-        { provider: 'gemini', model: 'gemini-2.5-flash' },
-        onToken,
-        () => {
-          doneCount++
-          resolve()
-        },
-        onError,
-      )
-    })
-
-    await done
-
-    expect(tokens.join('')).toBe('visible answer')
-    expect(tokens.join('')).not.toContain('MY HIDDEN REASONING')
-    expect(errors).toHaveLength(0)
-    expect(doneCount).toBe(1)
+    expect(r.tokens.join('')).toContain('good')
+    expect(r.errors.length).toBeGreaterThanOrEqual(1)
+    expect(r.errors[0]).toBeInstanceOf(Error)
+    expect(r.errors[0].message).toContain('Malformed stream payload')
+    expect(r.doneCount).toBe(1)
   })
 
   it('keeps usage metadata from the last frame that carries it', async () => {
-    const frameA = 'data: {"candidates":[{"content":{"parts":[{"text":"a"}]}}],"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":2}}'
-    const frameB = 'data: {"candidates":[{"content":{"parts":[{"text":"b"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":9}}'
-    const frameString = `${frameA}\n\n${frameB}\n\n`
-    const frameBytes = new TextEncoder().encode(frameString)
+    const frameA = 'data: {"choices":[{"delta":{"content":"a"}}],"usage":{"prompt_tokens":1,"completion_tokens":2}}'
+    const frameB = 'data: {"choices":[{"delta":{"content":"b"}}],"usage":{"prompt_tokens":5,"completion_tokens":9}}'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createFakeResponse([enc(`${frameA}\n\n${frameB}\n\n`)])))
 
-    const fakeResponse = createFakeResponse([frameBytes])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
+    const r = runStream(testSettings, orTarget, testPayload)
+    await r.done
+
+    expect(r.usage).toEqual({ inputTokens: 5, outputTokens: 9 })
+    expect(r.tokens.join('')).toBe('ab')
+    expect(r.errors).toHaveLength(0)
+    expect(r.doneCount).toBe(1)
+  })
+
+  it('surfaces an OpenRouter error frame through onError', async () => {
+    const frame = 'data: {"error":{"message":"rate limited"}}\n\n'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createFakeResponse([enc(frame)])))
 
     const tokens: string[] = []
     const errors: Error[] = []
-    let capturedUsage: any = null
-    let doneCount = 0
-
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
-
-    const done = new Promise<void>((resolve) => {
+    await new Promise<void>((resolve) => {
       streamLLMResponse(
         testPayload,
         testSettings,
-        { provider: 'gemini', model: 'gemini-2.5-flash' },
-        onToken,
-        (usage) => {
-          capturedUsage = usage
-          doneCount++
+        orTarget,
+        (c) => tokens.push(c),
+        () => resolve(),
+        (err) => {
+          errors.push(err)
           resolve()
         },
-        onError,
       )
     })
 
-    await done
-
-    expect(capturedUsage).toEqual({ inputTokens: 5, outputTokens: 9 })
-    expect(tokens.join('')).toBe('ab')
-    expect(errors).toHaveLength(0)
-    expect(doneCount).toBe(1)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].message).toContain('rate limited')
   })
 
-  it('sends the Gemini key in the x-goog-api-key header, not the URL', async () => {
-    const frameString = 'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}\n\n'
-    const frameBytes = new TextEncoder().encode(frameString)
-
-    const fakeResponse = createFakeResponse([frameBytes])
-    const fetchMock = vi.fn().mockResolvedValue(fakeResponse)
+  it('sends the OpenRouter key in the Authorization header, not the URL', async () => {
+    const frame = 'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n'
+    const fetchMock = vi.fn().mockResolvedValue(createFakeResponse([enc(frame)]))
     vi.stubGlobal('fetch', fetchMock)
 
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let doneCount = 0
+    const secretSettings: AppSettings = { ...testSettings, openRouterApiKey: 'SECRET-KEY-VALUE' }
+    const r = runStream(secretSettings, orTarget, testPayload)
+    await r.done
 
-    const secretSettings: AppSettings = {
-      id: 'global_settings',
-      geminiApiKey: 'SECRET-KEY-VALUE',
-      ollamaBaseUrl: 'http://localhost:11434',
-      defaultModel: 'gemini-2.5-flash',
-      provider: 'gemini',
-    }
-
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
-
-    const done = new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        secretSettings,
-        { provider: 'gemini', model: 'gemini-2.5-flash' },
-        onToken,
-        () => {
-          doneCount++
-          resolve()
-        },
-        onError,
-      )
-    })
-
-    await done
-
-    expect(doneCount).toBe(1)
-    expect(errors).toHaveLength(0)
+    expect(r.doneCount).toBe(1)
+    expect(r.errors).toHaveLength(0)
 
     const [url, init] = fetchMock.mock.calls[0]
-
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
     expect(url).not.toContain('SECRET-KEY-VALUE')
-    expect(url).toContain('alt=sse')
-    expect(url).not.toContain('key=')
-    expect(init.headers['x-goog-api-key']).toBe('SECRET-KEY-VALUE')
+    expect(init.headers.Authorization).toBe('Bearer SECRET-KEY-VALUE')
     expect(init.headers['Content-Type']).toBe('application/json')
   })
 
-  it('routes to Ollama when target.provider is ollama even though a Gemini key is present', async () => {
-    const ollamaLineChunk1 = '{"message":{"content":"hi"},"done":false}\n'
-    const ollamaLineChunk2 = '{"done":true,"prompt_eval_count":1,"eval_count":1}\n'
-    const frameBytes = new TextEncoder().encode(ollamaLineChunk1 + ollamaLineChunk2)
-
-    const fakeResponse = createFakeResponse([frameBytes])
-    const fetchMock = vi.fn().mockResolvedValue(fakeResponse)
+  it('routes to Ollama when target.provider is ollama', async () => {
+    const line1 = '{"message":{"content":"hi"},"done":false}\n'
+    const line2 = '{"done":true,"prompt_eval_count":1,"eval_count":1}\n'
+    const fetchMock = vi.fn().mockResolvedValue(createFakeResponse([enc(line1 + line2)]))
     vi.stubGlobal('fetch', fetchMock)
 
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let doneCount = 0
+    const r = runStream(testSettings, { provider: 'ollama', model: 'llama3' }, testPayload)
+    await r.done
 
-    const onToken = (chunk: string) => {
-      tokens.push(chunk)
-    }
-
-    const onError = (err: Error) => {
-      errors.push(err)
-    }
-
-    const done = new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        testSettings,
-        { provider: 'ollama', model: 'llama3' },
-        onToken,
-        () => {
-          doneCount++
-          resolve()
-        },
-        onError,
-      )
-    })
-
-    await done
-
-    expect(doneCount).toBe(1)
-    expect(errors).toHaveLength(0)
-    expect(tokens.join('')).toBe('hi')
+    expect(r.doneCount).toBe(1)
+    expect(r.errors).toHaveLength(0)
+    expect(r.tokens.join('')).toBe('hi')
+    expect(r.usage).toEqual({ inputTokens: 1, outputTokens: 1 })
 
     const [url, init] = fetchMock.mock.calls[0]
-
     expect(url).toContain('/api/chat')
-    expect(url).not.toContain('generativelanguage.googleapis.com')
     const body = JSON.parse(init.body)
     expect(body.model).toBe('llama3')
   })
 
   it('streams OpenRouter deltas, sends a Bearer header, and reads usage from the final chunk', async () => {
-    const orSettings: AppSettings = { ...testSettings, openRouterApiKey: 'or-secret', provider: 'openrouter' }
-    // Split one JSON frame across two reads to also exercise cross-read buffering
     const frame1 = 'data: {"choices":[{"delta":{"content":"Hel'
     const frame2 = 'lo"}}]}\n\ndata: {"choices":[{"delta":{"content":" world"}}],"usage":{"prompt_tokens":11,"completion_tokens":2}}\n\ndata: [DONE]\n\n'
-    const chunks = [new TextEncoder().encode(frame1), new TextEncoder().encode(frame2)]
-
-    const fakeResponse = createFakeResponse(chunks)
-    const fetchMock = vi.fn().mockResolvedValue(fakeResponse)
+    const fetchMock = vi.fn().mockResolvedValue(createFakeResponse([enc(frame1), enc(frame2)]))
     vi.stubGlobal('fetch', fetchMock)
 
-    const tokens: string[] = []
-    const errors: Error[] = []
-    let usage: { inputTokens: number; outputTokens: number } | null = null
+    const r = runStream(testSettings, orTarget, testPayload)
+    await r.done
 
-    await new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        orSettings,
-        { provider: 'openrouter', model: 'openai/gpt-4o-mini' },
-        (chunk) => tokens.push(chunk),
-        (u) => {
-          usage = u
-          resolve()
-        },
-        (err) => errors.push(err),
-      )
-    })
-
-    expect(errors).toHaveLength(0)
-    expect(tokens.join('')).toBe('Hello world')
-    expect(usage).toEqual({ inputTokens: 11, outputTokens: 2 })
+    expect(r.errors).toHaveLength(0)
+    expect(r.tokens.join('')).toBe('Hello world')
+    expect(r.usage).toEqual({ inputTokens: 11, outputTokens: 2 })
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
-    expect(url).not.toContain('or-secret')
     expect(init.headers.Authorization).toBe('Bearer or-secret')
     const body = JSON.parse(init.body)
     expect(body.model).toBe('openai/gpt-4o-mini')
@@ -509,31 +236,17 @@ describe('streamingClient', () => {
   })
 
   it('skips OpenRouter SSE keep-alive comment lines', async () => {
-    const orSettings: AppSettings = { ...testSettings, openRouterApiKey: 'or-secret', provider: 'openrouter' }
     const payload =
       ': OPENROUTER PROCESSING\n\n' +
       'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n' +
       ': OPENROUTER PROCESSING\n\n' +
       'data: [DONE]\n\n'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createFakeResponse([enc(payload)])))
 
-    const fakeResponse = createFakeResponse([new TextEncoder().encode(payload)])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse))
+    const r = runStream(testSettings, { provider: 'openrouter', model: 'x' }, testPayload)
+    await r.done
 
-    const tokens: string[] = []
-    const errors: Error[] = []
-
-    await new Promise<void>((resolve) => {
-      streamLLMResponse(
-        testPayload,
-        orSettings,
-        { provider: 'openrouter', model: 'x' },
-        (chunk) => tokens.push(chunk),
-        () => resolve(),
-        (err) => errors.push(err),
-      )
-    })
-
-    expect(errors).toHaveLength(0)
-    expect(tokens.join('')).toBe('ok')
+    expect(r.errors).toHaveLength(0)
+    expect(r.tokens.join('')).toBe('ok')
   })
 })

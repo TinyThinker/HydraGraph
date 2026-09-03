@@ -15,15 +15,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const updateSettings = useSettingsStore((s) => s.updateSettings)
 
   const [draft, setDraft] = useState({
-    provider: 'gemini' as LLMProvider,
-    geminiApiKey: '',
+    provider: 'openrouter' as LLMProvider,
     openRouterApiKey: '',
     openRouterBaseUrl: '',
     ollamaBaseUrl: '',
     defaultModel: '',
   })
 
-  const [showGeminiKey, setShowGeminiKey] = useState(false)
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -31,13 +29,11 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     if (open) {
       setDraft({
         provider: settings.provider,
-        geminiApiKey: settings.geminiApiKey ?? '',
         openRouterApiKey: settings.openRouterApiKey ?? '',
         openRouterBaseUrl: settings.openRouterBaseUrl ?? '',
         ollamaBaseUrl: settings.ollamaBaseUrl,
         defaultModel: settings.defaultModel,
       })
-      setShowGeminiKey(false)
       setShowOpenRouterKey(false)
     }
   }, [open, settings])
@@ -49,7 +45,6 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     try {
       await updateSettings({
         provider: draft.provider,
-        geminiApiKey: draft.geminiApiKey.trim() || undefined,
         openRouterApiKey: draft.openRouterApiKey.trim() || undefined,
         openRouterBaseUrl: draft.openRouterBaseUrl.trim() || undefined,
         ollamaBaseUrl: draft.ollamaBaseUrl.trim(),
@@ -85,15 +80,6 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             value={draft.provider}
             onChange={(value) => setDraft((prev) => ({ ...prev, provider: value }))}
           />
-          <MaskedInput
-            label="Gemini API key"
-            value={draft.geminiApiKey}
-            onChange={(value) => handleChange('geminiApiKey', value)}
-            placeholder="sk-..."
-            showPassword={showGeminiKey}
-            onToggleShow={() => setShowGeminiKey(!showGeminiKey)}
-          />
-
           <MaskedInput
             label="OpenRouter API key"
             value={draft.openRouterApiKey}
@@ -138,7 +124,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               value={draft.defaultModel}
               onChange={(e) => handleChange('defaultModel', e.target.value)}
               className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              placeholder="gemini-2.5-flash"
+              placeholder="openai/gpt-4o-mini"
             />
           </div>
         </div>

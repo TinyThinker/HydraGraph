@@ -1,7 +1,6 @@
 import type { LLMProvider } from '../types'
 
 const OPTIONS: { value: LLMProvider; label: string }[] = [
-  { value: 'gemini', label: 'Gemini (Google AI Studio)' },
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'ollama', label: 'Ollama (local)' },
 ]

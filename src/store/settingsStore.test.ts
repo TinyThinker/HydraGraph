@@ -52,18 +52,18 @@ describe('settingsStore', () => {
     it('merges the patch, persists it, and replaces the object reference', async () => {
       const before = state().settings
 
-      await state().updateSettings({ geminiApiKey: 'g-key', defaultModel: 'gemini-2.5-pro' })
+      await state().updateSettings({ openRouterApiKey: 'or-key', defaultModel: 'google/gemini-2.5-pro' })
 
       const after = state().settings
       expect(after).not.toBe(before)
-      expect(before.geminiApiKey).toBeUndefined() // previous object untouched
-      expect(after.geminiApiKey).toBe('g-key')
-      expect(after.defaultModel).toBe('gemini-2.5-pro')
+      expect(before.openRouterApiKey).toBeUndefined() // previous object untouched
+      expect(after.openRouterApiKey).toBe('or-key')
+      expect(after.defaultModel).toBe('google/gemini-2.5-pro')
       expect(after.ollamaBaseUrl).toBe(DEFAULT_SETTINGS.ollamaBaseUrl) // untouched field preserved
 
       const row = await db.settings.get('global_settings')
-      expect(row?.geminiApiKey).toBe('g-key')
-      expect(row?.defaultModel).toBe('gemini-2.5-pro')
+      expect(row?.openRouterApiKey).toBe('or-key')
+      expect(row?.defaultModel).toBe('google/gemini-2.5-pro')
     })
 
     it('always keeps the fixed primary key', async () => {
@@ -85,17 +85,14 @@ describe('settingsStore', () => {
       expect((await db.settings.get('global_settings'))?.provider).toBe('ollama')
     })
 
-    it('setApiKey stores per-provider keys and clears on empty string', async () => {
-      await state().setApiKey('gemini', '  g-key  ')
-      await state().setApiKey('openrouter', 'or-key')
-      expect(state().settings.geminiApiKey).toBe('g-key')
+    it('setApiKey stores the OpenRouter key, trims it, and clears on empty string', async () => {
+      await state().setApiKey('openrouter', '  or-key  ')
       expect(state().settings.openRouterApiKey).toBe('or-key')
+      expect((await db.settings.get('global_settings'))?.openRouterApiKey).toBe('or-key')
 
-      await state().setApiKey('gemini', '   ')
-      expect(state().settings.geminiApiKey).toBeUndefined()
-      expect((await db.settings.get('global_settings'))?.geminiApiKey).toBeUndefined()
-      // The other provider's key is left alone.
-      expect(state().settings.openRouterApiKey).toBe('or-key')
+      await state().setApiKey('openrouter', '   ')
+      expect(state().settings.openRouterApiKey).toBeUndefined()
+      expect((await db.settings.get('global_settings'))?.openRouterApiKey).toBeUndefined()
     })
 
     it('setBaseUrl writes the matching provider URL field', async () => {
@@ -119,7 +116,6 @@ describe('settingsStore', () => {
 
       expect(state().settings.defaultModels?.openrouter).toBe('openai/gpt-4o')
       // Other providers' defaults are preserved.
-      expect(state().settings.defaultModels?.gemini).toBe(DEFAULT_SETTINGS.defaultModels?.gemini)
       expect(state().settings.defaultModels?.ollama).toBe(DEFAULT_SETTINGS.defaultModels?.ollama)
       // Global fallback is untouched.
       expect(state().settings.defaultModel).toBe(DEFAULT_SETTINGS.defaultModel)
@@ -137,7 +133,7 @@ describe('settingsStore', () => {
     })
 
     it('resetSettings restores defaults in memory and DB', async () => {
-      await state().updateSettings({ geminiApiKey: 'x', provider: 'ollama', defaultModel: 'y' })
+      await state().updateSettings({ openRouterApiKey: 'x', provider: 'ollama', defaultModel: 'y' })
       await state().resetSettings()
 
       expect(state().settings).toEqual(DEFAULT_SETTINGS)

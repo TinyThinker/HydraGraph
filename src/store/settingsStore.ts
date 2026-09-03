@@ -8,12 +8,11 @@ import type { AppSettings, LLMProvider, ProviderModelMap } from '../types'
 // longer keeps its own.
 export const DEFAULT_SETTINGS: AppSettings = {
   id: 'global_settings',
-  provider: 'gemini',
+  provider: 'openrouter',
   ollamaBaseUrl: 'http://localhost:11434',
   openRouterBaseUrl: 'https://openrouter.ai/api/v1',
-  defaultModel: 'gemini-2.5-flash',
+  defaultModel: 'openai/gpt-4o-mini',
   defaultModels: {
-    gemini: 'gemini-2.5-flash',
     openrouter: 'openai/gpt-4o-mini',
     ollama: 'llama3',
   },
@@ -33,7 +32,7 @@ interface SettingsStoreActions {
   // Remember the last-opened tree so a reload reopens it.
   setActiveTreeId: (treeId: string) => Promise<void>
   // Empty string clears the key (stored as undefined).
-  setApiKey: (provider: 'gemini' | 'openrouter', key: string) => Promise<void>
+  setApiKey: (provider: 'openrouter', key: string) => Promise<void>
   setBaseUrl: (provider: 'ollama' | 'openrouter', url: string) => Promise<void>
   // Omit `provider` to set the global fallback model; pass one to set that
   // provider's default without touching the others.
@@ -73,13 +72,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     await get().updateSettings({ activeTreeId: treeId })
   },
 
-  setApiKey: async (provider, key) => {
+  setApiKey: async (_provider, key) => {
     const value = key.trim() || undefined
-    if (provider === 'gemini') {
-      await get().updateSettings({ geminiApiKey: value })
-    } else {
-      await get().updateSettings({ openRouterApiKey: value })
-    }
+    await get().updateSettings({ openRouterApiKey: value })
   },
 
   setBaseUrl: async (provider, url) => {

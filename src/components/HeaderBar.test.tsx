@@ -33,7 +33,7 @@ describe('HeaderBar first-run banner', () => {
     // The Settings modal writes through useSettingsStore; HeaderBar must react to
     // that same store rather than a stale private copy.
     await act(async () => {
-      await useSettingsStore.getState().updateSettings({ geminiApiKey: 'g-key' })
+      await useSettingsStore.getState().updateSettings({ openRouterApiKey: 'or-key' })
     })
 
     expect(screen.queryByText(BANNER)).not.toBeInTheDocument()

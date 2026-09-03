@@ -578,7 +578,7 @@ describe('regenerate and edit prompts', () => {
     // Assert: streamLLMResponse was called with the node's custom model
     expect(vi.mocked(streamLLMResponse)).toHaveBeenCalledTimes(1)
     const call = vi.mocked(streamLLMResponse).mock.calls[0]
-    expect(call[2]).toEqual({ provider: 'gemini', model: 'special-model-v9' })
+    expect(call[2]).toEqual({ provider: 'openrouter', model: 'special-model-v9' })
     // The resolved model is stamped back onto the node (mirrors the provider stamp).
     expect(useTreeStore.getState().nodes.get(rootId)!.modelUsed).toBe('special-model-v9')
   })
@@ -1645,7 +1645,7 @@ describe('fanOutAndSubmit', () => {
     const rootId = tree.rootNodeId
 
     const variants = [
-      { provider: 'gemini' as const, model: 'model-a', systemPromptOverride: 'You are A.' },
+      { provider: 'openrouter' as const, model: 'model-a', systemPromptOverride: 'You are A.' },
       { provider: 'ollama' as const, model: 'model-b', systemPromptOverride: 'You are B.' },
       { provider: 'openrouter' as const, model: 'model-c' },
     ]
@@ -1669,7 +1669,7 @@ describe('fanOutAndSubmit', () => {
     for (const id of ids) expect(parent.childrenIds).toContain(id)
 
     // each child keeps its own variant overrides
-    expect(nodes.get(ids[0])!.providerOverride).toBe('gemini')
+    expect(nodes.get(ids[0])!.providerOverride).toBe('openrouter')
     expect(nodes.get(ids[0])!.modelUsed).toBe('model-a')
     expect(nodes.get(ids[0])!.systemPromptOverride).toBe('You are A.')
 

@@ -23,7 +23,7 @@ function createNode(overrides: Partial<TurnNode>): TurnNode {
     status: overrides.status ?? 'idle',
     modelUsed: overrides.modelUsed ?? 'gemini-2.5-flash',
     timestamp: overrides.timestamp ?? Date.now(),
-    provider: overrides.provider ?? 'gemini',
+    provider: overrides.provider ?? 'openrouter',
     inputTokens: overrides.inputTokens,
     outputTokens: overrides.outputTokens,
   }
@@ -157,7 +157,7 @@ describe('ReaderPanel', () => {
       const node = createNode({
         id: 'node-cost',
         modelUsed: 'gemini-2.5-flash',
-        provider: 'gemini',
+        provider: 'openrouter',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
       })

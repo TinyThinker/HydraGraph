@@ -26,7 +26,7 @@ function createNode(overrides: Partial<TurnNode>): TurnNode {
     status: overrides.status ?? 'idle',
     modelUsed: overrides.modelUsed ?? 'gemini-2.5-flash',
     timestamp: overrides.timestamp ?? Date.now(),
-    provider: overrides.provider ?? 'gemini',
+    provider: overrides.provider ?? 'openrouter',
     errorMessage: overrides.errorMessage,
     stale: overrides.stale,
   }

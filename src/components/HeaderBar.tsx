@@ -30,13 +30,12 @@ export function HeaderBar() {
   })
   const canCompare = siblingCount >= 2
 
-  // Banner is shown if no provider is configured: no Gemini key, no OpenRouter key,
-  // and Ollama is either unconfigured or still at the default untested URL
-  const hasGeminiKey = settings?.geminiApiKey?.trim()
+  // Banner is shown if no provider is configured: no OpenRouter key, and Ollama
+  // is either unconfigured or still at the default untested URL
   const hasOpenRouterKey = settings?.openRouterApiKey?.trim()
   const ollamaUrl = settings?.ollamaBaseUrl?.trim() || ''
   const isOllamaConfigured = ollamaUrl && ollamaUrl !== DEFAULT_OLLAMA_URL
-  const needsProvider = !hasGeminiKey && !hasOpenRouterKey && !isOllamaConfigured
+  const needsProvider = !hasOpenRouterKey && !isOllamaConfigured
 
   return (
     <>
@@ -125,7 +124,7 @@ export function HeaderBar() {
         <div className="flex items-center justify-between px-4 py-3 bg-amber-950/40 border-b border-amber-800/50 text-amber-300 text-sm">
           <div className="flex items-center gap-2">
             <AlertTriangle size={16} className="flex-shrink-0" />
-            <span>No LLM provider configured. Add a Gemini or OpenRouter API key, or point at a running Ollama server, to start generating.</span>
+            <span>No LLM provider configured. Add an OpenRouter API key, or point at a running Ollama server, to start generating.</span>
           </div>
           <button
             onClick={() => setModalOpen(true)}
