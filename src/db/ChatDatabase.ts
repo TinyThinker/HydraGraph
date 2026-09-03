@@ -1,12 +1,13 @@
 import Dexie, { type Table } from 'dexie'
 import type { TurnNode, ConversationTree, AppSettings } from '../types'
+import type { CatalogModel } from '../lib/openRouterCatalog'
 
 // Cached OpenRouter model catalog. One row per source key (currently just
-// `openrouter`). `models` is left loosely typed here — the catalog layer
-// (Phase 2) owns the `CatalogModel` shape.
+// `openrouter`). `models` holds the normalized catalog shape owned by
+// `src/lib/openRouterCatalog.ts`.
 export interface CatalogRow {
   key: string
-  models: unknown[]
+  models: CatalogModel[]
   fetchedAt: number
 }
 

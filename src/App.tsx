@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './index.css'
 import { useTreeStore } from './store/useTreeStore'
 import { useSettingsStore } from './store/settingsStore'
+import { useCatalogStore } from './store/catalogStore'
 import { SplitLayout } from './components/SplitLayout'
 import { HeaderBar } from './components/HeaderBar'
 import { ReaderPanel } from './components/ReaderPanel'
@@ -25,6 +26,10 @@ export default function App() {
     async function boot() {
       const { loadAllTrees, loadTree, createTree } = useTreeStore.getState()
       await useSettingsStore.getState().loadSettings()
+      // Refresh the live model/price catalog in the background (TTL-guarded,
+      // falls back to cache then the bundled snapshot). Not awaited — the UI
+      // renders off the bundled seed until it lands.
+      void useCatalogStore.getState().loadCatalog()
       await loadAllTrees()
 
       const { activeTreeId } = useSettingsStore.getState().settings
