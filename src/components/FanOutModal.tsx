@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useSelectionStore } from '../store/useSelectionStore'
+import { useCatalogStore } from '../store/catalogStore'
+import { useSettingsStore, configuredProviders } from '../store/settingsStore'
+import { tierSpread } from '../lib/tierSpread'
 import { useActiveNodeId } from './useActiveNodeId'
 import { FanOutRow } from './FanOutRow'
 import type { FanOutVariant } from '../services/llm'
@@ -19,6 +22,7 @@ export function FanOutModal({ open, onClose }: FanOutModalProps) {
   const [prompt, setPrompt] = useState('')
   const [variants, setVariants] = useState<FanOutVariant[]>([{}, {}])
   const [busy, setBusy] = useState(false)
+  const configured = configuredProviders(useSettingsStore((s) => s.settings))
 
   useEffect(() => {
     if (open) {
@@ -42,8 +46,15 @@ export function FanOutModal({ open, onClose }: FanOutModalProps) {
     setVariants((prev) => (prev.length >= MAX_VARIANTS ? prev : [...prev, {}]))
   }
 
-  const canDispatch =
-    !busy && !!prompt.trim() && !!parentId && variants.length >= MIN_VARIANTS
+  const fillSpread = () => {
+    const n = Math.min(MAX_VARIANTS, Math.max(MIN_VARIANTS, variants.length))
+    const picks = tierSpread(useCatalogStore.getState().models, configured, n)
+    const next: FanOutVariant[] = picks.map((p) => ({ provider: p.provider, model: p.model || null }))
+    while (next.length < MIN_VARIANTS) next.push({})
+    setVariants(next.slice(0, MAX_VARIANTS))
+  }
+
+  const canDispatch = !busy && !!prompt.trim() && !!parentId && variants.length >= MIN_VARIANTS
 
   const dispatch = async () => {
     if (!canDispatch || !parentId) return
@@ -63,9 +74,7 @@ export function FanOutModal({ open, onClose }: FanOutModalProps) {
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-[32rem] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-200">
-            Fan-out — one prompt, several models
-          </h2>
+          <h2 className="text-lg font-semibold text-slate-200">Fan-out — one prompt, several models</h2>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -84,6 +93,16 @@ export function FanOutModal({ open, onClose }: FanOutModalProps) {
             data-testid="fanout-prompt"
             className="w-full resize-none rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
+          <button
+            type="button"
+            onClick={fillSpread}
+            disabled={configured.length === 0}
+            data-testid="fanout-fill"
+            title={configured.length === 0 ? 'Configure OpenRouter or a custom Ollama URL in Settings first' : undefined}
+            className="block text-xs font-medium text-indigo-400 hover:text-indigo-300 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Fill: spread across price tiers
+          </button>
 
           <div className="space-y-2">
             {variants.map((variant, i) => (

@@ -18,6 +18,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
 }
 
+/**
+ * Which providers have enough configuration to actually dispatch: `openrouter`
+ * once an API key is entered, `ollama` once its base URL is moved off the
+ * localhost default. Pure — takes a settings snapshot, touches no store.
+ */
+export function configuredProviders(settings: AppSettings): LLMProvider[] {
+  const out: LLMProvider[] = []
+  if (settings.openRouterApiKey?.trim()) out.push('openrouter')
+  if (settings.ollamaBaseUrl && settings.ollamaBaseUrl !== DEFAULT_SETTINGS.ollamaBaseUrl) {
+    out.push('ollama')
+  }
+  return out
+}
+
 interface SettingsStoreState {
   settings: AppSettings
   hydrated: boolean

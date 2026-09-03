@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useSettingsStore, DEFAULT_SETTINGS } from './settingsStore'
+import { useSettingsStore, DEFAULT_SETTINGS, configuredProviders } from './settingsStore'
 import { db } from '../db/ChatDatabase'
 
 async function resetStore() {
@@ -138,6 +138,38 @@ describe('settingsStore', () => {
 
       expect(state().settings).toEqual(DEFAULT_SETTINGS)
       expect(await db.settings.get('global_settings')).toEqual(DEFAULT_SETTINGS)
+    })
+  })
+
+  describe('configuredProviders', () => {
+    it('is empty for the untouched defaults', () => {
+      expect(configuredProviders(DEFAULT_SETTINGS)).toEqual([])
+    })
+
+    it('reports openrouter once a non-blank key is present', () => {
+      expect(configuredProviders({ ...DEFAULT_SETTINGS, openRouterApiKey: 'or-key' })).toEqual([
+        'openrouter',
+      ])
+      expect(configuredProviders({ ...DEFAULT_SETTINGS, openRouterApiKey: '   ' })).toEqual([])
+    })
+
+    it('reports ollama once its URL is moved off the localhost default', () => {
+      expect(
+        configuredProviders({ ...DEFAULT_SETTINGS, ollamaBaseUrl: 'http://box:11434' }),
+      ).toEqual(['ollama'])
+      expect(
+        configuredProviders({ ...DEFAULT_SETTINGS, ollamaBaseUrl: DEFAULT_SETTINGS.ollamaBaseUrl }),
+      ).toEqual([])
+    })
+
+    it('reports both, openrouter first', () => {
+      expect(
+        configuredProviders({
+          ...DEFAULT_SETTINGS,
+          openRouterApiKey: 'or-key',
+          ollamaBaseUrl: 'http://box:11434',
+        }),
+      ).toEqual(['openrouter', 'ollama'])
     })
   })
 

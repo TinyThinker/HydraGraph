@@ -1,5 +1,6 @@
 import { PERSONA_PRESETS } from '../lib/personaPresets'
 import { providerOptions } from '../lib/providerOptions'
+import { formatModelRef } from '../lib/formatModelRef'
 import { ModelSelect } from './ModelSelect'
 import type { FanOutVariant } from '../services/llm'
 import type { LLMProvider } from '../types'
@@ -73,6 +74,10 @@ export function FanOutRow({ index, variant, onChange, onRemove, canRemove }: Fan
           ×
         </button>
       )}
+
+      <p className="w-full font-mono text-[10px] text-slate-500">
+        {formatModelRef(variant.provider, variant.model)}
+      </p>
     </div>
   )
 }
