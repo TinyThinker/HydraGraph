@@ -34,7 +34,7 @@ beforeEach(() => {
 describe('NodeDispatchControls', () => {
   it('persists a provider override, using undefined for Inherit', () => {
     render(<NodeDispatchControls node={node({ providerOverride: 'openrouter' })} />)
-    const select = screen.getByRole('combobox')
+    const select = screen.getByRole('combobox', { name: 'Provider' })
     fireEvent.change(select, { target: { value: 'ollama' } })
     expect(updateNode).toHaveBeenCalledWith('n1', { providerOverride: 'ollama' })
 
@@ -44,7 +44,7 @@ describe('NodeDispatchControls', () => {
 
   it('commits the model field on blur', () => {
     render(<NodeDispatchControls node={node({})} />)
-    const input = screen.getByPlaceholderText('gemini-2.5-flash')
+    const input = screen.getByLabelText('Model')
     fireEvent.change(input, { target: { value: 'gpt-4o-mini' } })
     fireEvent.blur(input)
     expect(updateNode).toHaveBeenCalledWith('n1', { modelUsed: 'gpt-4o-mini' })
@@ -65,6 +65,6 @@ describe('NodeDispatchControls', () => {
 
   it('disables inputs while the turn streams', () => {
     render(<NodeDispatchControls node={node({ status: 'streaming' })} />)
-    expect(screen.getByPlaceholderText('gemini-2.5-flash')).toBeDisabled()
+    expect(screen.getByLabelText('Model')).toBeDisabled()
   })
 })

@@ -1,4 +1,6 @@
 import { PERSONA_PRESETS } from '../lib/personaPresets'
+import { providerOptions } from '../lib/providerOptions'
+import { ModelSelect } from './ModelSelect'
 import type { FanOutVariant } from '../services/llm'
 import type { LLMProvider } from '../types'
 
@@ -10,11 +12,7 @@ interface FanOutRowProps {
   canRemove: boolean
 }
 
-const PROVIDERS: { value: string; label: string }[] = [
-  { value: '', label: 'Inherit' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'ollama', label: 'Ollama' },
-]
+const PROVIDERS = providerOptions({ inherit: true })
 
 const control =
   'bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
@@ -40,13 +38,12 @@ export function FanOutRow({ index, variant, onChange, onRemove, canRemove }: Fan
         ))}
       </select>
 
-      <input
-        type="text"
-        aria-label={`Variant ${index + 1} model`}
+      <ModelSelect
+        provider={variant.provider ?? 'openrouter'}
         value={variant.model ?? ''}
-        onChange={(e) => onChange({ model: e.target.value || null })}
-        placeholder="gemini-2.5-flash"
-        className={`${control} flex-1 min-w-[8rem]`}
+        ariaLabel={`Variant ${index + 1} model`}
+        className="flex-1 min-w-[8rem]"
+        onChange={(model) => onChange({ model: model || null })}
       />
 
       <select

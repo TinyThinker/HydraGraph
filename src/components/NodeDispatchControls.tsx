@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useSettingsStore } from '../store/settingsStore'
 import { PERSONA_PRESETS } from '../lib/personaPresets'
+import { providerOptions } from '../lib/providerOptions'
+import { ModelSelect } from './ModelSelect'
 import type { LLMProvider, TurnNode } from '../types'
 
-const PROVIDERS: { value: '' | LLMProvider; label: string }[] = [
-  { value: '', label: 'Inherit (tree/global default)' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'ollama', label: 'Ollama' },
-]
+const PROVIDERS = providerOptions({ inherit: true })
 
 const FIELD =
   'w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 ' +
@@ -64,12 +63,12 @@ export function NodeDispatchControls({ node }: { node: TurnNode }) {
 
       <label className="block space-y-1">
         <span className="text-xs text-slate-400">Model</span>
-        <input
-          className={FIELD}
-          disabled={disabled}
+        <ModelSelect
+          provider={node.providerOverride ?? useSettingsStore.getState().settings.provider}
           value={model}
-          placeholder="gemini-2.5-flash"
-          onChange={(e) => setModel(e.target.value)}
+          disabled={disabled}
+          ariaLabel="Model"
+          onChange={setModel}
           onBlur={commitModel}
         />
       </label>
