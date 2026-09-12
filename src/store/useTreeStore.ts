@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { db } from '../db/ChatDatabase'
 import { resolveContextPayload } from '../lib/contextEngine'
 import { streamLLMResponse } from '../lib/streamingClient'
+import { createTokenCoalescer } from '../lib/tokenCoalescer'
 import { resolveDispatchForNode, type FanOutVariant } from '../services/llm'
 import { useSettingsStore } from './settingsStore'
 import { computeChildPosition, layoutTree } from '../lib/autoLayout'
@@ -406,21 +407,37 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         }
       }
 
+      // Batch deltas into one store commit per frame. Every exit from the
+      // stream (done, error, abort) must settle the buffer first: a flush that
+      // landed after liveText was cleared would resurrect an entry for a node
+      // that is no longer streaming, and the chat pane reads a present liveText
+      // entry as "still streaming".
+      const coalescer = createTokenCoalescer((text) => appendTokenDelta(nodeId, text))
+
       try {
         const abort = await streamLLMResponse(
           payload,
           globalSettings,
           target,
-          (chunk) => appendTokenDelta(nodeId, chunk),
-          (usage) => finalizeNode(nodeId, usage),
+          (chunk) => coalescer.push(chunk),
+          (usage) => {
+            coalescer.flush()
+            finalizeNode(nodeId, usage)
+          },
           (err) => {
+            coalescer.flush()
             persistError(err)
           },
         )
 
-        abortRegistry.set(nodeId, abort)
-        return abort
+        const abortAll = () => {
+          coalescer.cancel()
+          abort()
+        }
+        abortRegistry.set(nodeId, abortAll)
+        return abortAll
       } catch (err) {
+        coalescer.cancel()
         await persistError(err)
         return () => {}
       }

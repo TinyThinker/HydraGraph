@@ -7,6 +7,7 @@ import { SplitLayout } from './components/SplitLayout'
 import { HeaderBar } from './components/HeaderBar'
 import { ReaderPanel } from './components/ReaderPanel'
 import { CompareView } from './components/CompareView'
+import { SelectionBranchButton } from './components/SelectionBranchButton'
 import { installRenderHarness } from './lib/renderTally'
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
         <ReaderPanel />
       </div>
       <CompareView />
+      <SelectionBranchButton />
     </div>
   )
 }

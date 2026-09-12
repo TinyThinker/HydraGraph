@@ -1,8 +1,10 @@
+import { memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github-dark.css'
 import { CodeBlock } from './CodeBlock'
+import { bumpMarkdownParse } from '../lib/renderTally'
 import type { Components } from 'react-markdown'
 
 const components: Components = {
@@ -103,7 +105,14 @@ interface MarkdownContentProps {
   markdown: string
 }
 
-export function MarkdownContent({ markdown }: MarkdownContentProps) {
+/**
+ * Memoized on `markdown`: remark + rehype-highlight walk the whole document on
+ * every render, so an unchanged string must never pay for one. Callers rendering
+ * in-flight text should feed it through {@link useThrottledText} rather than
+ * handing it raw live tokens.
+ */
+export const MarkdownContent = memo(function MarkdownContent({ markdown }: MarkdownContentProps) {
+  bumpMarkdownParse()
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -113,4 +122,4 @@ export function MarkdownContent({ markdown }: MarkdownContentProps) {
       {markdown}
     </ReactMarkdown>
   )
-}
+})

@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Copy, Check, X } from 'lucide-react'
 import { useReaderPanel } from './useReaderPanel'
 import { useTreeStore } from '../store/useTreeStore'
 import { useCatalogStore } from '../store/catalogStore'
-import { MarkdownContent } from './MarkdownContent'
 import { MessageActions } from './MessageActions'
 import { NodeDispatchControls } from './NodeDispatchControls'
+import { ReaderResponse } from './ReaderResponse'
 import { estimateContextTokens, CONTEXT_WARN_TOKENS } from '../lib/contextEstimate'
 import { turnCostUSD, formatUSD } from '../lib/pricing'
 
@@ -18,7 +18,13 @@ export function ReaderPanel() {
   const models = useCatalogStore((s) => s.models)
   const [copied, setCopied] = useState(false)
 
-  const estTokens = node ? estimateContextTokens(node.id, nodes) : 0
+  // Walks the whole ancestor chain and concatenates every message, so it must
+  // not run on each render — the panel re-renders on every streamed token, and
+  // the estimate only moves when the node map itself changes.
+  const estTokens = useMemo(
+    () => (nodeId ? estimateContextTokens(nodeId, nodes) : 0),
+    [nodeId, nodes],
+  )
 
   // Close on Escape key
   useEffect(() => {
@@ -45,6 +51,7 @@ export function ReaderPanel() {
 
   const fullResponse = liveText ?? node.assistantResponse
   const lastGenCost = turnCostUSD(node, models)
+  const isStreaming = liveText !== undefined || node.status === 'streaming'
 
   const handleCopy = async () => {
     if (!navigator.clipboard) return
@@ -81,8 +88,9 @@ export function ReaderPanel() {
         </div>
       </div>
 
-      {/* Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4">
+      {/* Body. data-node-id lets SelectionBranchButton resolve a highlighted
+          passage here back to this turn. */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4" data-node-id={node.id}>
         {/* Context info */}
         <div className="text-xs text-slate-400 space-y-1">
           <div>Estimated context: ~{estTokens.toLocaleString()} tokens</div>
@@ -110,13 +118,7 @@ export function ReaderPanel() {
         {/* Assistant response */}
         <div>
           <p className="text-xs font-medium text-slate-400 mb-1">Assistant response</p>
-          {fullResponse ? (
-            <div className="text-sm text-slate-200">
-              <MarkdownContent markdown={fullResponse} />
-            </div>
-          ) : (
-            <p className="text-sm text-slate-500 italic">No response yet.</p>
-          )}
+          <ReaderResponse text={fullResponse} live={isStreaming} />
         </div>
       </div>
     </div>

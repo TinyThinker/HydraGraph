@@ -24,17 +24,29 @@ export function useCanvasGraph() {
     [nodes, selectedNodeId],
   )
 
-  // Reuse each node's RF wrapper object while its store object AND dim class are
-  // unchanged, so repositioning one node does not hand every other card a new
-  // `data` prop.
+  // Reuse each node's RF wrapper object while its store object, dim class AND
+  // selected flag are unchanged, so repositioning one node does not hand every
+  // other card a new `data` prop.
+  //
+  // `selected` is DERIVED from useSelectionStore rather than poked into React
+  // Flow imperatively via setNodes(). It has to be: this memo rebuilds a
+  // wrapper whenever its store node changes identity (finalizeNode, stale
+  // marking, re-layout), and a rebuilt wrapper that omitted `selected` would
+  // silently drop the selection — React Flow then fires onSelectionChange with
+  // an empty array, CanvasSelectionSync writes selectedNodeId = null, and the
+  // chat pane falls back to the empty root. That is the "pane blanks the moment
+  // a response finishes" bug.
   const rfNodesFromStore = useMemo<Node<TurnNodeData>[]>(() => {
     const cache = nodeWrapperCache.current
     const result = Array.from(nodes.values())
       .filter((n) => !hiddenIds.has(n.id))
       .map((n) => {
         const className = pillDimClassName(n.id, activeIds)
+        const selected = n.id === selectedNodeId
         const cached = cache.get(n.id)
-        if (cached && cached.data === n && cached.className === className) return cached
+        if (cached && cached.data === n && cached.className === className && cached.selected === selected) {
+          return cached
+        }
         const wrapper: Node<TurnNodeData> = {
           id: n.id,
           type: 'turnNode',
@@ -42,6 +54,7 @@ export function useCanvasGraph() {
           width: NODE_WIDTH,
           height: NODE_HEIGHT,
           className,
+          selected,
           data: n as TurnNodeData,
         }
         cache.set(n.id, wrapper)
@@ -49,7 +62,7 @@ export function useCanvasGraph() {
       })
     for (const id of cache.keys()) if (!nodes.has(id)) cache.delete(id)
     return result
-  }, [nodes, hiddenIds, activeIds])
+  }, [nodes, hiddenIds, activeIds, selectedNodeId])
 
   const [localNodes, setLocalNodes] = useState(rfNodesFromStore)
 

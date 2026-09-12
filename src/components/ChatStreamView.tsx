@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useSelectionStore } from '../store/useSelectionStore'
 import { getAncestryChain } from '../lib/ancestry'
@@ -12,18 +12,24 @@ import { useActiveNodeId } from './useActiveNodeId'
  */
 export function ChatStreamView() {
   const nodes = useTreeStore((s) => s.nodes)
-  const liveText = useTreeStore((s) => s.liveText)
   const activeId = useActiveNodeId()
   const selectedNodeId = useSelectionStore((s) => s.selectedNodeId)
+
+  // Subscribe to the length of the ACTIVE node's in-flight text, not the whole
+  // liveText map. Subscribing to the map re-rendered this list — and every
+  // ChatMessage in it — for a token arriving on any branch in the tree,
+  // including ones not on screen during a fan-out.
+  const liveLength = useTreeStore((s) => (activeId ? (s.liveText.get(activeId)?.length ?? 0) : 0))
 
   const chain = useMemo(() => getAncestryChain(nodes, activeId), [nodes, activeId])
 
   const endRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end' })
-  }, [chain.length, activeId, liveText])
+  }, [chain.length, activeId, liveLength])
 
-  const onSelect = (id: string) => useSelectionStore.getState().selectAndFocus(id)
+  // Stable identity, or ChatMessage's memo() can never bail out.
+  const onSelect = useCallback((id: string) => useSelectionStore.getState().selectAndFocus(id), [])
 
   const visibleTurns = chain.filter(
     (n) => n.userPrompt || n.assistantResponse || n.status !== 'idle',

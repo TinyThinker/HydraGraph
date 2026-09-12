@@ -112,17 +112,23 @@ Nothing here ships until Stop-4 evidence says which one matters. See
 
 - [ ] **Track A — Deepen arbitration:** persona presets, response diffing, per-branch
   model memory, cheap-model-first routing with escalation. *(if fan-out is used repeatedly)*
-- [ ] **Track B — Close the loop:** branch from a text selection; synthesis nodes whose
-  context is the union of several chains. *(if people build big trees and can't converge)*
+- [ ] **Track B — Close the loop:** ~~branch from a text selection~~ (shipped in v0.5.1,
+  pulled forward ahead of the Stop-4 gate); synthesis nodes whose context is the union
+  of several chains still open. *(if people build big trees and can't converge)*
 - [ ] **Track C — Trust and reach:** read-only shared tree links compressed into the
   URL (no backend); storage-health warnings; real backup. *(if people ask to show someone their tree)*
 
 ### Carried debt (none launch-blocking)
 
 - [ ] Edit a submitted prompt (not just regenerate).
-- [ ] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
-  document per streamed token. Measure first; likely degrades on long responses.
+- [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
+  document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).
 - [ ] 200-node performance pass.
+- [ ] **OpenRouter never reports token usage.** `streamingClient` parses a `usage`
+  frame but never asks for one (`usage: { include: true }`), so every real
+  OpenRouter turn finalizes at `{0, 0}` and the cost receipt reads `$0.0000`.
+  The streaming test hand-feeds a usage frame, which is why it stayed green.
+  Found 2026-09-12, not yet fixed — this makes the headline feature demo as zeros.
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop them at
   the next schema bump.
 

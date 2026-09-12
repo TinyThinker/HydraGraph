@@ -8,6 +8,48 @@
 
 ---
 
+## v0.5.1 — 2026-09-12 — Branch on a passage; streaming perf; the selection-wipe bug
+
+Three changes: one feature, one performance pass, one defect. The defect is the
+notable one — the chat pane blanked the instant any response finished, and the
+only recovery was clicking to another node and back. 315 tests across 45 files;
+`tsc` and `oxlint` clean.
+
+- **Branch from a selected passage.** Highlight any text inside a turn and a floating
+  "Branch on this" button (`SelectionBranchButton` + `useTextSelection`) makes that
+  turn active and seeds the composer with the passage as a Markdown quote
+  (`lib/quotePrompt.ts`). Works anywhere a container is tagged `data-node-id` — chat
+  bubbles, the reader panel, and compare columns. The draft moved out of
+  `ChatInputBar`'s local state into `useComposerStore` so anything on screen can seed
+  it. Branching previously always started from an empty box, which put the burden of
+  restating context back on the user. Partially closes ROADMAP Track B.
+- **Streaming no longer re-parses the whole document per token.** `useThrottledText`
+  settles in-flight text on a ~100 ms trailing throttle (final text publishes
+  immediately when streaming stops), and `MarkdownContent` is memoized on its input.
+  Measured on a 40-token response: **40 full parses → 6**, with the gap widening at
+  higher token rates and multiplied by column count in compare view. Alongside it:
+  `createTokenCoalescer` batches provider deltas into one store commit per animation
+  frame at the network boundary (`appendTokenDelta` keeps its synchronous contract);
+  `ChatStreamView` subscribes to the active node's live-text length instead of the
+  whole `liveText` map, and passes a stable `onSelect` so `ChatMessage`'s `memo` can
+  bail; `ReaderPanel` memoizes `estimateContextTokens`, which had been re-walking the
+  full ancestor chain on every token; `resolvePrice` builds a WeakMap-cached index per
+  catalog instead of up to three linear scans of ~300 models per turn, per render.
+- **Fixed: the chat pane blanked when a generation finished.** `selected` was written
+  into React Flow imperatively via `setNodes` by three separate components, while
+  `useCanvasGraph` rebuilt every node wrapper whenever the store's node map changed
+  identity. `finalizeNode` changes that map, so the rebuilt wrappers dropped the flag,
+  React Flow fired `onSelectionChange` with `[]`, `CanvasSelectionSync` wrote
+  `selectedNodeId = null`, and `useActiveNodeId` fell back to the empty root. Token
+  deltas only touch `liveText`, never `nodes`, which is exactly why streaming looked
+  fine right up to the moment it completed. `useSelectionStore` is now the sole owner
+  of `selected` and `useCanvasGraph` derives it onto each wrapper; the imperative
+  writes in `CanvasSelectionSync`, `CanvasSearchFocus` and `CanvasViewport` are gone.
+  Keyboard navigation and search fly-to now go through `selectAndFocus`, so they move
+  the chat pane too — previously they only moved React Flow's internal selection.
+  Regression test in `selectionSurvivesFinalize.test.tsx` (all 3 cases fail on the
+  pre-fix code).
+
 ## v0.5.0 — 2026-09-03 — Live model catalog & OpenRouter-only providers
 
 Made the cost receipt honest. Providers collapse to **OpenRouter + Ollama** (native

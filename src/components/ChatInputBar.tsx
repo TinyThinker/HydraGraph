@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { SendHorizontal, Split } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useSelectionStore } from '../store/useSelectionStore'
+import { useComposerStore } from '../store/useComposerStore'
 import { useActiveNodeId } from './useActiveNodeId'
 import { FanOutModal } from './FanOutModal'
 
@@ -9,13 +10,28 @@ import { FanOutModal } from './FanOutModal'
  * Fixed bottom input for the chat pane. Submitting forks a fresh child off the
  * active node, dispatches the prompt into it, and moves the active selection to
  * that new child (which also re-focuses the graph).
+ *
+ * The draft lives in `useComposerStore` rather than local state so "branch on
+ * this" can seed it with a quoted passage from a response.
  */
 export function ChatInputBar() {
   const forkAndSubmit = useTreeStore((s) => s.forkAndSubmit)
   const activeId = useActiveNodeId()
-  const [draft, setDraft] = useState('')
+  const draft = useComposerStore((s) => s.draft)
+  const setDraft = useComposerStore((s) => s.setDraft)
+  const focusNonce = useComposerStore((s) => s.focusNonce)
   const [busy, setBusy] = useState(false)
   const [fanOpen, setFanOpen] = useState(false)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // A seeded quote should leave the caret below it, ready to type the question.
+  useEffect(() => {
+    if (focusNonce === 0) return
+    const el = inputRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [focusNonce])
 
   const send = async () => {
     const text = draft.trim()
@@ -34,6 +50,7 @@ export function ChatInputBar() {
     <div className="shrink-0 border-t border-slate-800 bg-slate-900 p-3">
       <div className="flex items-end gap-2">
         <textarea
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

@@ -25,6 +25,41 @@ function priceOf(model: CatalogModel): ModelPrice {
 }
 
 /**
+ * Per-catalog lookup index, keyed on the catalog array's identity.
+ *
+ * The live OpenRouter catalog is several hundred entries and `resolvePrice` is
+ * called per turn, per render — the chat stream, the compare columns and the
+ * receipt all price on every pass — so the original exact/caseless/prefix scans
+ * were O(catalog) three times over, per node. The catalog array is replaced
+ * wholesale by `catalogStore` rather than mutated, so a WeakMap keyed on it
+ * stays correct across a refresh and lets the entries be collected with it.
+ */
+interface CatalogIndex {
+  byId: Map<string, CatalogModel>
+  /** Catalog ids lowercased, longest first — first prefix hit is the best one. */
+  sortedIds: string[]
+}
+
+const indexCache = new WeakMap<CatalogModel[], CatalogIndex>()
+
+function indexFor(catalog: CatalogModel[]): CatalogIndex {
+  const cached = indexCache.get(catalog)
+  if (cached !== undefined) return cached
+
+  const byId = new Map<string, CatalogModel>()
+  for (const m of catalog) {
+    byId.set(m.id, m)
+    const lower = m.id.toLowerCase()
+    if (!byId.has(lower)) byId.set(lower, m)
+  }
+  const sortedIds = catalog.map((m) => m.id.toLowerCase()).sort((a, b) => b.length - a.length)
+
+  const index: CatalogIndex = { byId, sortedIds }
+  indexCache.set(catalog, index)
+  return index
+}
+
+/**
  * Resolve a price for a model id against a catalog.
  *
  * - `ollama` provider is always free ({ 0, 0 }) — local inference.
@@ -43,21 +78,26 @@ export function resolvePrice(
 ): ModelPrice | null {
   if (provider === 'ollama') return { inputPerM: 0, outputPerM: 0 }
 
-  const exact = catalog.find((m) => m.id === model)
-  if (exact !== undefined) return priceOf(exact)
+  const { byId, sortedIds } = indexFor(catalog)
+
+  // Exact id, then case-insensitive id — both O(1). An exact entry always
+  // overwrites a caseless one when the index is built, so this order holds.
+  const direct = byId.get(model)
+  if (direct !== undefined) return priceOf(direct)
 
   const lower = model.toLowerCase()
-
-  const caseless = catalog.find((m) => m.id.toLowerCase() === lower)
+  const caseless = byId.get(lower)
   if (caseless !== undefined) return priceOf(caseless)
 
-  let best: CatalogModel | null = null
-  for (const m of catalog) {
-    if (lower.startsWith(m.id.toLowerCase())) {
-      if (best === null || m.id.length > best.id.length) best = m
+  // Longest catalog id that prefixes `model`. sortedIds is longest-first, so
+  // the first hit is already the longest one.
+  for (const id of sortedIds) {
+    if (lower.startsWith(id)) {
+      const match = byId.get(id)
+      if (match !== undefined) return priceOf(match)
     }
   }
-  return best === null ? null : priceOf(best)
+  return null
 }
 
 /**

@@ -1,18 +1,17 @@
 import { useEffect, useRef } from 'react'
-import { useReactFlow, useOnSelectionChange, useStore } from '@xyflow/react'
+import { useReactFlow, useStore } from '@xyflow/react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useSelectionStore } from '../store/useSelectionStore'
 import { useSettingsStore } from '../store/settingsStore'
 import { useReaderPanel } from './useReaderPanel'
 import { resolveNavTarget, isTypingTarget } from '../lib/treeNav'
-import { NODE_WIDTH, NODE_HEIGHT } from '../lib/nodeDimensions'
 import { db } from '../db/ChatDatabase'
 
 export function CanvasViewport() {
   const activeTreeId = useTreeStore((s) => s.activeTreeId)
-  const { setViewport, fitView, getZoom, setCenter, setNodes } = useReactFlow()
+  const { setViewport, fitView } = useReactFlow()
   const transform = useStore((s) => s.transform)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const selectedRef = useRef<string | null>(null)
 
   // A. Restore viewport on tree load
   useEffect(() => {
@@ -52,20 +51,18 @@ export function CanvasViewport() {
     }
   }, [transform])
 
-  // C. Keyboard navigation
-  useOnSelectionChange({
-    onChange: ({ nodes }) => {
-      selectedRef.current = nodes[0]?.id ?? null
-    },
-  })
-
+  // C. Keyboard navigation. The active node is read from useSelectionStore
+  // rather than from React Flow's own selection: the store is the single owner
+  // of `selected` (useCanvasGraph derives it onto each wrapper), so reading it
+  // here keeps rapid key presses correct instead of racing a round-trip through
+  // React Flow's onSelectionChange.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const nodes = useTreeStore.getState().nodes
-      const current = selectedRef.current
+      const current = useSelectionStore.getState().selectedNodeId
 
       let dir: 'parent' | 'child' | 'prev' | 'next' | null = null
 
@@ -127,17 +124,15 @@ export function CanvasViewport() {
 
         if (targetId == null) return
 
-        setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === targetId })))
-        selectedRef.current = targetId
-
-        const t = nodes.get(targetId)
-        if (t) setCenter(t.positionX + NODE_WIDTH / 2, t.positionY + NODE_HEIGHT / 2, { zoom: getZoom(), duration: 300 })
+        // selectAndFocus both moves the selection and asks CanvasSelectionSync's
+        // single auto-center effect to pan to it — no second setCenter here.
+        useSelectionStore.getState().selectAndFocus(targetId)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [setNodes, setCenter, getZoom])
+  }, [])
 
   return null
 }

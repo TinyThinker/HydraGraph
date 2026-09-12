@@ -24,6 +24,21 @@ export function resetRenderTally() {
   for (const key of Object.keys(counts)) {
     delete counts[key]
   }
+  markdownParses = 0
+}
+
+// Markdown is the single most expensive thing rendered per streamed token, so
+// it gets its own counter — render counts alone hide whether a re-render
+// actually re-walked the document.
+let markdownParses = 0
+
+export function bumpMarkdownParse() {
+  if (!enabled) return
+  markdownParses += 1
+}
+
+export function getMarkdownParseCount(): number {
+  return markdownParses
 }
 
 export function getRenderTally(): Record<string, number> {

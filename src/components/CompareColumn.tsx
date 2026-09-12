@@ -1,6 +1,7 @@
 import { useTreeStore } from '../store/useTreeStore'
 import { useCatalogStore } from '../store/catalogStore'
 import { MarkdownContent } from './MarkdownContent'
+import { useThrottledText } from './useThrottledText'
 import { turnCostUSD, formatUSD } from '../lib/pricing'
 import type { TurnNode } from '../types'
 
@@ -19,9 +20,15 @@ export function CompareColumn({
   const models = useCatalogStore((s) => s.models)
   const cost = turnCostUSD(node, models)
   const body = live ?? (node.assistantResponse || '…')
+  // Compare is where this matters most: N columns streaming at once each used
+  // to re-parse their full document on every token.
+  const settledBody = useThrottledText(body, live !== undefined || node.status === 'streaming')
 
   return (
-    <div className="w-80 shrink-0 flex flex-col border border-slate-800 rounded-lg bg-slate-900 overflow-hidden">
+    <div
+      data-node-id={node.id}
+      className="w-80 shrink-0 flex flex-col border border-slate-800 rounded-lg bg-slate-900 overflow-hidden"
+    >
       <div className="shrink-0 border-b border-slate-800 px-3 py-2">
         <div className="text-sm font-medium text-slate-200 flex items-center gap-2 flex-wrap">
           <span>{node.modelUsed || 'unknown model'}</span>
@@ -53,7 +60,7 @@ export function CompareColumn({
             {node.errorMessage || 'Generation failed.'}
           </p>
         ) : (
-          <MarkdownContent markdown={body} />
+          <MarkdownContent markdown={settledBody} />
         )}
       </div>
     </div>
