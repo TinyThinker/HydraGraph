@@ -262,10 +262,10 @@ spanning cheap→frontier; Dispatch forks children with those pairs.
   replace hand-typed ids in reader panel / fan-out / settings; single
   provider-linked credential field; fan-out price-tier spread.`
   Note the demo-tree receipt depends on it, and that the bundled snapshot is what
-  the no-key demo uses. Append matching `docs/CHANGELOG.md` lines. Run `/sync-docs`
-  to regenerate `docs/STATUS.md`. Update `docs/ARCHITECTURE.md` §5.2 (dispatch
+  the no-key demo uses. Append matching `docs/CHANGELOG.md` lines. Update
+  `docs/STATUS.md` by hand to match. Update `docs/ARCHITECTURE.md` §5.2 (dispatch
   precedence) + wherever providers are enumerated. *(ROADMAP, CHANGELOG, ARCHITECTURE
-  + STATUS via the skill)*
+  + STATUS, all hand-edited)*
 
 ---
 

@@ -112,11 +112,32 @@ Nothing here ships until Stop-4 evidence says which one matters. See
 
 - [ ] **Track A — Deepen arbitration:** persona presets, response diffing, per-branch
   model memory, cheap-model-first routing with escalation. *(if fan-out is used repeatedly)*
+  - Persona presets is pulled forward ahead of the Stop-4 gate: the current list is a
+    hardcoded four-entry const and fan-out cannot take a custom persona at all. Design
+    in [`notes/persona-library-plan.md`](notes/persona-library-plan.md) — global
+    library + per-tree default, **Dexie v6** (which also drops the vestigial
+    `TurnNode.width` / `height` below).
 - [ ] **Track B — Close the loop:** ~~branch from a text selection~~ (shipped in v0.5.1,
   pulled forward ahead of the Stop-4 gate); synthesis nodes whose context is the union
   of several chains still open. *(if people build big trees and can't converge)*
 - [ ] **Track C — Trust and reach:** read-only shared tree links compressed into the
   URL (no backend); storage-health warnings; real backup. *(if people ask to show someone their tree)*
+
+Investigated but not scheduled: web search / tool calling — API shapes, what the node
+schema can absorb, and the UI decision are written up in
+[`notes/tooling-research.md`](notes/tooling-research.md). That note also corrects the
+`usage: { include: true }` fix recorded under Carried debt below (the parameter is
+deprecated and has no effect). Its proposed `TurnNode.steps[]` schema bump is **v7**,
+not v6 — the persona library above takes v6.
+
+Investigated but not scheduled: **canvas node labels.** An optional `TurnNode.label` +
+`labelSource` pair carries a user-typed branch name or a generated title, with
+`stationSummary()` as the fallback. Design in
+[`notes/node-labels-research.md`](notes/node-labels-research.md) §5. It needs **no
+Dexie version** — `stores()` declares indexes, not columns, so two optional
+non-indexed fields need no migration and this work never joins the v6/v7 queue above.
+Ship manual rename before any auto-summarization; the model call is opt-in, needs a
+line in the cost receipt, and is exactly a Stop-4 decision.
 
 ### Carried debt (none launch-blocking)
 
@@ -124,6 +145,22 @@ Nothing here ships until Stop-4 evidence says which one matters. See
 - [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).
 - [ ] 200-node performance pass.
+- [ ] **Pill labels are truncated twice and unreadable when dimmed.** `stationSummary`
+  budgets 48 chars; the 240 px pill displays 19–29, so CSS `truncate` silently re-cuts
+  40–60% of every label. The pill is also 61% empty vertically (27.5 px of content in
+  72 px), so a `line-clamp-2` label needs no geometry change. Off-path labels sit at
+  **3.09:1** contrast (WCAG AA needs 4.5:1) and the role label at **1.51:1**. Fan-out
+  siblings share one prompt by construction, so their pills are byte-identical —
+  the disambiguator is `formatModelRef`, not a better summary. Quote-seeded branches
+  label themselves with the parent's prose. All four are pure-function / Tailwind
+  fixes: [`notes/node-labels-research.md`](notes/node-labels-research.md) §2–3.
+- [ ] **No hover detail on a pill.** The only expansion is a double-click into the
+  reader panel. `NodeToolbar` is already exported by the installed React Flow and
+  renders at constant screen size (legible at `minZoom` 0.2, where the 12 px label
+  renders at 2.4 px). Mount **one** instance in `Canvas`, never one per node — a
+  mounted `NodeToolbar` subscribes to the viewport transform, so 200 of them
+  re-render every pan frame and blow the `renderBudget` lock.
+  [`notes/node-labels-research.md`](notes/node-labels-research.md) §4.
 - [ ] **OpenRouter never reports token usage.** `streamingClient` parses a `usage`
   frame but never asks for one (`usage: { include: true }`), so every real
   OpenRouter turn finalizes at `{0, 0}` and the cost receipt reads `$0.0000`.

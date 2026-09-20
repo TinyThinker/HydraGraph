@@ -799,7 +799,7 @@ For EVERY individual checklist item in `docs/ROADMAP.md`, the AI CLI agent MUST 
 
 **Step 2 — Test & Verify:** Execute `npx tsc --noEmit` and build checks. Confirm that types resolve, zero lint errors exist, and state modifications adhere to immutability rules.
 
-**Step 3 — Commit & Mark Complete:** Tick the item `- [x]` in `docs/ROADMAP.md`, prepend a line to `docs/CHANGELOG.md`, then issue a clean Git commit. Run `/sync-docs` to regenerate `docs/STATUS.md`.
+**Step 3 — Commit & Mark Complete:** Tick the item `- [x]` in `docs/ROADMAP.md`, prepend a line to `docs/CHANGELOG.md`, update `docs/STATUS.md` by hand to match, then issue a clean Git commit.
 
 ---
 
