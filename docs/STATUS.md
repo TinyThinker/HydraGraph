@@ -11,8 +11,7 @@
 Current: v0.6.0
 Last commit: c9f37fb — 2026-09-20
 Last commit message: feat: ship a no-key demo tree, seeded on first run
-Branch: `feat/no-key-demo-tree` — three commits ahead of `main`, not yet merged.
-Land with `git checkout main && git merge --ff-only feat/no-key-demo-tree`.
+Merged to `main` as a four-commit v0.6.0 series (test fix · feature · two doc syncs).
 
 ---
 
