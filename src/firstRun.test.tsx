@@ -65,8 +65,11 @@ describe('first run with an empty database and no API key', () => {
     expect(screen.queryByText(/unknown model pricing/)).not.toBeInTheDocument()
     expect(screen.getAllByText(new RegExp(`${DEMO_TURNS.length} turns`)).length).toBe(2)
     // Real dollars, not $0.0000 — at least one non-zero digit after the point.
-    expect(screen.getByText(/saved · \d+%/)).toBeInTheDocument()
+    // The `~` marks the figures descending from the modelled linear thread.
+    expect(screen.getByText(/saved · ~\d+%/)).toBeInTheDocument()
     expect(screen.getAllByText(/\$0\.\d*[1-9]/).length).toBeGreaterThanOrEqual(3)
+    // A stranger is told which half of this receipt is measured.
+    expect(screen.getByText(/no prompt caching/)).toBeInTheDocument()
   })
 
   it('reopens the demo on reload rather than reseeding a second copy', async () => {

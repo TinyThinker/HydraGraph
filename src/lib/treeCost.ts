@@ -10,6 +10,34 @@ import { resolvePrice, turnCostUSD } from './pricing'
  * Pure: no store access, no Dexie, no React, no side effects.
  */
 
+/**
+ * The two halves of this receipt are not the same kind of number.
+ *
+ * `actual` is measured — provider-reported token counts, priced from the
+ * catalog. `counterfactual` is modelled: the thread was never sent, so its
+ * size is estimated from text length and its price assumes no caching. The
+ * headline the UI shows is their *difference*, which inherits every bias in
+ * the weaker half.
+ *
+ * These strings live here, beside the assumptions they describe, so the
+ * caveat can't drift away from the math it qualifies.
+ */
+export const COUNTERFACTUAL_NOTE =
+  'Estimated: one thread re-sending the full transcript each turn, no prompt caching.'
+
+export const COUNTERFACTUAL_DETAIL =
+  'Modelled, not measured. Assumes every turn re-sends the entire prior transcript, ' +
+  'sizes it at ~4 characters per token, and assumes no prompt-caching discount — a ' +
+  'real linear thread would usually get one, so the true gap is likely smaller.'
+
+export const ACTUAL_DETAIL =
+  'Measured from the token counts the provider reported for each turn, priced from the model catalog.'
+
+export const NO_SAVING_DETAIL =
+  'On a short tree there is barely any transcript to re-send, so the modelled linear ' +
+  'thread can cost about the same or less than what was actually spent. The gap opens ' +
+  'up as the conversation gets deeper and branches reach further back.'
+
 /** ~4 chars per token, matching `contextEstimate.ts`. */
 function approxTokens(text: string): number {
   return Math.round(text.length / 4)

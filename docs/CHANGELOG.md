@@ -10,6 +10,20 @@
 
 ## Unreleased
 
+- **The cost receipt no longer presents an estimate as a measurement.** The first row
+  is measured (provider-reported tokens, catalog prices); the second is modelled — the
+  linear thread was never sent, so its size comes from `text.length / 4` and its price
+  assumes no prompt caching. They rendered identically, which let "you saved $X" borrow
+  the authority of "this tree cost $Y". The linear row is now marked `(est.)`, every
+  figure descending from it is prefixed `~`, the assumptions are stated in the panel
+  (not only on hover), and both estimate rows carry the full caveat as a tooltip.
+  Strings live in `treeCost.ts` beside the math they qualify.
+- **The receipt never claims a negative saving.** A shallow tree has almost no
+  transcript to re-send, so the modelled linear thread can undercut real spend — which
+  rendered as `~$-0.0000 saved · ~-12%` in emerald under "Context you didn't pay for".
+  Below zero that row is replaced by a neutral "No saving to show yet — branching pays
+  off once the transcript grows." Surfaced by a test fixture rather than in the wild;
+  it would have hit first-time users hardest, whose trees are all shallow.
 - **Struck a carried-debt item that was already fixed upstream.** "OpenRouter never
   reports token usage" has been on the blocker list since 2026-09-12, and was the top
   entry in STATUS's Next Actions. It is obsolete: OpenRouter deprecated the

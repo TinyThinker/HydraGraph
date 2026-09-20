@@ -61,7 +61,8 @@ Merged to `main` as a four-commit v0.6.0 series (test fix · feature · two doc 
 - [ ] No hover detail on a pill — `NodeToolbar` mount plan written (`notes/node-labels-research.md` §4)
 - [x] ~~**OpenRouter never reports token usage**~~ — **withdrawn 2026-09-20; the record was wrong, not the client.** Usage arrives unasked in the final SSE frame and `streamingClient` already parses (`:83`) and flushes (`:106`) it. Verified live: a real `deepseek/deepseek-v4-flash-0731` turn reports `1,701 in · 1,996 out · $0.0002`; tree receipt `$0.0025` vs `$0.0042` linear, 42% saved. No code change. Open only as an enhancement — the same frame carries `usage.cost`, `cached_tokens` and `reasoning_tokens` (ROADMAP, Carried debt).
 - [x] Cost receipt mislabelled *why* a turn was excluded — a turn with no recorded tokens (errored / cancelled) read as "unknown model pricing". `treeCostSummary` now reports `unmeasuredTurns` separately (2026-09-20).
-- [ ] **The linear-thread counterfactual is an unlabelled estimate** — actual uses provider-reported tokens, the counterfactual uses `text.length / 4` (`treeCost.ts:14`) and assumes no prompt caching. Two rulers, and the headline is their difference. Label it before refining the math.
+- [x] **The linear-thread counterfactual is an unlabelled estimate** — labelled 2026-09-20: `(est.)` on the row, `~` on every derived figure, assumptions in the panel, full caveat on hover. Also stopped claiming a *negative* saving on shallow trees (rendered `~$-0.0000 saved · ~-12%` in green).
+- [ ] **The counterfactual arithmetic still uses a different ruler than the actual line** — four known biases, all flattering the branching story (chars/4 vs reported tokens, missing system prompt, dropped excluded turns, no cache discount). Fixable without an estimator by differencing `inputTokens` along a chain. ROADMAP has the detail. Do it when challenged.
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop at the next schema bump (folded into the v6 persona-library migration)
 - [x] Read-hook `--max-tokens` raised 800 → 3000 (2026-09-20).
 - [x] `Read`-over-`Bash` read policy added to `CLAUDE.md` (2026-09-20). Verified
@@ -79,9 +80,10 @@ tree. It was never true of the shipped client; the debt entry recorded a fix for
 parameter OpenRouter had already deprecated, and nobody re-ran the observation with
 a key. Real turns report real tokens and real dollars.
 
-What remains is a credibility question, not a defect: the receipt's *actual* line is
-measured, its *linear thread* line is an estimate, and the UI draws them identically.
-See Carried debt.
+The credibility question that replaced it — the receipt's *actual* line is measured,
+its *linear thread* line is modelled, and the UI drew them identically — is closed as
+of 2026-09-20. The estimate is labelled as one. Its arithmetic is still coarse, which
+is now recorded honestly rather than hidden. See Carried debt.
 
 Phases 1–2 cleared the shipping blockers and built the deep-context arbitration
 demo; Phase 3's catalog work and the no-key demo tree are done. What's left of
@@ -91,15 +93,12 @@ Phase 3 is the static deploy and honest onboarding copy.
 
 ## Next Actions (priority order)
 
-1. Label the receipt's linear-thread line as an estimate, and footnote the
-   no-prompt-caching assumption. Cheapest credibility fix available; the arithmetic
-   can be sharpened later.
-2. Pill labels — truncation and off-path contrast (`notes/node-labels-research.md`
+1. Pill labels — truncation and off-path contrast (`notes/node-labels-research.md`
    §2–3). Pure Tailwind / pure-function work, and the canvas is in every screenshot.
-3. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
+2. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
    (the demo tree it preloads is done — `lib/demoTree.ts`, seeded by `App.tsx`)
-4. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
-5. [Phase 3] One honest line about where data lives, plus an export nudge after real work
+3. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
+4. [Phase 3] One honest line about where data lives, plus an export nudge after real work
 
 ---
 

@@ -1,13 +1,24 @@
 import { useMemo } from 'react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useCatalogStore } from '../store/catalogStore'
-import { treeCostSummary } from '../lib/treeCost'
+import {
+  treeCostSummary,
+  COUNTERFACTUAL_NOTE,
+  COUNTERFACTUAL_DETAIL,
+  ACTUAL_DETAIL,
+  NO_SAVING_DETAIL,
+} from '../lib/treeCost'
 import { formatUSD } from '../lib/pricing'
 
 /**
  * Per-tree cost receipt: this branched tree's actual spend vs. the same turns
  * replayed as one linear thread, and the gap ("context you didn't pay for").
  * Pure presentational — reads the store, takes no props.
+ *
+ * The first row is measured; the second is modelled. They used to render
+ * identically, which let a claim the product can't support ("you saved $X")
+ * borrow the authority of one it can ("this tree cost $Y"). Everything
+ * downstream of the estimate is marked `~` and carries the assumptions.
  */
 export function CostReceipt() {
   const nodes = useTreeStore((s) => s.nodes)
@@ -30,22 +41,38 @@ export function CostReceipt() {
         <div className="text-slate-500">No priced turns yet.</div>
       ) : (
         <>
-          <div className="flex justify-between gap-4">
+          <div className="flex justify-between gap-4" title={ACTUAL_DETAIL}>
             <span>
               This tree · {turns} turns · {forks} forks
             </span>
             <span>{formatUSD(summary.actual)}</span>
           </div>
-          <div className="flex justify-between gap-4 mt-1">
-            <span>Same {turns} turns, one linear thread</span>
-            <span>{formatUSD(summary.counterfactual)}</span>
-          </div>
-          <div className="flex justify-between gap-4 mt-1 text-emerald-400">
-            <span>Context you didn't pay for</span>
+          <div className="flex justify-between gap-4 mt-1" title={COUNTERFACTUAL_DETAIL}>
             <span>
-              {formatUSD(summary.saved)} saved · {Math.round(summary.savedPct * 100)}%
+              Same {turns} turns, one linear thread <span className="text-slate-500">(est.)</span>
             </span>
+            <span>~{formatUSD(summary.counterfactual)}</span>
           </div>
+          {summary.saved > 0 ? (
+            <div
+              className="flex justify-between gap-4 mt-1 text-emerald-400"
+              title={COUNTERFACTUAL_DETAIL}
+            >
+              <span>Context you didn't pay for</span>
+              <span>
+                ~{formatUSD(summary.saved)} saved · ~{Math.round(summary.savedPct * 100)}%
+              </span>
+            </div>
+          ) : (
+            // A shallow tree has almost no transcript to re-send, so the
+            // modelled linear thread can come out cheaper than what was
+            // actually spent. Claiming a negative saving in green under
+            // "Context you didn't pay for" is worse than claiming nothing.
+            <div className="mt-1 text-slate-500" title={NO_SAVING_DETAIL}>
+              No saving to show yet — branching pays off once the transcript grows.
+            </div>
+          )}
+          <div className="mt-2 text-slate-500 leading-snug">{COUNTERFACTUAL_NOTE}</div>
         </>
       )}
       {(summary.unpricedTurns > 0 || summary.unmeasuredTurns > 0) && (

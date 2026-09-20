@@ -188,11 +188,22 @@ line in the cost receipt, and is exactly a Stop-4 decision.
     `usage.cost` (dollars actually charged), `prompt_tokens_details.cached_tokens`
     and `completion_tokens_details.reasoning_tokens`. Recording `cost` would make the
     receipt authoritative rather than a client-side reprice. Not launch-blocking.
-- [ ] **The linear-thread counterfactual is an unlabelled estimate.** The actual line
-  uses provider-reported tokens; the counterfactual uses `text.length / 4`
-  (`treeCost.ts:14`) and assumes no prompt caching, no system prompt, and drops
-  excluded turns from the transcript entirely. Two different rulers, and the headline
-  is their difference. Label it as an estimate before the arithmetic gets better.
+- [x] **The linear-thread counterfactual is an unlabelled estimate.** Labelled
+  2026-09-20: `(est.)` on the row, `~` on every figure derived from it, assumptions
+  stated in the panel rather than only on hover, full caveat as a tooltip. The receipt
+  also stopped claiming a *negative* saving on shallow trees, where the modelled thread
+  can undercut real spend. The arithmetic is still an estimate — see the next item.
+- [ ] **Make the counterfactual arithmetic match its own ruler.** Now that it reads as
+  an estimate, it can be made a good one. Four known biases, all currently flattering
+  the branching story: (1) actual uses provider-reported tokens while the counterfactual
+  uses `text.length / 4` (`treeCost.ts:14`) — two rulers for one subtraction; (2) the
+  system prompt is re-sent on every real turn but is absent from the modelled
+  transcript; (3) excluded turns vanish from the transcript later turns would have
+  inherited; (4) no prompt-caching discount, though a re-sending linear thread is the
+  exact shape caching rewards. The rigorous fix for (1) needs no estimator at all — a
+  turn's real prompt tokens are recoverable by differencing along a chain,
+  `inputTokens(child) − inputTokens(parent) − outputTokens(parent)`. Worth doing when
+  the number is challenged, not before.
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop them at
   the next schema bump.
 - [x] **Read-hook `--max-tokens` was too low for this repo's files.** Raised in
