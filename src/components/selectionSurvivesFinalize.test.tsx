@@ -107,10 +107,12 @@ describe('selection survives a finished generation', () => {
     })
     expect(childId).not.toBeNull()
 
-    // Mid-stream: the node is selected and its tokens are on screen.
+    // Mid-stream: the node is selected and its tokens are on screen. The wait
+    // must clear MARKDOWN_THROTTLE_MS (100ms) — mid-stream Markdown is released
+    // on a trailing edge, so a shorter wait asserts before the first parse.
     await act(async () => {
       push('data: {"choices":[{"delta":{"content":"Hello streamed answer"}}]}\n\n')
-      await new Promise((r) => setTimeout(r, 30))
+      await new Promise((r) => setTimeout(r, 150))
     })
     expect(useSelectionStore.getState().selectedNodeId).toBe(childId)
     expect(screen.getByText(/Hello streamed answer/)).toBeInTheDocument()
