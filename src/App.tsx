@@ -25,7 +25,7 @@ export default function App() {
     bootedRef.current = true
 
     async function boot() {
-      const { loadAllTrees, loadTree, createTree } = useTreeStore.getState()
+      const { loadAllTrees, loadTree, seedDemoTree } = useTreeStore.getState()
       await useSettingsStore.getState().loadSettings()
       // Refresh the live model/price catalog in the background (TTL-guarded,
       // falls back to cache then the bundled snapshot). Not awaited — the UI
@@ -42,7 +42,9 @@ export default function App() {
       } else if (trees.length > 0) {
         await loadTree(trees[0].id)
       } else {
-        await createTree('New Research')
+        // First run: land on the shipped demo tree rather than an empty canvas.
+        // Canned responses, no key required — see `lib/demoTree.ts`.
+        await seedDemoTree()
       }
       setReady(true)
     }

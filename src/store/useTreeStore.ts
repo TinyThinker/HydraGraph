@@ -7,6 +7,7 @@ import { resolveDispatchForNode, type FanOutVariant } from '../services/llm'
 import { useSettingsStore } from './settingsStore'
 import { computeChildPosition, layoutTree } from '../lib/autoLayout'
 import { parseImportDoc, remapImportedTree } from '../lib/treeExport'
+import { buildDemoTree } from '../lib/demoTree'
 import type { TurnNode, ConversationTree, NodeStatus, TokenUsage } from '../types'
 
 interface TreeStoreState {
@@ -44,6 +45,12 @@ interface TreeStoreActions {
   renameTree: (treeId: string, title: string) => Promise<void>
   deleteTree: (treeId: string) => Promise<void>
   importTree: (text: string) => Promise<{ ok: boolean; error?: string; treeId?: string }>
+  /**
+   * Write (or rewrite) the shipped demo tree and open it. Idempotent — fixed
+   * ids mean re-seeding replaces the rows instead of piling up copies, so any
+   * edits a visitor made to the demo are reset rather than duplicated.
+   */
+  seedDemoTree: () => Promise<ConversationTree>
 }
 
 // Module-scope: map of node id → pending flush timer
@@ -717,6 +724,21 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       set((state) => ({ trees: [tree, ...state.trees] }))
       await get().loadTree(tree.id)
       return { ok: true, treeId: tree.id }
+    },
+
+    seedDemoTree: async () => {
+      const { tree, nodes } = buildDemoTree()
+
+      await db.transaction('rw', [db.trees, db.nodes], async () => {
+        const staleIds = await db.nodes.where('treeId').equals(tree.id).primaryKeys()
+        if (staleIds.length > 0) await db.nodes.bulkDelete(staleIds as string[])
+        await db.trees.put(tree)
+        await db.nodes.bulkAdd(nodes)
+      })
+
+      set((state) => ({ trees: [tree, ...state.trees.filter((t) => t.id !== tree.id)] }))
+      await get().loadTree(tree.id)
+      return tree
     },
   }
 })

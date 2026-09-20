@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { Settings, AlertTriangle, LayoutGrid, Download, DollarSign, Columns3 } from 'lucide-react'
+import { Settings, LayoutGrid, Download, DollarSign, Columns3 } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
-import { useSettingsStore } from '../store/settingsStore'
 import { useCompareStore } from '../store/useCompareStore'
 import { useActiveNodeId } from './useActiveNodeId'
 import { downloadTreeExport } from '../lib/treeExport'
@@ -10,14 +9,12 @@ import { TreeSwitcher } from './TreeSwitcher'
 import { SearchBar } from './SearchBar'
 import { ImportButton } from './ImportButton'
 import { CostReceipt } from './CostReceipt'
-
-const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
+import { ProviderBanner } from './ProviderBanner'
 
 export function HeaderBar() {
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmRelayout, setConfirmRelayout] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
-  const settings = useSettingsStore((s) => s.settings)
   const relayoutActiveTree = useTreeStore((s) => s.relayoutActiveTree)
 
   const activeId = useActiveNodeId()
@@ -29,13 +26,6 @@ export function HeaderBar() {
     return count
   })
   const canCompare = siblingCount >= 2
-
-  // Banner is shown if no provider is configured: no OpenRouter key, and Ollama
-  // is either unconfigured or still at the default untested URL
-  const hasOpenRouterKey = settings?.openRouterApiKey?.trim()
-  const ollamaUrl = settings?.ollamaBaseUrl?.trim() || ''
-  const isOllamaConfigured = ollamaUrl && ollamaUrl !== DEFAULT_OLLAMA_URL
-  const needsProvider = !hasOpenRouterKey && !isOllamaConfigured
 
   return (
     <>
@@ -120,20 +110,7 @@ export function HeaderBar() {
           </div>
         </div>
       )}
-      {needsProvider && (
-        <div className="flex items-center justify-between px-4 py-3 bg-amber-950/40 border-b border-amber-800/50 text-amber-300 text-sm">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} className="flex-shrink-0" />
-            <span>No LLM provider configured. Add an OpenRouter API key, or point at a running Ollama server, to start generating.</span>
-          </div>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="text-amber-200 underline hover:text-amber-100 transition-colors flex-shrink-0 ml-4"
-          >
-            Open settings
-          </button>
-        </div>
-      )}
+      <ProviderBanner onOpenSettings={() => setModalOpen(true)} />
       <SettingsModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </>
   )

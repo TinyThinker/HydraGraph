@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, Plus } from 'lucide-react'
+import { ChevronDown, Plus, Sparkles } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { TreeSwitcherRow } from './TreeSwitcherRow'
 
@@ -11,6 +11,7 @@ export function TreeSwitcher() {
   const activeTreeId = useTreeStore((s) => s.activeTreeId)
   const loadTree = useTreeStore((s) => s.loadTree)
   const createTree = useTreeStore((s) => s.createTree)
+  const seedDemoTree = useTreeStore((s) => s.seedDemoTree)
 
   const activeTree = activeTreeId ? trees.find((t) => t.id === activeTreeId) : null
   const sorted = [...trees].sort((a, b) => b.updatedAt - a.updatedAt)
@@ -55,6 +56,19 @@ export function TreeSwitcher() {
           >
             <Plus size={14} />
             New tree
+          </button>
+
+          {/* Re-seeds the shipped demo (fixed ids, so it never duplicates) and
+              opens it — the way back after poking at it or deleting it. */}
+          <button
+            onClick={async () => {
+              await seedDemoTree()
+              setOpen(false)
+            }}
+            className="w-full flex items-center gap-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200 px-3 py-2 transition-colors"
+          >
+            <Sparkles size={14} />
+            Reset demo tree
           </button>
 
           <div className="border-t border-slate-700 my-1" />
