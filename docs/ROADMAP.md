@@ -168,6 +168,18 @@ line in the cost receipt, and is exactly a Stop-4 decision.
   Found 2026-09-12, not yet fixed — this makes the headline feature demo as zeros.
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop them at
   the next schema bump.
+- [x] **Read-hook `--max-tokens` was too low for this repo's files.** Raised in
+  `.claude/settings.json` from `800` to `3000` (2026-09-20). Plan:
+  `ast_token_trimmer` repo, `specs/2026-09-20-read-hook-consumer-fixes/plan.md`,
+  Phase 2 Task A.
+- [x] **Prefer `Read` over `Bash` for file inspection.** Added to `CLAUDE.md`
+  (2026-09-20), after the upstream `ast_token_trimmer` offset/limit fix (Phase 1)
+  shipped and was verified live. Plan: same doc, Phase 2 Task B. Verified
+  2026-09-20 in a fresh session: reading `src/store/useTreeStore.ts` produced a
+  real (non-passthrough) trim in `~/.cache/trim-metrics.jsonl`
+  (`input_tokens: 6208`, `limit: 3000`, `cuts: 5`) — the first trim under the
+  raised limit. See also
+  [`docs/archive/2026-09_read-hook-trimmer-analysis.md`](archive/2026-09_read-hook-trimmer-analysis.md).
 
 ---
 

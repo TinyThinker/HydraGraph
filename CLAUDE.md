@@ -17,6 +17,14 @@ commit, active blockers, next actions). Do not create "phase progress", "current
 state", or "tasks" files — that role is STATUS.md + ROADMAP.md. Records of completed
 work / diagnoses are born in `docs/archive/` and never edited after.
 
+## Reading files in this repo
+
+Use the `Read` tool as the default way to inspect a file here, not `cat` / `sed -n` /
+`grep` via Bash — a `PreToolUse` hook trims oversized `.ts`/`.py` reads to their
+signatures, and only the `Read` tool triggers it. Reach for Bash instead when you need
+to search across multiple files, or specifically want a function's full body (the
+trimmer hides those on purpose).
+
 ## Code Style & Architecture Constraints
 - Framework: React 19 + Vite 8 + TypeScript 6 (Strict Mode).
 - Canvas Engine: @xyflow/react (React Flow v12).

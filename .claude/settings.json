@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "trim-code-hook --max-tokens 3000 --cache-dir ~/.cache/ast-token-trimmer --metrics-file ~/.cache/trim-metrics.jsonl",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}    

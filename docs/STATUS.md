@@ -60,6 +60,11 @@ Last commit message: feat: branch from a selected passage; throttle streaming Ma
 - [ ] No hover detail on a pill — `NodeToolbar` mount plan written (`notes/node-labels-research.md` §4)
 - [ ] **OpenRouter never reports token usage** — `usage: { include: true }` has no effect (deprecated param); every real OpenRouter turn's cost receipt reads `$0.0000`. Found 2026-09-12, not yet fixed. See "Next Actions" — this undercuts the headline demo.
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop at the next schema bump (folded into the v6 persona-library migration)
+- [x] Read-hook `--max-tokens` raised 800 → 3000 (2026-09-20).
+- [x] `Read`-over-`Bash` read policy added to `CLAUDE.md` (2026-09-20). Verified
+  same day in a fresh session: reading `src/store/useTreeStore.ts` produced a
+  real (non-passthrough) trim in `~/.cache/trim-metrics.jsonl` under the new
+  `limit: 3000`. See ROADMAP for the plan link.
 
 ---
 
