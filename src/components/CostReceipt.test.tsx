@@ -43,4 +43,36 @@ describe('CostReceipt', () => {
     render(<CostReceipt />)
     expect(screen.getByText('No priced turns yet.')).toBeInTheDocument()
   })
+
+  // Regression: an errored turn used to be reported as "unknown model
+  // pricing", sending people to the model picker to fix a failed request.
+  it('names the real reason a turn was excluded', () => {
+    const ok = node({ id: 'ok', userPrompt: 'q', assistantResponse: 'a', inputTokens: 100, outputTokens: 200 })
+    const errored = node({ id: 'err', timestamp: 2, userPrompt: 'never finished' })
+    const unlisted = node({
+      id: 'unlisted',
+      timestamp: 3,
+      userPrompt: 'q',
+      assistantResponse: 'a',
+      modelUsed: 'some-unlisted-model-v9',
+      inputTokens: 100,
+      outputTokens: 200,
+    })
+    useTreeStore.setState({ nodes: new Map([ok, errored, unlisted].map((n) => [n.id, n])) })
+
+    render(<CostReceipt />)
+    expect(screen.getByText('1 turn excluded — no token counts recorded')).toBeInTheDocument()
+    expect(screen.getByText('1 turn excluded — unknown model pricing')).toBeInTheDocument()
+  })
+
+  it('pluralises and omits the lines that do not apply', () => {
+    const ok = node({ id: 'ok', userPrompt: 'q', assistantResponse: 'a', inputTokens: 100, outputTokens: 200 })
+    const e1 = node({ id: 'e1', timestamp: 2, userPrompt: 'unfinished' })
+    const e2 = node({ id: 'e2', timestamp: 3, userPrompt: 'also unfinished' })
+    useTreeStore.setState({ nodes: new Map([ok, e1, e2].map((n) => [n.id, n])) })
+
+    render(<CostReceipt />)
+    expect(screen.getByText('2 turns excluded — no token counts recorded')).toBeInTheDocument()
+    expect(screen.queryByText(/unknown model pricing/)).not.toBeInTheDocument()
+  })
 })

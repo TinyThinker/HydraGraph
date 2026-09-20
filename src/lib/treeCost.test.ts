@@ -98,6 +98,7 @@ describe('treeCostSummary', () => {
     expect(summary.savedPct).toBeCloseTo(EXPECT_SAVED_PCT, 8)
     expect(summary.pricedTurns).toBe(3)
     expect(summary.unpricedTurns).toBe(0)
+    expect(summary.unmeasuredTurns).toBe(0)
   })
 
   it('counts an unknown-model turn as unpriced without disturbing the math', () => {
@@ -118,8 +119,64 @@ describe('treeCostSummary', () => {
 
     expect(summary.pricedTurns).toBe(3)
     expect(summary.unpricedTurns).toBe(1)
+    expect(summary.unmeasuredTurns).toBe(0)
     expect(summary.actual).toBeCloseTo(EXPECT_ACTUAL, 8)
     expect(summary.counterfactual).toBeCloseTo(EXPECT_CF, 8)
+  })
+
+  // The receipt used to report both causes as "unknown model pricing", which
+  // pointed people at the model picker to fix a turn that had simply errored.
+  it('separates a turn with no token counts from one with no price', () => {
+    const nodes = threeTurns()
+    nodes.push(
+      makeTurn({
+        id: 't-errored',
+        timestamp: 2.4,
+        userPrompt: 'this turn never finished',
+        assistantResponse: '',
+        // priced model, but cancelled/errored before any usage frame arrived
+        inputTokens: undefined,
+        outputTokens: undefined,
+      }),
+      makeTurn({
+        id: 't-unknown',
+        timestamp: 2.5,
+        userPrompt: 'what about this one',
+        assistantResponse: 'no price for this model',
+        modelUsed: 'some-unlisted-model-v9',
+        inputTokens: 999,
+        outputTokens: 999,
+      }),
+    )
+
+    const summary = treeCostSummary(buildMap(nodes), CATALOG)
+
+    expect(summary.pricedTurns).toBe(3)
+    expect(summary.unmeasuredTurns).toBe(1)
+    expect(summary.unpricedTurns).toBe(1)
+    expect(summary.actual).toBeCloseTo(EXPECT_ACTUAL, 8)
+  })
+
+  // Both causes at once: classified as unmeasured only, matching
+  // `turnCostUSD`'s own short-circuit order. Never double-counted.
+  it('counts a turn that is both unmeasured and unpriced exactly once', () => {
+    const nodes = threeTurns()
+    nodes.push(
+      makeTurn({
+        id: 't-both',
+        timestamp: 2.6,
+        userPrompt: 'unlisted model, and it never finished',
+        modelUsed: 'some-unlisted-model-v9',
+        inputTokens: undefined,
+        outputTokens: undefined,
+      }),
+    )
+
+    const summary = treeCostSummary(buildMap(nodes), CATALOG)
+
+    expect(summary.unmeasuredTurns).toBe(1)
+    expect(summary.unpricedTurns).toBe(0)
+    expect(summary.pricedTurns).toBe(3)
   })
 
   it('ignores nodes with an empty userPrompt (e.g. a bare root)', () => {
@@ -138,6 +195,7 @@ describe('treeCostSummary', () => {
     const summary = treeCostSummary(buildMap(nodes), CATALOG)
     expect(summary.pricedTurns).toBe(3)
     expect(summary.unpricedTurns).toBe(0)
+    expect(summary.unmeasuredTurns).toBe(0)
     expect(summary.actual).toBeCloseTo(EXPECT_ACTUAL, 8)
   })
 
@@ -149,6 +207,7 @@ describe('treeCostSummary', () => {
       savedPct: 0,
       pricedTurns: 0,
       unpricedTurns: 0,
+      unmeasuredTurns: 0,
     })
   })
 })

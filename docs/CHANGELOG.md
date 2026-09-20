@@ -8,6 +8,27 @@
 
 ---
 
+## Unreleased
+
+- **Struck a carried-debt item that was already fixed upstream.** "OpenRouter never
+  reports token usage" has been on the blocker list since 2026-09-12, and was the top
+  entry in STATUS's Next Actions. It is obsolete: OpenRouter deprecated the
+  `usage: { include: true }` / `stream_options: { include_usage: true }` opt-ins and now
+  always sends usage in the final SSE frame, which `streamingClient.ts` already parses
+  (`:83`) and already flushes (`:106`). Confirmed against a live tree — a real
+  `deepseek/deepseek-v4-flash-0731` turn reports `1,701 in · 1,996 out · $0.0002`, and
+  the tree receipt reads `$0.0025 actual vs $0.0042 linear · 42% saved`. No code change
+  was needed; the record was wrong, not the client. See
+  [`notes/tooling-research.md`](notes/tooling-research.md) §3.4.
+- **The cost receipt now names the real reason a turn was excluded.** Both causes —
+  no recorded token counts, and no catalog price — were reported as "unknown model
+  pricing", which sent people to the model picker to fix a turn that had simply
+  errored or been cancelled. `treeCostSummary` reports `unmeasuredTurns` alongside
+  `unpricedTurns` (classified in `turnCostUSD`'s own short-circuit order, so a turn
+  that is both counts once), and `CostReceipt` renders a line per cause.
+
+---
+
 ## v0.6.0 — 2026-09-20 — The no-key demo tree
 
 Removes the cold-start tax: an empty browser now lands on a real 16-turn research

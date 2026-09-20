@@ -33,8 +33,21 @@ export interface TreeCostSummary {
   savedPct: number
   /** Real turns with a known price. */
   pricedTurns: number
-  /** Real turns whose model / tokens gave no price. */
+  /**
+   * Real turns excluded because the model has no catalog price.
+   *
+   * Distinct from {@link unmeasuredTurns}: this is a catalog gap (an unlisted
+   * or misspelled model id), and no amount of token data fixes it.
+   */
   unpricedTurns: number
+  /**
+   * Real turns excluded because no token counts were ever recorded — the turn
+   * is still streaming, was cancelled, or errored before its usage frame.
+   *
+   * Checked before pricing, matching `turnCostUSD`'s own short-circuit order,
+   * so a turn that is both unmeasured and unpriced counts here only.
+   */
+  unmeasuredTurns: number
 }
 
 export function treeCostSummary(
@@ -46,12 +59,21 @@ export function treeCostSummary(
   let actual = 0
   let pricedTurns = 0
   let unpricedTurns = 0
+  let unmeasuredTurns = 0
   const priced: TurnNode[] = []
 
   for (const turn of turns) {
     const cost = turnCostUSD(turn, catalog)
     if (cost === null) {
-      unpricedTurns++
+      // Why the turn was excluded decides what the receipt tells the user, and
+      // the two causes need different answers: a missing price is a catalog
+      // gap, missing tokens mean the turn never finished. Mirrors
+      // `turnCostUSD`'s own order so the two can never disagree.
+      if (turn.inputTokens === undefined || turn.outputTokens === undefined) {
+        unmeasuredTurns++
+      } else {
+        unpricedTurns++
+      }
     } else {
       actual += cost
       pricedTurns++
@@ -74,5 +96,13 @@ export function treeCostSummary(
   const saved = counterfactual - actual
   const savedPct = counterfactual > 0 ? saved / counterfactual : 0
 
-  return { actual, counterfactual, saved, savedPct, pricedTurns, unpricedTurns }
+  return {
+    actual,
+    counterfactual,
+    saved,
+    savedPct,
+    pricedTurns,
+    unpricedTurns,
+    unmeasuredTurns,
+  }
 }

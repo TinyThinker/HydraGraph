@@ -48,12 +48,26 @@ export function CostReceipt() {
           </div>
         </>
       )}
-      {summary.unpricedTurns > 0 && (
-        <div className="mt-2 text-slate-500">
-          {summary.unpricedTurns} turn{summary.unpricedTurns === 1 ? '' : 's'} excluded — unknown
-          model pricing
+      {(summary.unpricedTurns > 0 || summary.unmeasuredTurns > 0) && (
+        <div className="mt-2 text-slate-500 space-y-0.5">
+          {summary.unmeasuredTurns > 0 && (
+            <div>{excludedLine(summary.unmeasuredTurns, 'no token counts recorded')}</div>
+          )}
+          {summary.unpricedTurns > 0 && (
+            <div>{excludedLine(summary.unpricedTurns, 'unknown model pricing')}</div>
+          )}
         </div>
       )}
     </div>
   )
+}
+
+/**
+ * The two exclusion causes read identically in the UI but mean different
+ * things — an unfinished turn vs. a model the catalog has no price for.
+ * Reporting both as "unknown model pricing" sent people to the model picker
+ * to fix a turn that had simply errored.
+ */
+function excludedLine(count: number, reason: string): string {
+  return `${count} turn${count === 1 ? '' : 's'} excluded — ${reason}`
 }

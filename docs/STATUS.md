@@ -8,7 +8,7 @@
 
 ## Version
 
-Current: v0.6.0
+Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
 Last commit: c9f37fb — 2026-09-20
 Last commit message: feat: ship a no-key demo tree, seeded on first run
 Merged to `main` as a four-commit v0.6.0 series (test fix · feature · two doc syncs).
@@ -59,7 +59,9 @@ Merged to `main` as a four-commit v0.6.0 series (test fix · feature · two doc 
 - [ ] 200-node performance pass
 - [ ] Pill labels truncated twice, low contrast off-path (`notes/node-labels-research.md` §2–3)
 - [ ] No hover detail on a pill — `NodeToolbar` mount plan written (`notes/node-labels-research.md` §4)
-- [ ] **OpenRouter never reports token usage** — `usage: { include: true }` has no effect (deprecated param); every real OpenRouter turn's cost receipt reads `$0.0000`. Found 2026-09-12, not yet fixed. See "Next Actions" — and note the demo tree now makes it worse by contrast: its receipt is populated, so a visitor's first real turn reads as a regression.
+- [x] ~~**OpenRouter never reports token usage**~~ — **withdrawn 2026-09-20; the record was wrong, not the client.** Usage arrives unasked in the final SSE frame and `streamingClient` already parses (`:83`) and flushes (`:106`) it. Verified live: a real `deepseek/deepseek-v4-flash-0731` turn reports `1,701 in · 1,996 out · $0.0002`; tree receipt `$0.0025` vs `$0.0042` linear, 42% saved. No code change. Open only as an enhancement — the same frame carries `usage.cost`, `cached_tokens` and `reasoning_tokens` (ROADMAP, Carried debt).
+- [x] Cost receipt mislabelled *why* a turn was excluded — a turn with no recorded tokens (errored / cancelled) read as "unknown model pricing". `treeCostSummary` now reports `unmeasuredTurns` separately (2026-09-20).
+- [ ] **The linear-thread counterfactual is an unlabelled estimate** — actual uses provider-reported tokens, the counterfactual uses `text.length / 4` (`treeCost.ts:14`) and assumes no prompt caching. Two rulers, and the headline is their difference. Label it before refining the math.
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop at the next schema bump (folded into the v6 persona-library migration)
 - [x] Read-hook `--max-tokens` raised 800 → 3000 (2026-09-20).
 - [x] `Read`-over-`Bash` read policy added to `CLAUDE.md` (2026-09-20). Verified
@@ -71,12 +73,15 @@ Merged to `main` as a four-commit v0.6.0 series (test fix · feature · two doc 
 
 ## Active Blockers
 
-None launch-blocking, but one demo-credibility issue is now sharper: **the cost
-receipt reads $0.0000 on every real OpenRouter turn** (Ollama was always $0 by
-design — this is new and affects the paid path). See Carried debt above. The demo
-tree is unaffected — its numbers are derived from canned text and priced off
-`BUNDLED_CATALOG` — which means a visitor who adds their own key watches a working
-receipt go to zero. That asymmetry is the argument for fixing it before launch.
+**None.** The one that stood here — "the cost receipt reads $0.0000 on every real
+OpenRouter turn" — was withdrawn on 2026-09-20 after being checked against a live
+tree. It was never true of the shipped client; the debt entry recorded a fix for a
+parameter OpenRouter had already deprecated, and nobody re-ran the observation with
+a key. Real turns report real tokens and real dollars.
+
+What remains is a credibility question, not a defect: the receipt's *actual* line is
+measured, its *linear thread* line is an estimate, and the UI draws them identically.
+See Carried debt.
 
 Phases 1–2 cleared the shipping blockers and built the deep-context arbitration
 demo; Phase 3's catalog work and the no-key demo tree are done. What's left of
@@ -86,13 +91,15 @@ Phase 3 is the static deploy and honest onboarding copy.
 
 ## Next Actions (priority order)
 
-1. Fix the OpenRouter usage-reporting gap so the cost receipt shows real numbers
-   on real API calls, not just the demo tree's derived ones. Now the most visible
-   defect a visitor can find: the demo's receipt works, theirs won't.
-2. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
+1. Label the receipt's linear-thread line as an estimate, and footnote the
+   no-prompt-caching assumption. Cheapest credibility fix available; the arithmetic
+   can be sharpened later.
+2. Pill labels — truncation and off-path contrast (`notes/node-labels-research.md`
+   §2–3). Pure Tailwind / pure-function work, and the canvas is in every screenshot.
+3. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
    (the demo tree it preloads is done — `lib/demoTree.ts`, seeded by `App.tsx`)
-3. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
-4. [Phase 3] One honest line about where data lives, plus an export nudge after real work
+4. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
+5. [Phase 3] One honest line about where data lives, plus an export nudge after real work
 
 ---
 
@@ -163,5 +170,6 @@ throttled Markdown re-parse + memoized cost math — 40 parses/40 tokens down to
 and a fix for a defect where the chat pane blanked the instant any generation
 finished (`selected` now derives from `useSelectionStore` instead of being written
 imperatively in three places). 315 tests across 45 files; `tsc` and `oxlint` clean.
-Surfaced but not yet fixed in this pass: OpenRouter never actually requests usage
-data, so real-provider cost receipts read $0.0000 (see Active Blockers).
+This pass also recorded "OpenRouter never actually requests usage data, so
+real-provider cost receipts read $0.0000". That observation was withdrawn on
+2026-09-20 — see Carried debt.

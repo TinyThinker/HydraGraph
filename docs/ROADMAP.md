@@ -136,10 +136,11 @@ Nothing here ships until Stop-4 evidence says which one matters. See
 
 Investigated but not scheduled: web search / tool calling — API shapes, what the node
 schema can absorb, and the UI decision are written up in
-[`notes/tooling-research.md`](notes/tooling-research.md). That note also corrects the
-`usage: { include: true }` fix recorded under Carried debt below (the parameter is
-deprecated and has no effect). Its proposed `TurnNode.steps[]` schema bump is **v7**,
-not v6 — the persona library above takes v6.
+[`notes/tooling-research.md`](notes/tooling-research.md). That note's §3.4 is what
+retired the "OpenRouter never reports token usage" debt item below — the opt-in
+parameter it recorded as the fix is deprecated, and usage arrives unasked. Its
+proposed `TurnNode.steps[]` schema bump is **v7**, not v6 — the persona library above
+takes v6.
 
 Investigated but not scheduled: **canvas node labels.** An optional `TurnNode.label` +
 `labelSource` pair carries a user-typed branch name or a generated title, with
@@ -172,11 +173,26 @@ line in the cost receipt, and is exactly a Stop-4 decision.
   mounted `NodeToolbar` subscribes to the viewport transform, so 200 of them
   re-render every pan frame and blow the `renderBudget` lock.
   [`notes/node-labels-research.md`](notes/node-labels-research.md) §4.
-- [ ] **OpenRouter never reports token usage.** `streamingClient` parses a `usage`
-  frame but never asks for one (`usage: { include: true }`), so every real
-  OpenRouter turn finalizes at `{0, 0}` and the cost receipt reads `$0.0000`.
-  The streaming test hand-feeds a usage frame, which is why it stayed green.
-  Found 2026-09-12, not yet fixed — this makes the headline feature demo as zeros.
+- [x] ~~**OpenRouter never reports token usage.**~~ **Withdrawn 2026-09-20 — the
+  record was wrong, not the client.** The item claimed every real OpenRouter turn
+  finalized at `{0, 0}`. It does not. OpenRouter deprecated the
+  `usage: { include: true }` / `stream_options: { include_usage: true }` opt-ins and
+  now always sends usage in the final SSE frame; `streamingClient` already parses it
+  (`:83`) and already flushes the last buffered line (`:106`), so nothing was missing.
+  Confirmed on a live tree: a real `deepseek/deepseek-v4-flash-0731` turn reports
+  `1,701 in · 1,996 out · $0.0002`, tree receipt `$0.0025` actual vs `$0.0042` linear,
+  42% saved. No code change. Predicted by
+  [`notes/tooling-research.md`](notes/tooling-research.md) §3.4, which called the
+  recorded fix obsolete but could not re-diagnose without a key.
+  - Still open as an *enhancement*, not a defect: the final frame also carries
+    `usage.cost` (dollars actually charged), `prompt_tokens_details.cached_tokens`
+    and `completion_tokens_details.reasoning_tokens`. Recording `cost` would make the
+    receipt authoritative rather than a client-side reprice. Not launch-blocking.
+- [ ] **The linear-thread counterfactual is an unlabelled estimate.** The actual line
+  uses provider-reported tokens; the counterfactual uses `text.length / 4`
+  (`treeCost.ts:14`) and assumes no prompt caching, no system prompt, and drops
+  excluded turns from the transcript entirely. Two different rulers, and the headline
+  is their difference. Label it as an estimate before the arithmetic gets better.
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop them at
   the next schema bump.
 - [x] **Read-hook `--max-tokens` was too low for this repo's files.** Raised in
