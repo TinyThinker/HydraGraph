@@ -157,15 +157,24 @@ line in the cost receipt, and is exactly a Stop-4 decision.
 - [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).
 - [ ] 200-node performance pass.
-- [ ] **Pill labels are truncated twice and unreadable when dimmed.** `stationSummary`
-  budgets 48 chars; the 240 px pill displays 19–29, so CSS `truncate` silently re-cuts
-  40–60% of every label. The pill is also 61% empty vertically (27.5 px of content in
-  72 px), so a `line-clamp-2` label needs no geometry change. Off-path labels sit at
-  **3.09:1** contrast (WCAG AA needs 4.5:1) and the role label at **1.51:1**. Fan-out
-  siblings share one prompt by construction, so their pills are byte-identical —
-  the disambiguator is `formatModelRef`, not a better summary. Quote-seeded branches
-  label themselves with the parent's prose. All four are pure-function / Tailwind
-  fixes: [`notes/node-labels-research.md`](notes/node-labels-research.md) §2–3.
+- [x] **Pill labels are truncated twice and unreadable when dimmed.** Fixed
+  2026-09-20 — all four defects, per
+  [`notes/node-labels-research.md`](notes/node-labels-research.md) §2–3. Summary is
+  `line-clamp-2` on a 64-char / 12-word budget, so the clamp does the trimming instead
+  of the browser silently re-cutting 40–60% of every label. `pillModelRef` (new, in
+  `formatModelRef.ts`) gives the model its own row whenever a turn departs from the
+  default — the only thing that can ever distinguish fan-out siblings, and O(1) on the
+  node's own fields rather than a node-map scan per pill per commit. A leading
+  blockquote is skipped when the prompt continues below it, so quote-seeded branches
+  label the question rather than the parent's prose. Off-path dimming goes
+  `opacity-40` → `opacity-70` (3.09:1 → 7.46:1) and the role label `slate-500` →
+  `slate-400` (3.75:1 → 6.96:1). All three rows fit the existing 72 px pill (55 px
+  used), so `NODE_HEIGHT` / `H_GAP` / `V_GAP` are untouched and nothing re-lays-out.
+  - Known limit, deliberately accepted: `pillModelRef` compares against the *global*
+    default model, because the tree record is not held in memory (only `submitPrompt`
+    reads it, from Dexie). A tree with its own default model therefore labels every
+    pill rather than none — noisy, not wrong. Fixing it means holding the active tree
+    record in the store, which is a bigger change than the defect warrants.
 - [ ] **No hover detail on a pill.** The only expansion is a double-click into the
   reader panel. `NodeToolbar` is already exported by the installed React Flow and
   renders at constant screen size (legible at `minZoom` 0.2, where the 12 px label

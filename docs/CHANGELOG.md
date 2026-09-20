@@ -10,6 +10,36 @@
 
 ## Unreleased
 
+- **Canvas pill labels are readable, and fan-out siblings are finally
+  distinguishable.** Four fixes from
+  [`notes/node-labels-research.md`](notes/node-labels-research.md) §2–3, none of which
+  touches the store, the layout engine or the schema:
+  - **The double truncation is gone.** `stationSummary` budgeted 48 chars while the
+    pill rendered one `truncate`d line of 19–29, so the browser silently re-cut 40–60%
+    of every label and the user never learned a longer one existed. The summary now
+    renders `line-clamp-2` with a 64-char budget (12 words), and the clamp — the only
+    thing that knows the real width — does the trimming.
+  - **Fan-out siblings show their model.** Siblings are dispatched with a
+    byte-identical prompt by construction, so no summarizer can ever tell them apart;
+    the model is the only fact that differs, and it is what the comparison is about.
+    New `pillModelRef` gives it its own row whenever a turn departs from the default.
+    It reads the node's own fields plus one primitive from settings — a sibling scan
+    would need the node map re-derived for every pill on every store commit, streaming
+    frames included, which is what the render budget exists to prevent. Compact by
+    design: an OpenRouter slug already names its vendor, so the prefix is kept only
+    for `ollama`, where "this ran locally" is the point.
+  - **Quote-seeded branches label the question, not the quote.** Branch-from-selection
+    parks the caret below a `> `-quoted passage, so the prompt's first line is the
+    *parent's* prose — five sibling branches all reading "Pillar N: …". A leading
+    blockquote is now skipped when the prompt continues below it, and kept when it
+    does not (the user has not typed past the seed yet).
+  - **Off-path pills pass WCAG AA.** `opacity-40` composited the label against
+    slate-950 at 3.09:1; `opacity-70` gives 7.46:1, with `saturate-50` still carrying
+    the off-path signal. The role label moves `slate-500` → `slate-400` (3.75:1 →
+    6.96:1), having failed AA even undimmed.
+  - All three rows fit the existing 72px pill — role (12.5) + two summary lines (30) +
+    model (12.5) = 55px, against the 27.5px it used to spend. `NODE_HEIGHT`, `H_GAP`
+    and `V_GAP` are untouched, so nothing re-lays-out.
 - **The cost receipt no longer presents an estimate as a measurement.** The first row
   is measured (provider-reported tokens, catalog prices); the second is modelled — the
   linear thread was never sent, so its size comes from `text.length / 4` and its price

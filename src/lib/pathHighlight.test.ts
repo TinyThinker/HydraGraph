@@ -93,7 +93,7 @@ describe('pillDimClassName', () => {
 
   it('returns the dim class for off-path nodes', () => {
     const set = activePathIds(buildTree(), 'b')!
-    expect(pillDimClassName('b2', set)).toBe('opacity-40 saturate-50 transition-opacity')
+    expect(pillDimClassName('b2', set)).toBe('opacity-70 saturate-50 transition-opacity')
   })
 
   it('returns undefined when there is no active path', () => {

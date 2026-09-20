@@ -47,5 +47,10 @@ export function pillDimClassName(
   active: Set<string> | null,
 ): string | undefined {
   if (active === null || active.has(nodeId)) return undefined
-  return 'opacity-40 saturate-50 transition-opacity'
+  // `opacity-40` composited the label against slate-950 at 3.09:1, below the
+  // 4.5:1 WCAG AA needs — off-path pills were dim to the point of unreadable.
+  // `opacity-70` restores 7.46:1 while `saturate-50` keeps the off-path signal,
+  // and edges dim independently (`INACTIVE_EDGE_STYLE`), carrying most of the
+  // wayfinding weight anyway.
+  return 'opacity-70 saturate-50 transition-opacity'
 }

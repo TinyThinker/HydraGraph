@@ -97,9 +97,9 @@ describe('canvas path highlighting: T3.4', () => {
     expect(b2El).not.toBeNull()
     expect(aEl).not.toBeNull()
     // off-path -> dimmed
-    expect(b2El?.classList.contains('opacity-40')).toBe(true)
+    expect(b2El?.classList.contains('opacity-70')).toBe(true)
     // on-path -> not dimmed
-    expect(aEl?.classList.contains('opacity-40')).toBe(false)
+    expect(aEl?.classList.contains('opacity-70')).toBe(false)
 
     unmount()
   })

@@ -57,7 +57,7 @@ Merged to `main` as a four-commit v0.6.0 series (test fix · feature · two doc 
 - [ ] Edit a submitted prompt (not just regenerate)
 - [x] Throttle the chat pane's Markdown re-parse — 40 parses per 40 tokens → 6 (v0.5.1)
 - [ ] 200-node performance pass
-- [ ] Pill labels truncated twice, low contrast off-path (`notes/node-labels-research.md` §2–3)
+- [x] Pill labels truncated twice, low contrast off-path — **fixed 2026-09-20.** Two-line summary on a 64-char budget (`line-clamp-2` does the trimming, not the browser); `pillModelRef` gives fan-out siblings their model on its own row; quote-seeded branches label the question, not the quoted passage; off-path dim `opacity-40` → `opacity-70` (3.09:1 → 7.46:1); role label `slate-500` → `slate-400` (3.75:1 → 6.96:1). All three rows fit the existing 72 px pill — no geometry or layout change. (`notes/node-labels-research.md` §2–3)
 - [ ] No hover detail on a pill — `NodeToolbar` mount plan written (`notes/node-labels-research.md` §4)
 - [x] ~~**OpenRouter never reports token usage**~~ — **withdrawn 2026-09-20; the record was wrong, not the client.** Usage arrives unasked in the final SSE frame and `streamingClient` already parses (`:83`) and flushes (`:106`) it. Verified live: a real `deepseek/deepseek-v4-flash-0731` turn reports `1,701 in · 1,996 out · $0.0002`; tree receipt `$0.0025` vs `$0.0042` linear, 42% saved. No code change. Open only as an enhancement — the same frame carries `usage.cost`, `cached_tokens` and `reasoning_tokens` (ROADMAP, Carried debt).
 - [x] Cost receipt mislabelled *why* a turn was excluded — a turn with no recorded tokens (errored / cancelled) read as "unknown model pricing". `treeCostSummary` now reports `unmeasuredTurns` separately (2026-09-20).
@@ -93,12 +93,10 @@ Phase 3 is the static deploy and honest onboarding copy.
 
 ## Next Actions (priority order)
 
-1. Pill labels — truncation and off-path contrast (`notes/node-labels-research.md`
-   §2–3). Pure Tailwind / pure-function work, and the canvas is in every screenshot.
-2. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
+1. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
    (the demo tree it preloads is done — `lib/demoTree.ts`, seeded by `App.tsx`)
-3. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
-4. [Phase 3] One honest line about where data lives, plus an export nudge after real work
+2. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
+3. [Phase 3] One honest line about where data lives, plus an export nudge after real work
 
 ---
 

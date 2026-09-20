@@ -6,6 +6,15 @@
 > If this work is adopted, boxes go in [`../ROADMAP.md`](../ROADMAP.md); this note is
 > updated only when the findings themselves change.
 
+> **Status, 2026-09-20.** §3 (Layer 1) has **shipped** — all four defects in §2.1,
+> §2.3, §2.4 and §2.5 are fixed; see CHANGELOG § Unreleased. Two deviations from the
+> design below, both deliberate: the model row is a compact `pillModelRef` rather than
+> raw `formatModelRef`, which would render `openrouter/anthropic/claude-3.7-sonnet` and
+> be truncated by the very defect it fixes; and the summary keeps *both* lines when the
+> model row is present, because role + 2 lines + model is 55 px of the pill's 72, so
+> §3.2's either/or was unnecessarily conservative. §4 (hover card) and §5 (real titles)
+> are untouched and still open.
+
 **Revision:** 1 — 2026-09-12
 **Assessed against:** branch `feat/branch-on-selection-and-streaming-perf` at `fc82dc7`
 **Measured, not estimated:** contrast ratios are computed with the WCAG 2.1

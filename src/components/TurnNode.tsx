@@ -12,9 +12,11 @@ import {
   History,
 } from 'lucide-react'
 import { useTreeStore, collectSubtreeIds } from '../store/useTreeStore'
+import { useSettingsStore } from '../store/settingsStore'
 import { useReaderPanel } from './useReaderPanel'
 import { useRenderTally } from '../lib/renderTally'
 import { stationSummary } from '../lib/stationSummary'
+import { pillModelRef } from '../lib/formatModelRef'
 import { PillActions } from './PillActions'
 import type { TurnNodeData } from '../types'
 
@@ -45,6 +47,7 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({
   useRenderTally(data.id)
   const liveText = useTreeStore((s) => s.liveText.get(data.id))
   const openReader = useReaderPanel((s) => s.open)
+  const defaultModel = useSettingsStore((s) => s.settings.defaultModel)
   const toggleCollapse = useTreeStore((s) => s.toggleCollapse)
   const hiddenCount = useTreeStore((s) =>
     data.isCollapsed || data.childrenIds.length > 0
@@ -54,6 +57,9 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({
 
   const roleLabel =
     data.parentId === null ? 'Root' : data.userPrompt.trim() ? 'You' : 'Assistant'
+  // A primitive selector on purpose: settings change rarely, so this does not
+  // re-run 200 pills on every store commit the way a node-map read would.
+  const modelRef = pillModelRef(data, defaultModel)
   const branchCount = data.childrenIds.length
   const showCollapse = data.isCollapsed || branchCount > 0
 
@@ -70,11 +76,25 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({
       <RoleIcon data={data} />
 
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+        {/* slate-500 failed AA even undimmed (3.75:1); slate-400 gives 6.96:1. */}
+        <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
           <span>{roleLabel}</span>
           {data.stale && <History size={10} className="text-amber-400" />}
         </div>
-        <div className="truncate text-xs text-slate-200">{stationSummary(data)}</div>
+        {/* The pill is 72px tall and spent 27.5px of it, so the extra rows are
+            free: role (12.5) + two summary lines (30) + model (12.5) = 55px,
+            with no geometry, layout-constant or re-layout change. `line-clamp-2`
+            does the final trimming, which is the only place that knows the
+            real width. */}
+        <div className="line-clamp-2 text-xs text-slate-200">{stationSummary(data)}</div>
+        {/* Fan-out siblings carry a byte-identical prompt by construction, so
+            no summarizer can tell them apart — the model is the only fact that
+            differs, and it is what the comparison is about. */}
+        {modelRef && (
+          <div className="truncate text-[10px] text-slate-400" title={modelRef}>
+            {modelRef}
+          </div>
+        )}
       </div>
 
       {branchCount > 1 && (
