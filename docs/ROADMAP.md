@@ -81,8 +81,19 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
   spread.
   - The demo tree's cost receipt (below) depends on these real prices, and the
     bundled snapshot is the catalog the no-key demo runs against.
-- [ ] Demo tree shipped with the app: canned responses, no key required, fully
+- [x] Demo tree shipped with the app: canned responses, no key required, fully
   explorable, receipt already showing numbers.
+  - `lib/demoContent.ts` (transcript) + `lib/demoTree.ts` (`buildDemoTree`,
+    `DEMO_TREE_ID`). 16 turns, 4 forks, trunk 8 deep: a 3-model fan-out on one
+    identical question, a 3-persona fan-out on one DDL, and two late branches that
+    reach back to early turns. Seeded on first run by `App.tsx`; re-seedable and
+    idempotent via `useTreeStore.seedDemoTree()` / "Reset demo tree".
+  - Receipt: **$0.1794 vs $0.2545 linear, 29% saved**, 0 unpriced turns — token
+    counts derived from the canned text via `resolveContextPayload`, priced against
+    `BUNDLED_CATALOG` so it holds with no key and no network.
+  - No demo branch in the streaming / dispatch / pricing / export paths; the demo is
+    ordinary rows. The only UI concession is `ProviderBanner`, which explains rather
+    than warns while the demo is open.
 - [ ] Static deploy; the landing page *is* the app with the demo preloaded.
 - [ ] Key setup in three steps with a live connection test; document the Ollama
   `OLLAMA_ORIGINS` gotcha where people hit it.

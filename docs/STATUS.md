@@ -2,15 +2,16 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-09-19
+> Last synced: 2026-09-20
 
 ---
 
 ## Version
 
-Current: v0.5.1
-Last commit: fc82dc7 — 2026-09-12 04:11 -0700
-Last commit message: feat: branch from a selected passage; throttle streaming Markdown; fix selection wipe
+Current: v0.6.0
+Last commit: 303e8eb — 2026-09-20
+Last commit message: docs: raise read-hook token budget, prefer Read over Bash, confirm fix live
+(v0.6.0 — the no-key demo tree — is in the working tree, not yet committed.)
 
 ---
 
@@ -34,7 +35,7 @@ Last commit message: feat: branch from a selected passage; throttle streaming Ma
 
 ### Phase 3 — The front door (days 10–12)
 - [x] OpenRouter + Ollama are the only providers (native Gemini removed; Dexie v5 remaps old `gemini` rows to `google/*` slugs); live OpenRouter `/api/v1/models` price catalog (IndexedDB-cached, 1 h TTL, bundled snapshot fallback); searchable priced model pickers replace hand-typed ids in reader panel / fan-out / Settings; one provider-linked credential field; fan-out cheap→frontier price-tier spread
-- [ ] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers
+- [x] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers — 16 turns / 4 forks, seeded on first run, priced off `BUNDLED_CATALOG` ($0.1794 vs $0.2545 linear, 29% saved)
 - [ ] Static deploy; the landing page is the app with the demo preloaded
 - [ ] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
 - [ ] One honest line about where data lives, plus an export nudge after real work
@@ -58,7 +59,7 @@ Last commit message: feat: branch from a selected passage; throttle streaming Ma
 - [ ] 200-node performance pass
 - [ ] Pill labels truncated twice, low contrast off-path (`notes/node-labels-research.md` §2–3)
 - [ ] No hover detail on a pill — `NodeToolbar` mount plan written (`notes/node-labels-research.md` §4)
-- [ ] **OpenRouter never reports token usage** — `usage: { include: true }` has no effect (deprecated param); every real OpenRouter turn's cost receipt reads `$0.0000`. Found 2026-09-12, not yet fixed. See "Next Actions" — this undercuts the headline demo.
+- [ ] **OpenRouter never reports token usage** — `usage: { include: true }` has no effect (deprecated param); every real OpenRouter turn's cost receipt reads `$0.0000`. Found 2026-09-12, not yet fixed. See "Next Actions" — and note the demo tree now makes it worse by contrast: its receipt is populated, so a visitor's first real turn reads as a regression.
 - [ ] `TurnNode.width` / `height` are vestigial since fixed-size pills — drop at the next schema bump (folded into the v6 persona-library migration)
 - [x] Read-hook `--max-tokens` raised 800 → 3000 (2026-09-20).
 - [x] `Read`-over-`Bash` read policy added to `CLAUDE.md` (2026-09-20). Verified
@@ -70,23 +71,28 @@ Last commit message: feat: branch from a selected passage; throttle streaming Ma
 
 ## Active Blockers
 
-None launch-blocking, but one demo-credibility issue: **the cost receipt reads
-$0.0000 on every real OpenRouter turn** (Ollama was always $0 by design — this is
-new and affects the paid path). See Carried debt above. Phases 1–2 cleared the
-shipping blockers and built the deep-context arbitration demo; Phase 3's catalog
-work is done. What's left of Phase 3 is the front door — a no-key demo tree,
-static deploy, and honest onboarding copy.
+None launch-blocking, but one demo-credibility issue is now sharper: **the cost
+receipt reads $0.0000 on every real OpenRouter turn** (Ollama was always $0 by
+design — this is new and affects the paid path). See Carried debt above. The demo
+tree is unaffected — its numbers are derived from canned text and priced off
+`BUNDLED_CATALOG` — which means a visitor who adds their own key watches a working
+receipt go to zero. That asymmetry is the argument for fixing it before launch.
+
+Phases 1–2 cleared the shipping blockers and built the deep-context arbitration
+demo; Phase 3's catalog work and the no-key demo tree are done. What's left of
+Phase 3 is the static deploy and honest onboarding copy.
 
 ---
 
 ## Next Actions (priority order)
 
 1. Fix the OpenRouter usage-reporting gap so the cost receipt shows real numbers
-   on real API calls, not just against the bundled demo catalog.
-2. [Phase 3] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers (runs against `BUNDLED_CATALOG`)
-3. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
-4. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
-5. [Phase 3] One honest line about where data lives, plus an export nudge after real work
+   on real API calls, not just the demo tree's derived ones. Now the most visible
+   defect a visitor can find: the demo's receipt works, theirs won't.
+2. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
+   (the demo tree it preloads is done — `lib/demoTree.ts`, seeded by `App.tsx`)
+3. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
+4. [Phase 3] One honest line about where data lives, plus an export nudge after real work
 
 ---
 
@@ -130,7 +136,26 @@ static deploy, and honest onboarding copy.
 
 ---
 
-## Last Built (v0.5.1 — 2026-09-12)
+## Last Built (v0.6.0 — 2026-09-20)
+
+The no-key demo tree. An empty browser now boots into a 16-turn metrics-pipeline
+design session (`lib/demoContent.ts` + `lib/demoTree.ts`, seeded by `App.tsx`) —
+4 forks, trunk 8 deep, a 3-model fan-out on one identical question, a 3-persona
+fan-out on one DDL, and two late branches back to early turns. Token counts are
+derived from the canned text through the real `resolveContextPayload`, priced off
+`BUNDLED_CATALOG`, so with no key and no network the receipt reads **$0.1794 vs
+$0.2545 linear — 29% saved, 0 unpriced turns**. Nothing in the streaming, dispatch,
+pricing or export paths special-cases the demo; the only UI concession is
+`ProviderBanner`, which explains instead of warning while the demo is open (and
+trims `HeaderBar` back under 150 lines). `seedDemoTree()` is idempotent on fixed
+ids, with "Reset demo tree" in the switcher as the way back. New `firstRun.test.tsx`
+boots the real `<App/>` offline and asserts what a stranger sees. 337 tests across
+49 files; `tsc` and `oxlint` clean. Also fixed one test that was already red on
+`main` (`selectionSurvivesFinalize` waited 30 ms for a 100 ms Markdown throttle).
+
+---
+
+## Previously (v0.5.1 — 2026-09-12)
 
 Branch from a selected passage (`SelectionBranchButton` + `useTextSelection`, draft
 moved into `useComposerStore`), a streaming-performance pass (token coalescing +

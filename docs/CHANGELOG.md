@@ -8,6 +8,51 @@
 
 ---
 
+## v0.6.0 — 2026-09-20 — The no-key demo tree
+
+Removes the cold-start tax: an empty browser now lands on a real 16-turn research
+session instead of an empty canvas, with no API key, no network, and a cost receipt
+already showing dollars. 337 tests across 49 files; `tsc` and `oxlint` clean.
+
+- **Demo tree shipped with the app.** `src/lib/demoContent.ts` holds the canned
+  transcript — a metrics-pipeline design session, 16 turns, 4 forks, trunk 8 deep —
+  and `src/lib/demoTree.ts` (`buildDemoTree(now?)`, `DEMO_TREE_ID`, `isDemoTree`)
+  turns it into ordinary `TurnNode` / `ConversationTree` rows: children derived from
+  `parentId`, positions from the real `layoutTree`, viewport left unset so
+  `CanvasViewport` fits the whole tree on open. No special-casing anywhere in the
+  streaming, dispatch, pricing or export paths — the demo is just rows, which is what
+  makes it fully explorable (read, branch, compare, export, delete).
+- **The receipt is arithmetic, not decoration.** `inputTokens` is the same ~4
+  chars/token estimate over the same resolved context the real dispatch path would
+  have sent (`resolveContextPayload`, persona overrides included); `outputTokens` is
+  the response text. Every model used is in `BUNDLED_CATALOG`, so prices resolve with
+  no key and no network: **16 turns, $0.1794 actual vs $0.2545 as one linear thread —
+  29% saved**, 0 turns excluded. Enforced by tests rather than by hand.
+- **What the demo teaches, in the tree's shape.** A 3-way fan-out at turn 5 asks the
+  identical question of Llama 3.3 70B, GPT-4o and Claude 3.7 Sonnet — the cheap model
+  hedges, the frontier model catches the 40%-of-volume tenant the others miss — then
+  the losing branches stay on the canvas. A second fan-out runs three personas
+  (Skeptic / Security Auditor / Performance Engineer, the real `PERSONA_PRESETS`) on
+  one DDL at the same model. Two late branches reach back to turn 2 and turn 3, which
+  is where the branch-vs-linear gap comes from.
+- **First run lands on it.** `App.tsx` boot seeds the demo when the database is empty
+  (was: an empty "New Research" tree). `useTreeStore.seedDemoTree()` is idempotent —
+  fixed ids, so re-seeding replaces the rows and never duplicates them — and
+  "Reset demo tree" in the tree switcher is the way back after poking at it.
+  A visitor's own trees are never touched.
+- **No scary banner over canned data.** The provider strip moved to
+  `src/components/ProviderBanner.tsx`: on the demo tree with no key it explains what
+  you're looking at and offers "Add a key"; on your own tree the amber warning is
+  unchanged; with a provider configured it renders nothing. Also trims `HeaderBar`
+  back under the 150-line rule.
+- **First-run smoke test.** `src/firstRun.test.tsx` boots the real `<App/>` against a
+  fresh IndexedDB with no key and `fetch` stubbed to fail, then asserts the demo
+  renders, the calm banner shows, and the receipt reports real dollars — the landing
+  page path, end to end.
+- **Fixed: one pre-existing red test.** `selectionSurvivesFinalize.test.tsx` waited
+  30 ms for mid-stream text that v0.5.1's `MARKDOWN_THROTTLE_MS` releases at 100 ms.
+  Unrelated to the demo; the suite was red on `main` before this change.
+
 ## v0.5.1 — 2026-09-12 — Branch on a passage; streaming perf; the selection-wipe bug
 
 Three changes: one feature, one performance pass, one defect. The defect is the

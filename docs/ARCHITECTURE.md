@@ -614,6 +614,32 @@ addNode / deleteNodeSubtree / relayoutActiveTree
 
 `layoutTree()` picks the root as the `parentId === null` node with the earliest `timestamp`, builds the `d3.hierarchy` manually (not via `stratify`) with a `seen` set so cycles and dangling child pointers cannot hang the walk, lays out with `nodeSize([NODE_WIDTH + 64, NODE_HEIGHT + 90])`, converts to top-left coordinates, and normalises the minimum x/y to a fixed 40 px margin. Orphans unreachable from the root keep their previous coordinates. Only `relayoutActiveTree` bumps `fitViewNonce`; ordinary spawns and deletes re-layout without yanking the viewport.
 
+### 5.6 First-Run Seeding (the no-key demo tree)
+
+`App.tsx` boot order is: load settings → kick off the catalog refresh (not awaited) → load all trees → open one. The third branch of that last step is the demo: **remembered tree → any existing tree → `seedDemoTree()`**. An empty database therefore lands on a populated tree rather than an empty canvas, with no key and no network.
+
+```
+lib/demoContent.ts          DEMO_TURNS[] — canned prompts/responses, per-turn model,
+        │                    persona strings taken from PERSONA_PRESETS
+        ▼
+lib/demoTree.ts             buildDemoTree(now?) — pure, no store, no Dexie
+        │                    childrenIds ← parentId · positions ← layoutTree()
+        │                    inputTokens ← resolveContextPayload(…).length / 4
+        │                    outputTokens ← response.length / 4
+        ▼
+useTreeStore.seedDemoTree()  one 'rw' transaction: delete rows for DEMO_TREE_ID,
+        │                    put tree, bulkAdd nodes → loadTree()
+        ▼
+ProviderBanner              isDemoTree(activeTreeId) && no provider configured
+                             → explainer, not the amber warning
+```
+
+Three properties worth preserving:
+
+- **The demo is ordinary rows.** Nothing in `submitPrompt`, `streamingClient`, `pricing`, `treeCost` or `treeExport` knows it exists, which is why it is fully explorable — a visitor can read, branch, compare, regenerate, export or delete it like any tree. `DEMO_TREE_ID` is read in exactly one place outside the seeder (`ProviderBanner`).
+- **Its receipt is arithmetic over its own text**, computed with the real `resolveContextPayload` (persona overrides included) and priced against `BUNDLED_CATALOG`, so every model referenced in `demoContent.ts` must exist in that snapshot. `demoTree.test.ts` fails if one doesn't.
+- **Seeding is idempotent on fixed ids** (`demo-*`), so re-seeding — first run, or "Reset demo tree" in the switcher — replaces rows instead of accumulating copies, and never touches the visitor's own trees. The tree record deliberately omits `viewportX/Y/Zoom` so `CanvasViewport` falls back to `fitView()` and a first-time visitor sees the whole tree.
+
 ## 6. Execution Strategy & Delivered Build Status
 
 The original plan was a Targeted MVP (Phases 1–3) followed by Post-MVP Enhancements (Phase 4). All four are implemented. A subsequent POC-enhancement track (archived under `docs/archive/2026-08_poc-enhancements/`) then reshaped the UI from a single-pane card canvas into the dual-pane subway layout described in §4. The condensed shipping history is in [`CHANGELOG.md`](CHANGELOG.md).
