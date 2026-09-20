@@ -49,6 +49,16 @@ already showing dollars. 337 tests across 49 files; `tsc` and `oxlint` clean.
   fresh IndexedDB with no key and `fetch` stubbed to fail, then asserts the demo
   renders, the calm banner shows, and the receipt reports real dollars — the landing
   page path, end to end.
+- **README and SETUP brought current.** Both still documented native Gemini as a
+  provider (removed in v0.5.0) and a per-node model badge in the node footer (deleted
+  in Phase 1 with `NodeFooter`) — the first two documents a stranger reads described a
+  build from two releases ago. `SETUP.md` now covers the no-key demo tree and how to
+  get it back, the real three-control Settings modal, dispatch precedence, the
+  node-level model/persona controls in the reader panel, fan-out + compare, the
+  OpenRouter `$0.0000` gap where someone will hit it, and the non-obvious rule that
+  Ollama only counts as configured once its URL moves off the localhost default.
+  `README.md`'s feature list gains the Phase 2 work it never mentioned (fan-out,
+  compare, cost receipts, branch-from-a-passage) and leads with the demo.
 - **Fixed: one pre-existing red test.** `selectionSurvivesFinalize.test.tsx` waited
   30 ms for mid-stream text that v0.5.1's `MARKDOWN_THROTTLE_MS` releases at 100 ms.
   Unrelated to the demo; the suite was red on `main` before this change.

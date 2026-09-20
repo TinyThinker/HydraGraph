@@ -43,11 +43,14 @@ Each branch maintains a clean, isolated context stack. Deep dives stay deep with
 
 - **Spatial canvas** — a "subway map" of compact station-pill nodes with deterministic auto-layout; pan and zoom to navigate
 - **Dual pane** — canvas for wayfinding on the left, a linear chat stream for reading and composing on the right
-- **Branching** — submit a prompt to fork a child off any turn; edges visualize ancestry, the active path is highlighted
+- **Branching** — submit a prompt to fork a child off any turn; edges visualize ancestry, the active path is highlighted. Or highlight a passage inside any response and branch straight from it, quote included
 - **Context isolation** — each API call compiles only the direct ancestor chain
-- **Cascading system prompts** — set a persona at any node; all descendants inherit it unless overridden
+- **Fan-out** — one prompt, N branches from identical ancestry, a different model or persona each, dispatched in parallel
+- **Compare** — selected siblings column by column, with the shared-context guarantee (same N turns, same ~N tokens) stated on screen
+- **Cost receipts** — per-turn and per-tree dollars from a live OpenRouter price catalog, against the counterfactual: what the same turns would have cost as one linear thread that re-sends everything. "Context you didn't pay for"
+- **Personas** — set a system prompt at any node (presets included); all descendants inherit it unless overridden
 - **Local-first / BYOK** — all data in browser IndexedDB, your API key never leaves your machine
-- **Multi-provider** — stream token-by-token from Gemini, OpenRouter, or a local Ollama instance
+- **Two providers, every model** — OpenRouter (so GPT, Claude, Gemini, DeepSeek, Llama… as `vendor/model` slugs) or a local Ollama instance, streaming token-by-token
 - **Workspace** — multiple trees, full-text search with fly-to, JSON export/import, per-tree viewport, keyboard navigation
 - **Session restore** — reopen the browser and pick up exactly where you left off
 
@@ -63,7 +66,7 @@ Each branch maintains a clean, isolated context stack. Deep dives stay deep with
 | Storage | [Dexie.js](https://dexie.org) v4 (IndexedDB) |
 | Layout | [d3-hierarchy](https://github.com/d3/d3-hierarchy) v3 |
 | Styling | Tailwind CSS v4 |
-| LLM | Gemini API (Google AI Studio) · OpenRouter · Ollama (local) |
+| LLM | OpenRouter (GPT · Claude · Gemini · DeepSeek · Llama as `vendor/model` slugs) · Ollama (local) |
 
 ---
 
@@ -74,7 +77,15 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`, click the gear icon to pick a provider and enter your key, and start a tree.
+Open `http://localhost:5173`. **No API key needed to look around** — a first load seeds
+a shipped demo tree: a 16-turn research session with canned responses, a three-model
+fan-out on one identical question, a three-persona review of one piece of DDL, and a
+cost receipt already showing real dollars (`$0.1794` for the branched tree vs `$0.2545`
+as one linear thread). Read it, compare the siblings, export it, delete it — it is
+ordinary data, not a slideshow.
+
+To run your own prompts, click the gear icon, pick a provider and enter a key. Already
+have trees in this browser and want the demo? Tree switcher → **Reset demo tree**.
 
 For provider configuration, the Ollama `OLLAMA_ORIGINS` gotcha, and the full script list, see **[`docs/SETUP.md`](docs/SETUP.md)**.
 

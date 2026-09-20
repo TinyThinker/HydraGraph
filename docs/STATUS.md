@@ -9,9 +9,10 @@
 ## Version
 
 Current: v0.6.0
-Last commit: 303e8eb — 2026-09-20
-Last commit message: docs: raise read-hook token budget, prefer Read over Bash, confirm fix live
-(v0.6.0 — the no-key demo tree — is in the working tree, not yet committed.)
+Last commit: c9f37fb — 2026-09-20
+Last commit message: feat: ship a no-key demo tree, seeded on first run
+Branch: `feat/no-key-demo-tree` — three commits ahead of `main`, not yet merged.
+Land with `git checkout main && git merge --ff-only feat/no-key-demo-tree`.
 
 ---
 
