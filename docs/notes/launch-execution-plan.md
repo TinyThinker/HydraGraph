@@ -442,5 +442,17 @@ file so the next session knows where to start.
       last holdout was Cloudflare's edge-injected analytics beacon, stopped by
       `Cache-Control: no-transform` (A8) after the dashboard turned out to have no
       toggle for it. **Phase A is closed. Phase B is next.**
-- [ ] Phase B — Key hardening
+- [x] **Phase B — done 2026-09-21.** `KeyGuidance.tsx` (new) carries all three pieces of
+      copy, the destination-host line, and "Forget key"; `forgetApiKey` in
+      `settingsStore` deletes the key from the Dexie row. The banner returning with no
+      extra wiring (B4) was verified, not assumed — a test forgets the key with
+      `ProviderBanner` mounted and watches it reappear. `npm run check` green at **378
+      tests / 52 files**; `SettingsModal` 142 lines, `SettingsCredentialField` 120.
+      Verified in the browser as well as the test DOM. One thing the screenshot caught
+      that the tests could not: the guidance first rendered as a *sibling* of the
+      credential field, which put "Refresh prices" between the key input and the advice
+      about the key. It now passes through a `guidance` slot on
+      `SettingsCredentialField`, rendered straight after the input, with a DOM-order
+      test pinning it there.
+      **Phase C is next, and it runs in a different repo.**
 - [ ] Phase C — The hub at `tinythinkerlabs.dev` (separate repo)

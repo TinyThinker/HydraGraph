@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { MaskedInput } from './MaskedInput'
 import { useCatalogStore } from '../store/catalogStore'
 import type { LLMProvider } from '../types'
@@ -25,6 +25,12 @@ interface SettingsCredentialFieldProps {
   openRouterBaseUrl: string
   ollamaBaseUrl: string
   onChange: (field: CredentialField, value: string) => void
+  /**
+   * Slot rendered directly under the key input, so nothing sits between pasting
+   * a key and being told what to do with it. Dropped on the Ollama branch,
+   * which has no key to guide.
+   */
+  guidance?: ReactNode
 }
 
 /**
@@ -39,6 +45,7 @@ export function SettingsCredentialField({
   openRouterBaseUrl,
   ollamaBaseUrl,
   onChange,
+  guidance,
 }: SettingsCredentialFieldProps) {
   const [showKey, setShowKey] = useState(false)
   const source = useCatalogStore((s) => s.source)
@@ -74,6 +81,8 @@ export function SettingsCredentialField({
         showPassword={showKey}
         onToggleShow={() => setShowKey((s) => !s)}
       />
+
+      {guidance}
 
       <details>
         <summary className="cursor-pointer text-xs font-medium text-slate-400">Advanced</summary>

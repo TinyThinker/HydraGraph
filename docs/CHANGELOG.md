@@ -10,6 +10,27 @@
 
 ## Unreleased
 
+- **Nobody pastes a key now without being told what it costs them if it leaks**
+  (2026-09-21). A new `KeyGuidance` component under the OpenRouter credential field
+  says three things and no more: OpenRouter shows the key once so save it in a password
+  manager; use a dedicated key with a spend limit (blast radius is the control, not
+  secrecy — link straight to OpenRouter's key settings); this is an early build, the key
+  lives in this browser and the trees live only on this machine. It also names the host
+  the key will be sent to — `openRouterBaseUrl` is user-editable and decides where the
+  `Authorization` header goes, and nothing in the UI said so (V7). Anything other than
+  `openrouter.ai`, including a value that doesn't parse as a URL, is called out in amber
+  as non-default. **"Forget key"** sits beside it whenever a key is stored: a new
+  `forgetApiKey` store action deletes the property from the persisted Dexie row rather
+  than blanking it, and the provider banner comes back on its own because
+  `configuredProviders` already derives from the key — verified by test, no extra wiring.
+  The read path (`streamingClient` auth header, `configuredProviders`) is untouched.
+  Guidance lives in its own file so `SettingsModal` (142) and `SettingsCredentialField`
+  (120) both stay under the 150-line cap; it reaches the DOM through a `guidance` slot
+  on `SettingsCredentialField` rather than as a sibling, so nothing — in particular the
+  "Refresh prices" row — sits between pasting a key and being told what to do with it.
+  The Ollama branch drops the slot, which is what keeps the guidance OpenRouter-only.
+  378 tests across 52 files; `tsc` and `oxlint` clean. Phase B of the launch plan is
+  closed, and the modal was eyeballed in the browser, not only in the test DOM.
 - **The app is live at `https://hydragraph.tinythinkerlabs.dev`** (2026-09-21, Cloudflare
   Pages). The CSP, `X-Robots-Tag: noindex` and `Referrer-Policy: no-referrer` are all
   present on the live response, the demo seeds cold into 16 turns / 4 forks, the receipt

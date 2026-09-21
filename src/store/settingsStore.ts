@@ -47,6 +47,9 @@ interface SettingsStoreActions {
   setActiveTreeId: (treeId: string) => Promise<void>
   // Empty string clears the key (stored as undefined).
   setApiKey: (provider: 'openrouter', key: string) => Promise<void>
+  // Wipe the OpenRouter key and nothing else — the property is removed from the
+  // persisted row, not left behind as `undefined`.
+  forgetApiKey: () => Promise<void>
   setBaseUrl: (provider: 'ollama' | 'openrouter', url: string) => Promise<void>
   // Omit `provider` to set the global fallback model; pass one to set that
   // provider's default without touching the others.
@@ -89,6 +92,13 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setApiKey: async (_provider, key) => {
     const value = key.trim() || undefined
     await get().updateSettings({ openRouterApiKey: value })
+  },
+
+  forgetApiKey: async () => {
+    const next: AppSettings = { ...get().settings, id: 'global_settings' }
+    delete next.openRouterApiKey
+    await db.settings.put(next)
+    set({ settings: next })
   },
 
   setBaseUrl: async (provider, url) => {

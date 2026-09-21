@@ -150,6 +150,9 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
       Warn at the point of entry to save it in a password manager; recommend a
       dedicated key with a spend limit (blast radius, not secrecy, is the control);
       add a "Forget key" control; show which host the key will be sent to.
+      **Shipped 2026-09-21** as `KeyGuidance.tsx` + `settingsStore.forgetApiKey`
+      (launch plan Phase B). What keeps this box open is the *trees* half above —
+      `persist()`, `estimate()`, the export nudge — none of which is started.
   - Deferred out of this box, tracked in the same note: File System Access autosave
     (~1d, Chrome/Edge, local file — *not* sync and *not* a backend); a CSP
     (`index.html` has none); passphrase / WebAuthn unlock (gated on Phase 4 demand);

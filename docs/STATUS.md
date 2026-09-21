@@ -2,22 +2,23 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-09-20 (re-verified against source the same day — every open
-> item below was checked against the code, not just re-read; then updated again
-> after Phase A of the launch plan)
+> Last synced: 2026-09-21 (re-verified against source on 2026-09-20 — every open
+> item below was checked against the code, not just re-read; updated again after
+> Phase A of the launch plan, then after Phase B)
 
 ---
 
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last commit: fec095a — 2026-09-20
-Last commit message: feat(deploy): static build with CSP, noindex, and build stamp
-v0.6.0 merged as a four-commit series (test fix · feature · two doc syncs); four
-further commits on `main` are unreleased — the counterfactual labelling, the
-receipt exclusion fix, the pill-label pass, and Phase A of the launch plan.
+Last commit: 5b478cd — 2026-09-21
+Last commit message: docs: Polish is Pro-only, so no-transform costs nothing here
+v0.6.0 merged as a four-commit series (test fix · feature · two doc syncs); the
+commits on `main` since are unreleased — the counterfactual labelling, the receipt
+exclusion fix, the pill-label pass, Phase A of the launch plan (deploy + CSP +
+`no-transform`), and now Phase B (key hardening).
 
-Test suite on `main`: **369 tests across 51 files**; `tsc -b` and `oxlint` clean.
+Test suite on `main`: **378 tests across 52 files**; `tsc -b` and `oxlint` clean.
 
 ---
 
@@ -44,7 +45,7 @@ Test suite on `main`: **369 tests across 51 files**; `tsc -b` and `oxlint` clean
 - [x] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers — 16 turns / 4 forks, seeded on first run, priced off `BUNDLED_CATALOG` ($0.1794 vs $0.2545 linear, 29% saved)
 - [x] Static deploy; the landing page is the app with the demo preloaded — **live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21)**, serving the CSP, `noindex` and `Referrer-Policy`, demo seeding cold, catalog fetch 200, **zero CSP violations and a silent console**. The edge-injected `static.cloudflareinsights.com` beacon was the last holdout; no dashboard toggle exists for it, so `Cache-Control: … no-transform` in `public/_headers` (A8) is what stops it — verified against the live response
 - [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app** (it is already written up in `SETUP.md` §4 — what's missing is a hint next to the Ollama option, not the prose)
-- [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`)
+- [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`). **The key half shipped 2026-09-21** — `KeyGuidance` under the credential field (save it / scope it / early-build warning), the destination host named and flagged when it isn't `openrouter.ai`, and a "Forget key" button backed by `settingsStore.forgetApiKey`. What's left is the *trees* half: `navigator.storage.persist()` on first real write, `estimate()` for real numbers, the export nudge
 
 ### Phase 4 — Post it, then listen (days 13–14)
 - [ ] Ship where people already think in tokens: local-model communities, BYOK power users, prompt engineers
@@ -92,8 +93,10 @@ of 2026-09-20. The estimate is labelled as one. Its arithmetic is still coarse, 
 is now recorded honestly rather than hidden. See Carried debt.
 
 Phases 1–2 cleared the shipping blockers and built the deep-context arbitration
-demo; Phase 3's catalog work and the no-key demo tree are done. What's left of
-Phase 3 is the static deploy and honest onboarding copy.
+demo; Phase 3's catalog work, the no-key demo tree and the static deploy are done,
+as is the key half of the storage policy. What's left of Phase 3 is the three-step
+key setup with a connection test, the in-app Ollama `OLLAMA_ORIGINS` hint, and
+tree durability (`persist()` + export nudge).
 
 ---
 
@@ -104,17 +107,18 @@ Ordering rationale, with ROI and impact per item, lives in
 
 *Static deploy is done — live at `https://hydragraph.tinythinkerlabs.dev` since
 2026-09-21, all A3 checks green including a silent console. Phase A of
-[`notes/launch-execution-plan.md`](notes/launch-execution-plan.md) is closed.*
+[`notes/launch-execution-plan.md`](notes/launch-execution-plan.md) is closed, and
+Phase B (key hardening) closed the same day.*
 
-1. **[Phase B] Key hardening** — the next session's work, spec'd in full in the
-   execution plan: save-your-key warning, scoped-key guidance, the destination host
-   shown in the UI, and a "Forget key" button. Overlaps items 2 and 3 below
+1. **[Phase C] The hub at `tinythinkerlabs.dev`** — a one-file static landing page in a
+   **separate repo**, with its own `_headers` (`connect-src 'none'`, and
+   `no-transform` from the first deploy). Lowest priority: slipping it costs nothing
+   because the app's subdomain already stands alone. Spec in the execution plan
 2. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
    `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
-3. [Phase 3] Storage policy — durability for trees, handling for the key. Was "one
-   honest line about where data lives"; re-scoped 2026-09-20 into two problems with
-   opposite goals. `persist()` on first real write, save-your-key warning at entry,
-   scoped-key guidance, "Forget key", destination-host display, export nudge.
+3. [Phase 3] Storage policy — **the key half is done** (Phase B: guidance, destination
+   host, "Forget key"). What remains is durability for trees: `persist()` on first real
+   write, `estimate()` for real numbers, export nudge at a real-work threshold.
    Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
 4. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
    one number a skeptical reader will poke at

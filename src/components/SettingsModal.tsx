@@ -4,6 +4,7 @@ import { useSettingsStore } from '../store/settingsStore'
 import { ProviderSelect } from './ProviderSelect'
 import { ModelSelect } from './ModelSelect'
 import { SettingsCredentialField } from './SettingsCredentialField'
+import { KeyGuidance } from './KeyGuidance'
 import type { LLMProvider } from '../types'
 
 interface SettingsModalProps {
@@ -22,6 +23,7 @@ const EMPTY_DRAFT = {
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const settings = useSettingsStore((s) => s.settings)
   const updateSettings = useSettingsStore((s) => s.updateSettings)
+  const forgetApiKey = useSettingsStore((s) => s.forgetApiKey)
 
   const [draft, setDraft] = useState(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
@@ -58,6 +60,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     }
   }
 
+  // Wipe both copies: the persisted row and the field being edited. The draft
+  // resync effect above would clear the field anyway, but not before a render.
+  const handleForget = async () => {
+    await forgetApiKey()
+    setDraft((prev) => ({ ...prev, openRouterApiKey: '' }))
+  }
+
   const setField = (field: keyof typeof draft, value: string) =>
     setDraft((prev) => ({ ...prev, [field]: value }))
 
@@ -86,6 +95,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             openRouterBaseUrl={draft.openRouterBaseUrl}
             ollamaBaseUrl={draft.ollamaBaseUrl}
             onChange={setField}
+            guidance={
+              <KeyGuidance
+                openRouterBaseUrl={draft.openRouterBaseUrl}
+                hasStoredKey={Boolean(settings.openRouterApiKey?.trim())}
+                onForget={() => void handleForget()}
+              />
+            }
           />
 
           <div>
