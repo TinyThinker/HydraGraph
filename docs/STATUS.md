@@ -11,7 +11,7 @@
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last commit: 581d760 — 2026-09-20
+Last commit: fec095a — 2026-09-20
 Last commit message: feat(deploy): static build with CSP, noindex, and build stamp
 v0.6.0 merged as a four-commit series (test fix · feature · two doc syncs); four
 further commits on `main` are unreleased — the counterfactual labelling, the
