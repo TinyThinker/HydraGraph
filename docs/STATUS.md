@@ -131,10 +131,16 @@ headers present, no injected beacon, silent console, zero CSP violations.*
    nothing more. Small, and it stops being optional the moment anyone else commits
 4. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
    one number a skeptical reader will poke at
-5. [Debt, hub] **`www.tinythinkerlabs.dev` does not resolve** (checked live
-   2026-09-21 — no connection). The apex works and is what every link points at, but
-   people type `www`. Fix is a Cloudflare redirect rule to the apex, not a code change;
-   it lives in the hub's Cloudflare project, not this repo
+5. [Debt, hub] **Two dashboard-only follow-ups, both deferred 2026-09-21 for time.**
+   Neither touches code, neither lives in this repo, neither is blocking:
+   - **`www.tinythinkerlabs.dev` does not resolve** (checked live — no connection). The
+     apex works and is what every link points at, but people type `www`. Cloudflare
+     *Rules → Redirect Rules*, 301 to the apex; needs a `www` DNS record to exist
+   - **Search Console is not set up** for `tinythinkerlabs.dev`. The hub shipped
+     indexable but nothing is watching whether Google crawls it. DNS TXT verification,
+     ~2 min, domain already in-account. Best done early rather than well — indexing
+     takes weeks to start and the clock runs from verification, so deferring costs data
+     rather than saving work
 6. [Phase 3+] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync
 
 ---

@@ -243,7 +243,22 @@ line in the cost receipt, and is exactly a Stop-4 decision.
 - [ ] **`www.tinythinkerlabs.dev` does not resolve** (checked live 2026-09-21 — curl
   gets no connection). The apex serves the hub and is what every link points at, but
   people type `www`. Fix is a Cloudflare redirect rule to the apex; it lives in the
-  hub's Cloudflare project, not in this repo or the hub repo.
+  hub's Cloudflare project, not in this repo or the hub repo. Click-path: *Rules →
+  Redirect Rules → Create*, match hostname `www.tinythinkerlabs.dev`, 301 to
+  `https://tinythinkerlabs.dev`. Needs a `www` DNS record to exist for the rule to
+  catch. **Deferred 2026-09-21 — no time, not blocking.**
+- [ ] **`tinythinkerlabs.dev` is not verified in Google Search Console.** The hub went
+  live indexable on 2026-09-21 with canonical, description and Open Graph tags, but
+  nothing is watching whether Google actually crawls it. Verification is a DNS TXT
+  record and the domain is already in the Cloudflare account, so it is a ~2-minute job.
+  Worth doing *early* rather than well: indexing takes weeks to begin, and the clock
+  only starts once Google knows the site exists — so every day deferred is a day of
+  data not collected, not a day of work saved. Nothing in either repo changes.
+  **Deferred 2026-09-21 — no time, not blocking.**
+  - Do **not** pair this with a `robots.txt` that disallows the app. `robots.txt`
+    blocks fetching, while `noindex` needs the crawler to fetch and read the header —
+    do both and the app can be indexed anyway as a bare URL, the opposite of the
+    intent. Neither site has a `robots.txt`; keep it that way.
 - [ ] Edit a submitted prompt (not just regenerate).
 - [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).
