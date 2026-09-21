@@ -100,22 +100,22 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
   - No demo branch in the streaming / dispatch / pricing / export paths; the demo is
     ordinary rows. The only UI concession is `ProviderBanner`, which explains rather
     than warns while the demo is open.
-- [ ] Static deploy; the landing page *is* the app with the demo preloaded.
+- [x] Static deploy; the landing page *is* the app with the demo preloaded.
   - **Live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21).** `public/_headers`
     ships the CSP (`connect-src` limited to OpenRouter and localhost), `X-Robots-Tag:
     noindex` and `Referrer-Policy: no-referrer`, all three confirmed on the live
     response; `__BUILD_SHA__` is stamped at build time and shown in the corner. The A3
     checklist passes against the live URL — demo seeds cold, receipt priced, catalog
     fetch 200.
-  - **Open before this box ticks: the injected analytics beacon.** Pages injects
+  - **The injected analytics beacon is gone** (A8). Pages was injecting
     `static.cloudflareinsights.com/beacon.min.js` at the edge, which `script-src 'self'`
-    blocks — the only violation on the live site, and the CSP behaving correctly.
-    Declined rather than allowed, for consistency with "no third-party script" rather
-    than out of any threat from Cloudflare. **There is no dashboard toggle**: the
-    injection toggle only exists once a site is opted *into* Web Analytics. The fix is
+    blocked — the CSP behaving correctly. Declined rather than allowed, for consistency
+    with "no third-party script" rather than out of any threat from Cloudflare. **There
+    is no dashboard toggle**: the injection toggle only exists once a site is opted
+    *into* Web Analytics. Cloudflare's documented opt-out is
     `Cache-Control: public, max-age=0, must-revalidate, no-transform` in
-    `public/_headers` (Cloudflare's documented opt-out) — shipped, pending a deploy to
-    verify against the live response. See A8 in the execution plan.
+    `public/_headers`. Verified on the live response 2026-09-21 — the tag is absent from
+    the HTML and the console is silent.
   - **Execution plan: [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md)**
     — three session-sized phases (deploy · key hardening · landing page), with the
     settled decisions and a do-not-do list so no session re-derives them.

@@ -19,6 +19,8 @@
   Cloudflare Pages injects a Web Analytics beacon from `static.cloudflareinsights.com`
   and `script-src 'self'` refuses it. That gets fixed by turning Web Analytics off in
   `public/_headers` via `Cache-Control: no-transform`, not by allowing the host.
+  **Verified clean on the live site the same day** — zero CSP violations, zero console
+  output, zero failed requests. Phase A of the launch plan is closed.
 - **The beacon has no off switch in the dashboard, which is why looking for one failed.**
   Cloudflare injects it at the edge, after Pages has served the response, so no build
   output can remove it — and the "JS snippet injection" toggle only exists for a site

@@ -250,8 +250,13 @@ path, and an HTML response on any of them is injectable.
 a parse failure there would silently drop the CSP from a live site, and the file is small
 enough that the risk isn't worth the convenience. This section is the explanation.)*
 
-**Verify after deploy** — `no-transform` blocking injection is Cloudflare's documented
-behaviour, not something this repo can prove locally:
+**Verified on the live response 2026-09-21:** the beacon tag is absent from the HTML,
+`cache-control: public, max-age=0, must-revalidate, no-transform` is on the response, and
+a headless re-run of A3 reports zero CSP violations, zero console output, zero failed
+requests. It worked exactly as documented.
+
+**The commands** — `no-transform` blocking injection is Cloudflare proxy behaviour, not
+something this repo can prove locally, so re-run these after any header change:
 
 ```bash
 curl -s https://hydragraph.tinythinkerlabs.dev | grep -i cloudflareinsights   # want: no output
@@ -410,9 +415,12 @@ file so the next session knows where to start.
       **A7 is the user's:** Cloudflare Pages project + custom domain, then re-verify the
       live URL against the A3 checklist. Phase A's "done when" is not met until that
       lands.
-- [ ] Phase A7 — Cloudflare Pages project + `hydragraph.tinythinkerlabs.dev` (user).
-      **Live 2026-09-21** and passing the A3 checklist. One item open before Phase A's
-      "done when" is met: disable Cloudflare Web Analytics, whose injected beacon is the
-      only thing the CSP is blocking on the live site.
+- [x] **Phase A7/A8 — done 2026-09-21.** `https://hydragraph.tinythinkerlabs.dev` is
+      live and passing the full A3 checklist: CSP, `noindex` and `Referrer-Policy` on
+      the response, demo seeding cold at 16 turns / 4 forks, receipt at $0.1803 vs
+      ~$0.2557, catalog fetch 200, **zero CSP violations and a silent console**. The
+      last holdout was Cloudflare's edge-injected analytics beacon, stopped by
+      `Cache-Control: no-transform` (A8) after the dashboard turned out to have no
+      toggle for it. **Phase A is closed. Phase B is next.**
 - [ ] Phase B — Key hardening
 - [ ] Phase C — The hub at `tinythinkerlabs.dev` (separate repo)

@@ -42,7 +42,7 @@ Test suite on `main`: **369 tests across 51 files**; `tsc -b` and `oxlint` clean
 ### Phase 3 — The front door (days 10–12)
 - [x] OpenRouter + Ollama are the only providers (native Gemini removed; Dexie v5 remaps old `gemini` rows to `google/*` slugs); live OpenRouter `/api/v1/models` price catalog (IndexedDB-cached, 1 h TTL, bundled snapshot fallback); searchable priced model pickers replace hand-typed ids in reader panel / fan-out / Settings; one provider-linked credential field; fan-out cheap→frontier price-tier spread
 - [x] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers — 16 turns / 4 forks, seeded on first run, priced off `BUNDLED_CATALOG` ($0.1794 vs $0.2545 linear, 29% saved)
-- [ ] Static deploy; the landing page is the app with the demo preloaded — **live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21)**, serving the CSP, `noindex` and `Referrer-Policy`, demo seeding cold, catalog fetch 200. One item left before this box ticks: the edge-injected `static.cloudflareinsights.com` beacon, the only CSP violation on the live site. No dashboard toggle exists for it; the fix is `Cache-Control: … no-transform` in `public/_headers` (A8), shipped and awaiting a deploy to verify
+- [x] Static deploy; the landing page is the app with the demo preloaded — **live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21)**, serving the CSP, `noindex` and `Referrer-Policy`, demo seeding cold, catalog fetch 200, **zero CSP violations and a silent console**. The edge-injected `static.cloudflareinsights.com` beacon was the last holdout; no dashboard toggle exists for it, so `Cache-Control: … no-transform` in `public/_headers` (A8) is what stops it — verified against the live response
 - [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app** (it is already written up in `SETUP.md` §4 — what's missing is a hint next to the Ollama option, not the prose)
 - [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`)
 
@@ -102,13 +102,13 @@ Phase 3 is the static deploy and honest onboarding copy.
 Ordering rationale, with ROI and impact per item, lives in
 [`notes/launch-priorities.md`](notes/launch-priorities.md).
 
-1. [Phase 3] Static deploy — **live at `https://hydragraph.tinythinkerlabs.dev`**
-   (Phase A of [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md)).
-   All A3 checks pass on the live URL. One item open: the edge-injected Web Analytics
-   beacon, the single CSP violation there. **Not a dashboard fix** — that toggle only
-   exists for sites opted into Web Analytics. A8 adds Cloudflare's documented opt-out,
-   `Cache-Control: … no-transform`, to `public/_headers`; **push `main` to deploy it,
-   then verify against the live response**
+*Static deploy is done — live at `https://hydragraph.tinythinkerlabs.dev` since
+2026-09-21, all A3 checks green including a silent console. Phase A of
+[`notes/launch-execution-plan.md`](notes/launch-execution-plan.md) is closed.*
+
+1. **[Phase B] Key hardening** — the next session's work, spec'd in full in the
+   execution plan: save-your-key warning, scoped-key guidance, the destination host
+   shown in the UI, and a "Forget key" button. Overlaps items 2 and 3 below
 2. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
    `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
 3. [Phase 3] Storage policy — durability for trees, handling for the key. Was "one
