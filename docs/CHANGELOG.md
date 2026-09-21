@@ -10,6 +10,63 @@
 
 ## Unreleased
 
+- **The build is deployable, and the CSP was verified against the real thing rather
+  than reasoned about.** `public/_headers` ships a `Content-Security-Policy` whose
+  `connect-src` is limited to `openrouter.ai` plus localhost (Ollama) — so a
+  compromised dependency has nowhere to send the API key — alongside `X-Robots-Tag:
+  noindex` and `Referrer-Policy: no-referrer`. `style-src` keeps `'unsafe-inline'`
+  because React writes inline `style` attributes. Verified in headless Chrome on a
+  fresh profile against `dist/` served *with* those headers applied: zero violations,
+  zero console output, zero failed requests, nothing loosened from the policy as
+  planned. `vite.config.ts` stamps `__BUILD_SHA__` (Cloudflare's
+  `CF_PAGES_COMMIT_SHA`, else `git rev-parse`, else `unknown` — never fails a build)
+  and `BuildStamp.tsx` renders it muted in the corner, so a tester's bug report names
+  its build.
+- **A demo priced at a tenth of the truth, visible only with the network on.** Running
+  the above check against the *live* catalog collapsed the receipt to "$0.0229 vs
+  ~$0.0194 — no saving to show yet, 11 turns excluded." OpenRouter has delisted
+  `anthropic/claude-3.5-sonnet` and `anthropic/claude-3.7-sonnet`, and the live catalog
+  replaces `BUNDLED_CATALOG` wholesale, so 11 of the demo's 16 turns lost their price
+  the instant the fetch landed. The whole suite stayed green the entire time —
+  `demoTree.test.ts` prices against `BUNDLED_CATALOG` explicitly and structurally
+  cannot see it. `resolvePrice` now falls back to the bundled snapshot when the live
+  catalog has no entry for a model: a turn's cost is history, and a delisted model's
+  last-known price is the right basis for it. Pricing only — the model picker still
+  offers the live list, so nothing ever offers a retired model to send to.
+
+- **The "where data lives" box was one checkbox hiding two opposite problems.** Trees
+  want maximum durability; the API key wants minimum exposure. They share one storage
+  policy today — same Dexie database, same lifetime, same eviction fate — and the
+  original scoping inherited that conflation, proposing a sentence of copy where the
+  posture needed changing. Split, designed and risk-rated in
+  [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md). Two findings drove
+  it: `navigator.storage.persist()` is never called, so every tree is evictable and
+  nothing says so; and an OpenRouter key **cannot be retrieved after creation**, which
+  inverts the intuitive security default — refusing to store it costs the user more
+  than it protects them, so the control is blast radius (a dedicated key with a spend
+  limit) rather than secrecy. The note carries an eight-row vulnerability table with
+  severity and likelihood. The audit behind it found the XSS surface already closed
+  (`react-markdown` v10, no `rehype-raw`, no `innerHTML` anywhere), exports verified
+  free of credentials, the key masked by default, and the catalog fetched
+  anonymously — plus two real gaps: `index.html` ships no CSP, and the user-editable
+  `openRouterBaseUrl` silently determines where the key is transmitted with nothing in
+  the UI naming the destination.
+- **Every open planning item was verified against source, and the docs were corrected
+  where they had drifted.** All eleven pending items are real — none had been quietly
+  fixed and left ticked-open. Four inaccuracies were found and fixed: STATUS named
+  `c9f37fb` as the last commit when `main` was three commits ahead at `ad7b043`; the
+  test count read 292/337 against an actual 368 across 51 files; the counterfactual
+  debt item pointed at `treeCost.ts:14` when the `length / 4` ruler had moved to
+  `:42-44`; and the Ollama item read as if `OLLAMA_ORIGINS` were undocumented when
+  `SETUP.md` §4 already covers it properly — the real gap is an in-app hint, which
+  makes that item smaller than it looked. Three items also gained detail that only
+  reading the code reveals: `vite.config.ts` declares no `base` (a subpath host needs
+  one), export already ships via `HeaderBar` → `downloadTreeExport` so only the nudge
+  is missing, and the perf harness is hard-capped at 50 nodes, so the 200-node pass
+  includes extending the seeder. The four counterfactual biases were each pinned to a
+  line. New [`notes/launch-priorities.md`](notes/launch-priorities.md) records why the
+  remaining boxes are ordered as they are — ROI, user impact, infra impact, the three
+  arguable calls, and the signal that would re-rank each one.
 - **Canvas pill labels are readable, and fan-out siblings are finally
   distinguishable.** Four fixes from
   [`notes/node-labels-research.md`](notes/node-labels-research.md) §2–3, none of which

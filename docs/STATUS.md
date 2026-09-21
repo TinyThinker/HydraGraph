@@ -2,16 +2,22 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-09-20
+> Last synced: 2026-09-20 (re-verified against source the same day — every open
+> item below was checked against the code, not just re-read; then updated again
+> after Phase A of the launch plan)
 
 ---
 
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last commit: c9f37fb — 2026-09-20
-Last commit message: feat: ship a no-key demo tree, seeded on first run
-Merged to `main` as a four-commit v0.6.0 series (test fix · feature · two doc syncs).
+Last commit: 581d760 — 2026-09-20
+Last commit message: feat(deploy): static build with CSP, noindex, and build stamp
+v0.6.0 merged as a four-commit series (test fix · feature · two doc syncs); four
+further commits on `main` are unreleased — the counterfactual labelling, the
+receipt exclusion fix, the pill-label pass, and Phase A of the launch plan.
+
+Test suite on `main`: **369 tests across 51 files**; `tsc -b` and `oxlint` clean.
 
 ---
 
@@ -36,9 +42,9 @@ Merged to `main` as a four-commit v0.6.0 series (test fix · feature · two doc 
 ### Phase 3 — The front door (days 10–12)
 - [x] OpenRouter + Ollama are the only providers (native Gemini removed; Dexie v5 remaps old `gemini` rows to `google/*` slugs); live OpenRouter `/api/v1/models` price catalog (IndexedDB-cached, 1 h TTL, bundled snapshot fallback); searchable priced model pickers replace hand-typed ids in reader panel / fan-out / Settings; one provider-linked credential field; fan-out cheap→frontier price-tier spread
 - [x] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers — 16 turns / 4 forks, seeded on first run, priced off `BUNDLED_CATALOG` ($0.1794 vs $0.2545 linear, 29% saved)
-- [ ] Static deploy; the landing page is the app with the demo preloaded
-- [ ] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
-- [ ] One honest line about where data lives, plus an export nudge after real work
+- [ ] Static deploy; the landing page is the app with the demo preloaded — **repo side done** (`public/_headers` CSP + noindex, `__BUILD_SHA__` stamp, CSP verified headless against the real headers); waiting on the Cloudflare Pages project and `hydra.tinythinkerlabs.dev`, which is the user's step
+- [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app** (it is already written up in `SETUP.md` §4 — what's missing is a hint next to the Ollama option, not the prose)
+- [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`)
 
 ### Phase 4 — Post it, then listen (days 13–14)
 - [ ] Ship where people already think in tokens: local-model communities, BYOK power users, prompt engineers
@@ -93,10 +99,26 @@ Phase 3 is the static deploy and honest onboarding copy.
 
 ## Next Actions (priority order)
 
-1. [Phase 3] Static deploy; the landing page is the app with the demo preloaded
-   (the demo tree it preloads is done — `lib/demoTree.ts`, seeded by `App.tsx`)
-2. [Phase 3] Key setup in three steps with a live connection test; document the Ollama `OLLAMA_ORIGINS` gotcha where people hit it
-3. [Phase 3] One honest line about where data lives, plus an export nudge after real work
+Ordering rationale, with ROI and impact per item, lives in
+[`notes/launch-priorities.md`](notes/launch-priorities.md).
+
+1. [Phase 3] Static deploy — **the repo side is done** (Phase A of
+   [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md): CSP + noindex in
+   `public/_headers`, `__BUILD_SHA__` stamp, headless CSP verification). The remaining
+   step is the user's: create the Cloudflare Pages project against
+   `github.com/TinyThinker/HydraGraph` (build `npm run build`, output `dist`, branch
+   `main`), attach `hydra.tinythinkerlabs.dev`, then re-run the A3 checklist on the
+   live URL. No `base` is needed — the app sits at the root of its own subdomain
+2. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
+   `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
+3. [Phase 3] Storage policy — durability for trees, handling for the key. Was "one
+   honest line about where data lives"; re-scoped 2026-09-20 into two problems with
+   opposite goals. `persist()` on first real write, save-your-key warning at entry,
+   scoped-key guidance, "Forget key", destination-host display, export nudge.
+   Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
+4. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
+   one number a skeptical reader will poke at
+5. [Phase 3+] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync
 
 ---
 
@@ -148,7 +170,9 @@ design session (`lib/demoContent.ts` + `lib/demoTree.ts`, seeded by `App.tsx`) �
 fan-out on one DDL, and two late branches back to early turns. Token counts are
 derived from the canned text through the real `resolveContextPayload`, priced off
 `BUNDLED_CATALOG`, so with no key and no network the receipt reads **$0.1794 vs
-$0.2545 linear — 29% saved, 0 unpriced turns**. Nothing in the streaming, dispatch,
+$0.2545 linear — 29% saved, 0 unpriced turns** (with the live catalog, ~$0.1803 vs
+~$0.2557 — live prices win where OpenRouter still lists the model). Nothing in the
+streaming, dispatch,
 pricing or export paths special-cases the demo; the only UI concession is
 `ProviderBanner`, which explains instead of warning while the demo is open (and
 trims `HeaderBar` back under 150 lines). `seedDemoTree()` is idempotent on fixed

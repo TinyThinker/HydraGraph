@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { resolvePrice, turnCostUSD, formatUSD } from './pricing'
 import type { CatalogModel } from './openRouterCatalog'
+import { BUNDLED_CATALOG } from './bundledCatalog'
 
 /** Local fixture — passed explicitly so assertions don't ride on the store. */
 const CATALOG: CatalogModel[] = [
@@ -59,6 +60,19 @@ describe('resolvePrice', () => {
   it('falls back to the bundled catalog store when no catalog is passed', () => {
     // Historical remapped id — must still price via BUNDLED_CATALOG.
     expect(resolvePrice('google/gemini-2.5-flash')).not.toBeNull()
+  })
+
+  it('prices a model the live catalog has retired, from the bundled snapshot', () => {
+    // OpenRouter delists retired models, so a live catalog that has dropped
+    // `anthropic/claude-3.5-sonnet` would otherwise unprice every past turn
+    // taken on it — including most of the demo tree.
+    const live: CatalogModel[] = [CATALOG[0]]
+    expect(resolvePrice('anthropic/claude-3.5-sonnet', undefined, live)).toEqual(
+      resolvePrice('anthropic/claude-3.5-sonnet', undefined, BUNDLED_CATALOG),
+    )
+    expect(resolvePrice('anthropic/claude-3.5-sonnet', undefined, live)).not.toBeNull()
+    // The fallback does not invent prices for ids nobody ever shipped.
+    expect(resolvePrice('mystery-model-9000', undefined, live)).toBeNull()
   })
 })
 

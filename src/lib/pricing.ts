@@ -1,6 +1,7 @@
 import type { TurnNode, LLMProvider } from '../types'
 import type { CatalogModel } from './openRouterCatalog'
 import { useCatalogStore } from '../store/catalogStore'
+import { BUNDLED_CATALOG } from './bundledCatalog'
 
 /**
  * Model pricing helpers.
@@ -59,6 +60,30 @@ function indexFor(catalog: CatalogModel[]): CatalogIndex {
   return index
 }
 
+/** Exact id -> case-insensitive id -> longest case-insensitive prefix. */
+function lookup(model: string, catalog: CatalogModel[]): CatalogModel | undefined {
+  const { byId, sortedIds } = indexFor(catalog)
+
+  // Exact id, then case-insensitive id — both O(1). An exact entry always
+  // overwrites a caseless one when the index is built, so this order holds.
+  const direct = byId.get(model)
+  if (direct !== undefined) return direct
+
+  const lower = model.toLowerCase()
+  const caseless = byId.get(lower)
+  if (caseless !== undefined) return caseless
+
+  // Longest catalog id that prefixes `model`. sortedIds is longest-first, so
+  // the first hit is already the longest one.
+  for (const id of sortedIds) {
+    if (lower.startsWith(id)) {
+      const match = byId.get(id)
+      if (match !== undefined) return match
+    }
+  }
+  return undefined
+}
+
 /**
  * Resolve a price for a model id against a catalog.
  *
@@ -67,7 +92,13 @@ function indexFor(catalog: CatalogModel[]): CatalogIndex {
  *   catalog id that is a case-insensitive prefix of `model`
  *   (`anthropic/claude-3.5-sonnet-20241022` -> `anthropic/claude-3.5-sonnet`).
  *   Catalog ids are `vendor/model` and kept whole.
- * - no match -> `null`.
+ * - still nothing, and `catalog` is not already the snapshot -> the same scan
+ *   against `BUNDLED_CATALOG`. OpenRouter delists retired models, so the live
+ *   catalog cannot price a turn taken on one (`anthropic/claude-3.5-sonnet` was
+ *   dropped, which silently unpriced 11 of the demo tree's 16 turns). A turn's
+ *   cost is history; the snapshot's last-known price is the right basis for it.
+ *   Only pricing falls back — the model picker still offers the live list only.
+ * - no match anywhere -> `null`.
  *
  * `catalog` defaults to the current `catalogStore` models (synchronous read).
  */
@@ -78,24 +109,12 @@ export function resolvePrice(
 ): ModelPrice | null {
   if (provider === 'ollama') return { inputPerM: 0, outputPerM: 0 }
 
-  const { byId, sortedIds } = indexFor(catalog)
+  const hit = lookup(model, catalog)
+  if (hit !== undefined) return priceOf(hit)
 
-  // Exact id, then case-insensitive id — both O(1). An exact entry always
-  // overwrites a caseless one when the index is built, so this order holds.
-  const direct = byId.get(model)
-  if (direct !== undefined) return priceOf(direct)
-
-  const lower = model.toLowerCase()
-  const caseless = byId.get(lower)
-  if (caseless !== undefined) return priceOf(caseless)
-
-  // Longest catalog id that prefixes `model`. sortedIds is longest-first, so
-  // the first hit is already the longest one.
-  for (const id of sortedIds) {
-    if (lower.startsWith(id)) {
-      const match = byId.get(id)
-      if (match !== undefined) return priceOf(match)
-    }
+  if (catalog !== BUNDLED_CATALOG) {
+    const retired = lookup(model, BUNDLED_CATALOG)
+    if (retired !== undefined) return priceOf(retired)
   }
   return null
 }

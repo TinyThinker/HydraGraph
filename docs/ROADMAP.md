@@ -4,7 +4,9 @@
 > earliest unchecked `- [ ]` box in the earliest incomplete phase is "the next step".
 > [`STATUS.md`](STATUS.md) is generated from this file. Strategy and rationale behind
 > this plan live in [`notes/mvp-strategy.md`](notes/mvp-strategy.md) (competitive scan,
-> positioning, instrumentation targets).
+> positioning, instrumentation targets). **Why the remaining boxes are ordered the way
+> they are** — ROI, user impact, infra impact, and the signals that would re-rank them
+> — is in [`notes/launch-priorities.md`](notes/launch-priorities.md).
 
 **Goal:** a public link in ~14 working days. Ship, then listen — do not keep polishing
 in private. Positioning: *deep-context model arbitration* — compare several models/
@@ -15,7 +17,8 @@ personas at turn 30 of a real problem, on identical inherited context, with the 
 ## Current State
 
 The engineering is largely done and tested (streaming, context engine, deterministic
-layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 292 tests).
+layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 368 tests
+across 51 files, `tsc` and `oxlint` clean as of 2026-09-20).
 Phases 1–2 are complete — the first-run friction and the retry/cancel regression are
 fixed, and the deep-context arbitration demo (fan-out, compare, cost receipt) is
 built. The model-catalog work under Phase 3 is done; next up is the front door.
@@ -90,14 +93,58 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     idempotent via `useTreeStore.seedDemoTree()` / "Reset demo tree".
   - Receipt: **$0.1794 vs $0.2545 linear, 29% saved**, 0 unpriced turns — token
     counts derived from the canned text via `resolveContextPayload`, priced against
-    `BUNDLED_CATALOG` so it holds with no key and no network.
+    `BUNDLED_CATALOG` so it holds with no key and no network. With the live catalog
+    loaded it reads ~$0.1803 vs ~$0.2557 (~30%): live prices win where OpenRouter
+    still lists the model, and `resolvePrice` falls back to the snapshot for the two
+    Anthropic models OpenRouter has since delisted.
   - No demo branch in the streaming / dispatch / pricing / export paths; the demo is
     ordinary rows. The only UI concession is `ProviderBanner`, which explains rather
     than warns while the demo is open.
 - [ ] Static deploy; the landing page *is* the app with the demo preloaded.
-- [ ] Key setup in three steps with a live connection test; document the Ollama
-  `OLLAMA_ORIGINS` gotcha where people hit it.
+  - **Phase A's repo work is done (2026-09-20).** `public/_headers` ships the CSP
+    (`connect-src` limited to OpenRouter and localhost), `X-Robots-Tag: noindex` and
+    `Referrer-Policy: no-referrer`; `__BUILD_SHA__` is stamped at build time and shown
+    in the corner. Verified headless against the real headers: zero violations. What
+    remains is the Cloudflare Pages project and the custom domain — the user's step.
+  - **Execution plan: [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md)**
+    — three session-sized phases (deploy · key hardening · landing page), with the
+    settled decisions and a do-not-do list so no session re-derives them.
+  - Host is Cloudflare Pages; domain is `tinythinkerlabs.dev`, bought 2026-09-20 via
+    Cloudflare Registrar so DNS is already in-account.
+  - Layout: **the app at the root of `hydra.tinythinkerlabs.dev`** — no multi-page
+    build, no `base`, no subpath. Projects are explained on the hub at the apex, so
+    each project's URL is stable forever. Future projects get their own **subdomain** —
+    subpaths share a browser origin, which would let one project's compromised
+    dependency read another's IndexedDB.
+- [ ] Key setup in three steps with a live connection test; surface the Ollama
+  `OLLAMA_ORIGINS` gotcha **in the app**.
+  - The prose is already written and good: [`SETUP.md`](SETUP.md) §4 covers the env
+    var, the macOS `launchctl` variant, the instant-fail symptom, and a
+    troubleshooting row. What is missing is a hint next to the Ollama option in
+    Settings, where someone hits the wall. This item is smaller than it reads.
+  - `SettingsModal` is currently a flat form (provider · credential · default model ·
+    Save) with no step state and no connection probe anywhere in `src/`.
 - [ ] One honest line about where data lives, plus an export nudge after real work.
+  - Export already ships (`HeaderBar` → `downloadTreeExport`); only the sentence and
+    the nudge trigger are missing.
+  - **Scope revised 2026-09-20.** This was one checkbox covering two problems with
+    opposite goals — trees want durability, the key wants minimal exposure — and they
+    currently share one storage policy. Split, designed, and risk-rated in
+    [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md). The pre-launch
+    slice grows from ~0.5d to ~0.75d and now changes the posture instead of just
+    describing it:
+    - Trees: call `navigator.storage.persist()` on first real write (never called
+      today), `estimate()` for real numbers, export nudge at a real-work threshold.
+    - Key: **persist by default** — an OpenRouter key cannot be retrieved after
+      creation, so refusing to store it costs the user more than it protects them.
+      Warn at the point of entry to save it in a password manager; recommend a
+      dedicated key with a spend limit (blast radius, not secrecy, is the control);
+      add a "Forget key" control; show which host the key will be sent to.
+  - Deferred out of this box, tracked in the same note: File System Access autosave
+    (~1d, Chrome/Edge, local file — *not* sync and *not* a backend); a CSP
+    (`index.html` has none); passphrase / WebAuthn unlock (gated on Phase 4 demand);
+    OAuth PKCE, which would dissolve the key-storage question entirely if OpenRouter's
+    flow works as documented — verify before committing.
 
 **Gate:** a stranger with no API key understands the product within one minute.
 
@@ -156,7 +203,10 @@ line in the cost receipt, and is exactly a Stop-4 decision.
 - [ ] Edit a submitted prompt (not just regenerate).
 - [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).
-- [ ] 200-node performance pass.
+- [ ] 200-node performance pass. The existing harness does not reach that size:
+  `renderTally.ts`'s `seedFiftyNodes` is hard-capped at 50 (`:126`) and is exposed
+  only on `window.__hydraSeedFiftyNodes`, so this item includes extending the seeder
+  before anything can be measured.
 - [x] **Pill labels are truncated twice and unreadable when dimmed.** Fixed
   2026-09-20 — all four defects, per
   [`notes/node-labels-research.md`](notes/node-labels-research.md) §2–3. Summary is
@@ -204,12 +254,15 @@ line in the cost receipt, and is exactly a Stop-4 decision.
   can undercut real spend. The arithmetic is still an estimate — see the next item.
 - [ ] **Make the counterfactual arithmetic match its own ruler.** Now that it reads as
   an estimate, it can be made a good one. Four known biases, all currently flattering
-  the branching story: (1) actual uses provider-reported tokens while the counterfactual
-  uses `text.length / 4` (`treeCost.ts:14`) — two rulers for one subtraction; (2) the
+  the branching story, all four re-verified in source on 2026-09-20: (1) actual uses
+  provider-reported tokens while the counterfactual uses `text.length / 4`
+  (`approxTokens`, `treeCost.ts:42-44`) — two rulers for one subtraction; (2) the
   system prompt is re-sent on every real turn but is absent from the modelled
-  transcript; (3) excluded turns vanish from the transcript later turns would have
-  inherited; (4) no prompt-caching discount, though a re-sending linear thread is the
-  exact shape caching rewards. The rigorous fix for (1) needs no estimator at all — a
+  transcript (`cfInput`, `treeCost.ts:117`); (3) excluded turns vanish from the
+  transcript later turns would have inherited (the loop at `treeCost.ts:114` walks
+  `priced` only); (4) no prompt-caching discount in the price math
+  (`treeCost.ts:119`), though a re-sending linear thread is the exact shape caching
+  rewards. The rigorous fix for (1) needs no estimator at all — a
   turn's real prompt tokens are recoverable by differencing along a chain,
   `inputTokens(child) − inputTokens(parent) − outputTokens(parent)`. Worth doing when
   the number is challenged, not before.

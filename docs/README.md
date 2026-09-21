@@ -88,6 +88,9 @@ docs/
   SETUP.md             Tier 1 — run + provider configuration
   notes/               Tier 2 — rationale behind ROADMAP boxes (no checklists here)
     mvp-strategy.md            the competitive-scan / positioning essay
+    launch-priorities.md       why the open ROADMAP boxes are ordered as they are
+    storage-and-key-plan.md    tree durability + key handling, with a risk table
+    launch-execution-plan.md   deploy / key hardening / landing page, phase by phase
     model-catalog-plan.md      live OpenRouter catalog + pricing design
     persona-library-plan.md    editable personas + per-tree default (Dexie v6)
     tooling-research.md        web search / tool calling assessment (Dexie v7)
