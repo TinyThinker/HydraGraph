@@ -67,6 +67,7 @@ session wastes context.
 | Encryption / passphrase / WebAuthn | **Out of scope.** Gated on real user demand |
 | Backend | **No.** Evaluated at length and rejected — it closes half the threat table and opens a worse half |
 | Session-only key storage | **Rejected.** Would force key re-creation for anyone who didn't save it elsewhere |
+| Cloudflare Web Analytics | **Off**, decided 2026-09-21 after the beacon turned up as the live site's only CSP violation. Not a threat call — Cloudflare is already the host, and the beacon is cookieless. It's consistency: the plan says no third-party script, `script-src 'self'` is worth more as an absolute than as a list with exceptions, and server-side zone analytics already answers "is anyone visiting" for a `noindex` site shared with a few people. **Turn it off on every Pages project here, including Phase C's hub** |
 
 ## Do not do
 
