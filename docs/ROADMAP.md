@@ -121,7 +121,8 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     settled decisions and a do-not-do list so no session re-derives them.
   - Host is Cloudflare Pages; domain is `tinythinkerlabs.dev`, bought 2026-09-20 via
     Cloudflare Registrar so DNS is already in-account.
-  - **The hub at the apex is built** (2026-09-21), in its own repo
+  - **The hub at the apex is live** — `https://tinythinkerlabs.dev` (2026-09-21), in its
+    own repo
     `TinyThinker/tinythinkerlabs-hub` — one static `index.html`, no build step, no
     JavaScript, CSP stricter than the app's (`script-src 'none'`, `connect-src 'none'`)
     and `no-transform` from the first commit. It ships as an **assets-only Worker**, not
@@ -130,8 +131,10 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     Pages. Indexing was made an explicit call: the
     **hub is indexable, the app keeps `noindex`** — the app is a client-rendered SPA with
     no crawlable text, so it was never the SEO asset, and the hub is the page that
-    carries the early-build caveat. Attaching `tinythinkerlabs.dev` to a second Pages
-    project is the user's step; until it lands the hub is built but not live.
+    carries the early-build caveat. Verified live: headers present on the response, no
+    injected beacon, silent console, CTA reaches the app, no `X-Robots-Tag` on the hub
+    while the app keeps `noindex`. Open: `www.tinythinkerlabs.dev` does not resolve —
+    wants a Cloudflare redirect rule, not a code change (carried debt).
   - Layout: **the app at the root of `hydragraph.tinythinkerlabs.dev`** — no multi-page
     build, no `base`, no subpath. Projects are explained on the hub at the apex, so
     each project's URL is stable forever. Future projects get their own **subdomain** —
@@ -237,6 +240,10 @@ line in the cost receipt, and is exactly a Stop-4 decision.
   build`: that turns a red test into a failed deploy discovered after the fact, pays
   build minutes to find it, and cannot gate a merge. Cloudflare deploys; the gate
   belongs on GitHub.
+- [ ] **`www.tinythinkerlabs.dev` does not resolve** (checked live 2026-09-21 — curl
+  gets no connection). The apex serves the hub and is what every link points at, but
+  people type `www`. Fix is a Cloudflare redirect rule to the apex; it lives in the
+  hub's Cloudflare project, not in this repo or the hub repo.
 - [ ] Edit a submitted prompt (not just regenerate).
 - [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).

@@ -489,8 +489,26 @@ file so the next session knows where to start.
       present on `/` **and** `/favicon.svg`, unknown paths return a real 404,
       `not_found_handling` left at default — not `single-page-application`, since this is
       one page. Headless run still clean.
-      **The Cloudflare half is the user's**, exactly like A7: create the Worker from the
-      hub repo (empty build command, deploy command `npx wrangler deploy`, path `/`),
-      attach the apex `tinythinkerlabs.dev` under *Domains & Routes*, then run the two
-      `curl` checks in the hub README and confirm a silent console. Phase C's "done when"
-      is not met until that lands.
+- [x] **Phase C — LIVE at `https://tinythinkerlabs.dev`, 2026-09-21. Phase C is closed,
+      and with it the whole launch execution plan.** Verified against the live apex:
+      - `HTTP/2 200`, and all four headers on the response — the CSP verbatim
+        (`script-src 'none'`, `connect-src 'none'`), `referrer-policy`,
+        `x-content-type-options`, and `cache-control: public, max-age=0,
+        must-revalidate, no-transform`.
+      - **No analytics beacon.** `curl -s https://tinythinkerlabs.dev | grep -i
+        cloudflareinsights` returns nothing. `no-transform` shipped from the first
+        commit did its job on Workers exactly as it did on Pages — the A8 lesson
+        carried, and nothing had to be rediscovered.
+      - Headless: **silent console, zero CSP violations, zero failed requests**,
+        `scripts: 0` in the DOM, no overflow at 390 px.
+      - The link reaches the app: CTA resolves to
+        `https://hydragraph.tinythinkerlabs.dev/`, which still returns 200.
+      - Indexing is as decided: **no `X-Robots-Tag` on the hub**, `x-robots-tag:
+        noindex` still on the app.
+      - Unknown paths return a real 404; `/favicon.svg` serves `image/svg+xml` with the
+        same headers.
+
+      **One gap, not blocking:** `www.tinythinkerlabs.dev` does not resolve (curl gets
+      no connection). The apex works, which is what everything points at, but people do
+      type `www`. Fix is a redirect rule in Cloudflare, not a code change — see ROADMAP
+      carried debt.

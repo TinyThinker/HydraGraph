@@ -16,8 +16,9 @@ Last commit message: docs: record the missing CI gate as carried debt
 
 The hub (launch plan Phase C) lives in a **separate repo** —
 `TinyThinker/tinythinkerlabs-hub`, at `db6fce0` — and never affects this repo's
-version, tests or deploys. It is built but not yet live. It deploys as an assets-only
-**Worker**; this app stays on **Pages**, which still works and had no reason to move.
+version, tests or deploys. **Live at `https://tinythinkerlabs.dev` since 2026-09-21.**
+It deploys as an assets-only **Worker**; this app stays on **Pages**, which still works
+and had no reason to move.
 v0.6.0 merged as a four-commit series (test fix · feature · two doc syncs); the
 commits on `main` since are unreleased — the counterfactual labelling, the receipt
 exclusion fix, the pill-label pass, Phase A of the launch plan (deploy + CSP +
@@ -111,35 +112,29 @@ tree durability (`persist()` + export nudge).
 Ordering rationale, with ROI and impact per item, lives in
 [`notes/launch-priorities.md`](notes/launch-priorities.md).
 
-*Static deploy is done — live at `https://hydragraph.tinythinkerlabs.dev` since
-2026-09-21, all A3 checks green including a silent console. Phase A of
-[`notes/launch-execution-plan.md`](notes/launch-execution-plan.md) is closed, and
-Phase B (key hardening) closed the same day. Phase C's page is **built** in its own
-repo; only the Cloudflare attach remains.*
+***[`notes/launch-execution-plan.md`](notes/launch-execution-plan.md) is fully closed as
+of 2026-09-21** — all three phases. The app is live at
+`https://hydragraph.tinythinkerlabs.dev` (Phase A, Pages), key hardening shipped
+(Phase B), and the hub is live at `https://tinythinkerlabs.dev` (Phase C, an
+assets-only Worker in its own repo). Both URLs verified against the live response:
+headers present, no injected beacon, silent console, zero CSP violations.*
 
-1. **[Phase C] Attach `tinythinkerlabs.dev` to the hub Worker** — the hub itself is
-   **built and committed** (2026-09-21) in its own repo, `TinyThinker/tinythinkerlabs-hub`
-   (`db6fce0`): one static `public/index.html`, no build step, no JavaScript, `_headers`
-   with `script-src 'none'` / `connect-src 'none'` and `no-transform` from the first
-   commit. Ships as an **assets-only Worker**, not Pages — Pages is the legacy flow now.
-   `wrangler.jsonc` omits `main` on purpose, because `_headers` does not apply to
-   Worker-generated responses. Verified against `wrangler dev`: all four headers on every
-   asset, unknown paths 404, zero CSP violations, silent console. What's left is the
-   user's half: create the Worker from the repo (empty build command, `npx wrangler
-   deploy`, path `/`), attach the apex under *Domains & Routes*, then the two `curl`
-   checks in the hub README
-2. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
+1. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
    `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
-3. [Phase 3] Storage policy — **the key half is done** (Phase B: guidance, destination
+2. [Phase 3] Storage policy — **the key half is done** (Phase B: guidance, destination
    host, "Forget key"). What remains is durability for trees: `persist()` on first real
    write, `estimate()` for real numbers, export nudge at a real-work threshold.
    Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
-4. [Debt] **CI that actually runs `npm run check`** — a GitHub Actions workflow plus
+3. [Debt] **CI that actually runs `npm run check`** — a GitHub Actions workflow plus
    branch protection on `main`. Today the only thing standing between a red test and
    the live site is remembering to run it; Cloudflare's build command type-checks and
    nothing more. Small, and it stops being optional the moment anyone else commits
-5. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
+4. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
    one number a skeptical reader will poke at
+5. [Debt, hub] **`www.tinythinkerlabs.dev` does not resolve** (checked live
+   2026-09-21 — no connection). The apex works and is what every link points at, but
+   people type `www`. Fix is a Cloudflare redirect rule to the apex, not a code change;
+   it lives in the hub's Cloudflare project, not this repo
 6. [Phase 3+] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync
 
 ---

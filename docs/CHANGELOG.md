@@ -10,6 +10,17 @@
 
 ## Unreleased
 
+- **The hub is live at `https://tinythinkerlabs.dev`** (2026-09-21). Verified against
+  the live apex: `HTTP/2 200`, the CSP verbatim on the response alongside
+  `referrer-policy`, `x-content-type-options` and the `no-transform` `Cache-Control`;
+  **no analytics beacon** (`grep -i cloudflareinsights` returns nothing — `no-transform`
+  worked on Workers exactly as it did on Pages, so the A8 lesson carried and nothing was
+  rediscovered); silent console, zero CSP violations, zero failed requests, `scripts: 0`
+  in the DOM; the CTA resolves to the app, which still returns 200; unknown paths 404.
+  Indexing is as decided — no `X-Robots-Tag` on the hub, `noindex` still on the app.
+  **Phase C is closed, and with it the entire launch execution plan.** One gap left
+  open, not blocking: `www.tinythinkerlabs.dev` does not resolve, which wants a
+  Cloudflare redirect rule rather than a code change.
 - **The hub at the apex is built, in its own repo** (2026-09-21). Phase C of the launch
   plan lives in `TinyThinker/tinythinkerlabs-hub` — one static `index.html`, no build
   step, no framework, no JavaScript at all, dark slate/indigo so it reads as a sibling of
