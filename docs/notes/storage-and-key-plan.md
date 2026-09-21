@@ -4,6 +4,12 @@
 > [`ROADMAP.md`](../ROADMAP.md), which was originally one checkbox and is split here
 > into two. Written 2026-09-20. Every claim about current behaviour was verified
 > against source, with file and line cited.
+>
+> **Revised 2026-09-21.** Part 2 shipped. Part 1 was re-audited and re-ordered: quota
+> exhaustion and eviction separated, the app confirmed *not* Chrome-only, the tier
+> ladder corrected (Safari has the highest loss risk and was getting the least help),
+> Tier 0.5 added, two defects recorded, and BYO-cloud (Drive / OneDrive) evaluated and
+> declined for now.
 
 ## The premise
 
@@ -42,12 +48,120 @@ reason explained there.
 The result: the app's data can vanish without warning, and the user has been given no
 reason to think it might.
 
+## Two failures, not one — verified 2026-09-21
+
+"Running out of storage" is two different events with opposite consequences, and
+conflating them sends the design in the wrong direction.
+
+### Quota exhaustion — the write fails, the data survives
+
+IndexedDB throws `QuotaExceededError` and Dexie aborts the transaction atomically.
+Trees already on disk are untouched; what is lost is the turn being written.
+
+It is also close to unreachable here. The demo transcript is 16 turns in a 40 KB source
+file — roughly 2.5 KB per turn — so a 200-node tree is well under a megabyte, against a
+Chrome quota of roughly 60% of free disk. Reaching it would take on the order of a
+million turns. **The exception is a private window**, where the quota is deliberately
+tiny.
+
+### Eviction — the data is deleted
+
+This is the one that loses trees, and quota pressure is only one of its triggers.
+
+| Trigger | Browser | Defended by |
+|---|---|---|
+| Disk pressure, least-recently-used origin evicted | Chrome / Edge | `persist()` |
+| ~7 days without a first-party visit | Safari | **Nothing.** Export only |
+| User clears site data | All | Nothing, correctly |
+| Private window closes | All | Nothing, by design |
+
+`persist()` answers the first row only. Safari's rule is a *timer*, not a pressure
+response — no disk shortage required — and `persist()` does not reliably override it.
+
+## The app is not Chrome-only — audited 2026-09-21
+
+Worth stating plainly, because the tier structure below reads as though it were.
+Nothing in `src/` is Chrome-gated:
+
+- SSE streaming via `getReader()` + `TextDecoder` (`streamingClient.ts:62`, `:148`)
+- `navigator.clipboard`, guarded with an early return (`ReaderPanel.tsx:57`,
+  `CodeBlock.tsx:19`)
+- IndexedDB through Dexie
+- No `showSaveFilePicker`, no `structuredClone`, no service worker, and no
+  `browserslist` or Vite `target` override
+
+And the durability round trip already works everywhere: **export *and* import both
+ship** — `downloadTreeExport` (`treeExport.ts:40`), `parseImportDoc` (`:55`),
+`remapImportedTree` (`:170`), wired through `ImportButton.tsx`, with a versioned schema
+(`TREE_EXPORT_SCHEMA_VERSION`) and id remapping on the way in. A file download and a
+file input are the two most portable primitives on the web.
+
+**Be precise about what "works everywhere" means**, because it is easy to overclaim.
+Three distinct capabilities, only the first two of which are universal:
+
+| Capability | Browsers | What the app gets |
+|---|---|---|
+| Trigger a download | All | A filename *suggestion*. No handle, no path, no way to update the file later |
+| Read a user-picked file (`<input type="file">`) | All | One file, user-initiated, per click |
+| Write to a chosen path repeatedly (`showSaveFilePicker` + a persisted handle) | **Chrome / Edge only** | Pick once, autosave indefinitely |
+
+`downloadTreeExport` is firmly in row 1 — `Blob` → `createObjectURL` → synthetic
+`<a download>` → `click()` → `revokeObjectURL` (`treeExport.ts:40-52`). The object URL
+is revoked immediately; nothing persists. Every export is a **new** timestamped file.
+
+Safari and Firefox do support OPFS (`navigator.storage.getDirectory()`), but that is
+origin-private storage — invisible in the user's filesystem and evictable on the same
+timer. It is not a durability mechanism.
+
+So Tier 2 is **not a missing capability so much as a missing automation**: the *outcome*
+(a JSON file on disk the user controls) is reachable in every browser, but on
+Safari/Firefox it costs a deliberate click **per save, in perpetuity, and depends on the
+user remembering**. After twenty turns that is one current file on Chrome versus N stale
+files — or zero — elsewhere.
+
+That is a real gap, and it is precisely why Tier 0's nudge and Tier 0.5's restore carry
+the weight on those browsers: if the save is manual, the app's job is to ask at the
+right moment and to recover gracefully when the answer was no. See Sequencing.
+
+## The ladder is built upside down
+
+| | Risk of loss | What the original tier plan gave it |
+|---|---|---|
+| **Safari** | Highest — a 7-day timer | Nothing beyond what ships today |
+| **Firefox** | Medium — eviction under pressure | `persist()`, via a prompt users decline |
+| **Chrome / Edge** | Lowest — engagement-based, usually granted | `persist()` **and** autosave |
+
+The browser most likely to lose data gets the least help. Correcting that inversion is
+the main change in this revision.
+
+It also collides with Phase 4, whose single metric is *"track who came back a second
+time."* On Safari, a returner past day 7 opens an empty app and reads it as a broken
+product — so that metric would be measuring Apple's ITP policy rather than retention.
+
+## Two defects found while auditing this
+
+- **`persistError` answers a failed write with another write.** `useTreeStore.ts:397`
+  handles a stream/persist failure by calling `db.nodes.update` (`:405`). If the
+  original failure was quota, that write fails too — and the call at `:436` does not
+  await it, so it surfaces as an unhandled rejection. The error handler breaks in
+  precisely the case it exists for.
+- **Quota failures are never named as quota.** Three write paths, three behaviours: the
+  throttled stream flush logs to `console.error` (`:73`) and is silent to the user;
+  stream failures are reported as stream errors (`:446`); only tree creation surfaces
+  anything (`:720`, `{ ok: false, error }`). A `QuotaExceededError` should say "storage
+  is full, export now", not "generation failed".
+
 ## The plan — three tiers
 
 ### Tier 0 — the floor (all browsers, exists today)
 
 Manual export stays the universal fallback. It works everywhere, including the browsers
 where Tiers 1 and 2 do not. What it lacks is a prompt, which is the nudge below.
+
+**This is the cross-browser durability product, not a stopgap under the "real" tiers.**
+Export *and* import already ship and already round-trip on every browser; Tier 2 only
+automates a mechanism that works today. Tier 0 therefore ships **before** Tier 2, not
+after — the revision of 2026-09-21.
 
 **Add:** an export nudge that fires once per tree, when the tree is not the demo
 (`isDemoTree`, `lib/demoTree.ts`) and has crossed a real-work threshold — around 8
@@ -57,6 +171,31 @@ used).
 
 Never fires on the demo tree. Someone exploring canned content has nothing to lose, and
 a nudge there reads as a dark pattern.
+
+**Make the urgency browser-aware.** Same mechanism, different copy, because the risk
+genuinely differs by an order of magnitude:
+
+| Detected | Line |
+|---|---|
+| No `showSaveFilePicker` **and** `persist()` not granted (≈ Safari) | "This browser clears site data after about a week of not visiting. Keep a copy." |
+| `persist()` granted (≈ Chrome / Firefox after accept) | A quieter line — storage is durable but not backed up |
+| `estimate()` reports a tiny quota (≈ private window) | "Private window — everything here is discarded when you close it." Say it up front |
+
+Detect by **feature and outcome, never by user-agent string**. UA sniffing is wrong
+within a release or two and is unfalsifiable in tests; `persist()`'s return value and
+the presence of an API are both directly assertable.
+
+### Tier 0.5 — restore on empty (all browsers, ~2 h)
+
+If IndexedDB comes up empty but the user has been here before (any surviving
+`AppSettings` row, or a returning-visitor flag), do not present a blank canvas. Offer
+the import path directly: *"No trees found. Restore from an export?"*
+
+This is the single highest-value item for the Safari path and it needs no new
+capability — `ImportButton` and `parseImportDoc` already exist. It converts eviction
+from silent data loss into a two-click recovery for anyone who took the Tier 0 nudge,
+and it is the difference between "the app lost my work" and "the app helped me get it
+back."
 
 ### Tier 1 — stop being evictable (all browsers, ~1 hour)
 
@@ -82,7 +221,19 @@ exists:
 
 The File System Access API gives the user a real file, in a location they chose, that
 the app autosaves into. This is the only mechanism here that survives a site-data clear,
-a profile reset, or eviction.
+a profile reset, or eviction *without the user doing anything*.
+
+**Demoted below Tier 0 on 2026-09-21.** It is a convenience layered on the export path,
+not a capability other browsers lack — the same file, saved automatically instead of on
+a click. Shipping it before the cross-browser nudge would spend a day making the
+lowest-risk browser safer while the highest-risk one got nothing.
+
+**It is also, for free, the BYO-cloud story.** `showSaveFilePicker()` lets the user pick
+*any* folder, including a synced Google Drive / OneDrive / Dropbox folder on desktop. So
+does the plain download the app already produces, if their Downloads folder syncs — as
+many do. The user gets cloud-backed trees with zero OAuth scopes, zero new hosts in the
+CSP, and zero new privacy claims from us. See "BYO-cloud" below for why the API-based
+version is not worth its price.
 
 **This is not sync and it is not a backend.** There is no server, no account, no network
 call. It is a local file, the same as the export the app already writes — just kept
@@ -128,7 +279,10 @@ good file intact. This does not need to be built.
 - **Safari.** No File System Access, and script-writable storage is cleared after
   roughly seven days without interaction with the origin. `persist()` does not reliably
   override it. On Safari, manual export is genuinely the only durability story — which
-  is why Tier 0 is not optional.
+  is why Tier 0 is not optional, and why Tier 0.5 (restore on empty) matters more here
+  than anywhere else. **Safari's timer cannot be beaten from inside the browser.** It
+  can only be made visible before it fires and recoverable after. That is the whole
+  design goal; anything framed as "preventing" it is overpromising.
 - **Private / incognito windows.** Storage is discarded at session end by design.
   Detectable via `estimate()` returning a tiny quota; worth saying plainly rather than
   letting the user find out.
@@ -136,6 +290,158 @@ good file intact. This does not need to be built.
   "not saving" visibly rather than failing silently.
 - **Permission revoked between visits.** Recoverable, but only with a click. Silent
   resumption is not possible by design.
+
+---
+
+## Is browser-local a bad product? Do we need a desktop app?
+
+Asked directly on 2026-09-21, after the Chrome-only finding above landed harder than it
+should have. Recorded so the answer does not have to be re-derived at midnight.
+
+**No, and no.** The reasoning, in order of how much it should change your mind:
+
+### The loss profile is inverted from the fear
+
+Safari's rule is seven days of **no visits**. So the timer selects for exactly the wrong
+intuition about who gets hurt:
+
+| User | Visit pattern | Tree value | Outcome |
+|---|---|---|---|
+| Using it as intended — turn 30 of a real problem | Every few days | High | **Timer never fires** |
+| Tried it, liked it, busy fortnight | Gap > 7 days | Low–medium | Loses an exploration |
+| Tried it once, never returned | Never | ~Zero | Loses nothing they wanted |
+
+The users with the most to lose visit often enough to keep resetting the clock. The one
+who gets bitten is a lapsed triallist whose tree was mostly demo poking — and today they
+return to a freshly seeded demo tree (`App.tsx` → `seedDemoTree`, idempotent), which
+reads as a fresh install rather than a crash. Not nothing, but not "the app eats work".
+
+### The precedent
+
+Excalidraw is browser-local, IndexedDB, no account, and carries this exact exposure. So
+does tldraw. Both are widely loved. What separates them from a genuinely bad local-first
+app is not the storage model — it is whether the user was told, and whether they can get
+their work back.
+
+### What would actually make it bad
+
+1. ~~Browser storage can be evicted~~ — a property of the platform, not a defect.
+2. **The user was not told.** True today. ← the real sin
+3. **There is no way back.** True today. ←
+
+(2) and (3) are Tier 0 and Tier 0.5, about a day of work. That does not remove the risk;
+it converts *silent data loss* into *a stated characteristic with a recovery path*. That
+conversion is the whole difference.
+
+### Why a desktop app is the wrong trade
+
+[`ROADMAP.md`](../ROADMAP.md) Phase 3 states the advantage being spent: *"Nobody installs
+anything, ever."* Going desktop costs the Phase 4 strategy (a link converts far better
+than a download from an unknown indie developer), code signing and notarization, an
+update channel, per-platform builds, and the one-click demo — to address a failure mode
+affecting a minority of a minority.
+
+**It also stays available.** Tauri can wrap this same web app whenever evidence calls for
+it. This is a door that does not close, not a fork in the road, and the evidence belongs
+to Phase 4. Do not treat it as urgent.
+
+### The cheap middle path — verify before believing
+
+**Installed web app ("Add to Dock" on macOS, "Add to Home Screen" on iOS).** Installed
+web apps plausibly get storage treated differently from a browser tab, and may be exempt
+from the seven-day purge. A web app manifest is a few lines and needs **no service
+worker** — which matters, since a service worker would complicate the CSP.
+
+If it holds, this is the Safari durability story for near-zero cost. **Apple has changed
+this behaviour more than once — verify against current behaviour before writing it into
+the UI or claiming it to users.** ~20 minutes. Tracked in ROADMAP carried debt.
+
+---
+
+## BYO-cloud — Google Drive / OneDrive as the user's own backend
+
+Evaluated 2026-09-21. **Technically viable, deliberately not scheduled.** Recorded here
+so it is not re-derived, and because the reasoning is not the obvious one.
+
+### It would work, and it does not need a backend
+
+Both providers support the OAuth 2.0 **authorization-code flow with PKCE**, which exists
+specifically so a public client with no server secret can authenticate. The redirect
+returns to our own static page. Concretely:
+
+| | Google Drive | OneDrive |
+|---|---|---|
+| Auth | OAuth 2.0 + PKCE | OAuth 2.0 + PKCE (MSAL, an npm package — bundles under `script-src 'self'`) |
+| Narrow scope | `drive.file` — only files the app created or the user picked | `Files.ReadWrite.AppFolder` — an app-private folder |
+| API | Drive REST v3 | Microsoft Graph |
+| Server secret | None | None |
+
+The narrow scopes matter: neither grants read access to the user's existing files. The
+app would see only the trees it wrote. Serialization reuses `buildExportDoc` /
+`serializeExportDoc` exactly as Tier 2 does — it is the same document, sent over HTTPS
+instead of written to a handle.
+
+**Verify before committing** (claims that drift and were not re-checked): whether
+Google's consent screen shows an unverified-app interstitial for `drive.file` alone,
+and whether their token endpoint's CORS policy permits the browser-side exchange
+without the Google Identity Services script — pulling in that script would violate the
+`script-src 'self'` we declined the Cloudflare beacon to keep.
+
+### The honest framing: it breaks "no third party", not "no backend"
+
+This is the part worth being precise about, because the instinct that it is "still
+local, the user controls it" is **half right**.
+
+| | Local file (Tier 2) | User's Drive / OneDrive | Our backend |
+|---|---|---|---|
+| Who holds the bytes | User's disk | **Google / Microsoft** | Us |
+| Who controls access | User | User — revocable, deletable | Us |
+| Can *we* read it | No | **No** | Yes |
+| Survives a site-data clear | Yes | Yes | Yes |
+| Marginal cost to us | $0 | $0 | $$ |
+| New party in the trust story | None | **One** | None (we are the party) |
+
+So it is genuinely *not* sync-as-a-service, and it does not put us on the hook for
+storage costs or user data. But the claim "your conversations never leave your machine"
+would stop being true, and that claim is load-bearing for this product's positioning.
+The replacement — "your trees go to your Google Drive, if you switch it on" — is still
+honest and still good. It is just a claim that requires precision to state, and privacy
+copy is exactly where slightly-wrong costs trust disproportionately.
+
+Transparency would demand: naming the destination before the consent screen, naming the
+scope in plain words, showing the connection state persistently, and a disconnect
+control that also offers to delete what was uploaded. That is real surface, not a
+checkbox.
+
+### Why it is not scheduled
+
+1. **Storage is cheap; the expectation it creates is not.** Once a tree is in Drive,
+   *"open it on my laptop"* is the immediately obvious next request — and that is
+   multi-device sync, which needs conflict resolution over a branching DAG. Users will
+   not distinguish BYO-storage from sync, and the roadmap's
+   [`What to refuse`](../ROADMAP.md) list names **sync** as the one request that turns a
+   free static page into a service. This is the cheapest-looking door into the most
+   expensive room.
+2. **It widens the CSP.** `connect-src` is currently OpenRouter plus localhost, and it
+   is the primary mitigation for V1–V3 below — an XSS that cannot reach a destination
+   cannot exfiltrate a key. Adding Google and Microsoft origins weakens that control for
+   every user, including the ones who never turn the feature on.
+3. **It buys little the free path does not.** The problem to solve is Safari durability,
+   and Tier 0 + Tier 0.5 solve it for zero new hosts, zero OAuth registration and zero
+   new privacy claims. Meanwhile a user who *wants* their trees in Drive can already put
+   them there — via a synced folder in `showSaveFilePicker()`, or simply a synced
+   Downloads folder.
+4. **It is unfalsifiable pre-launch.** Nobody has asked. This is precisely a Phase 4
+   decision, and the same "hold until asked twice" rule that governs sync applies.
+
+### If it is ever revisited
+
+Take it as a **Track C** item, after Phase 4 evidence, and only if users ask for
+cross-device access specifically — not merely for backup, which Tier 0/0.5 already
+cover. Do Drive first (larger audience, narrower scope), keep it strictly opt-in, and
+ship it as *backup*, not sync: one-way upload with an explicit restore, no background
+reconciliation, no last-writer-wins. If the request is genuinely for sync, the honest
+answers are read-only share links (already Track C) or declining.
 
 ---
 
@@ -263,14 +569,32 @@ of rows at strictly higher cost.
 
 ## Sequencing
 
-**Before launch** (folded into the Phase 3 "where data lives" box, ~0.75d):
-the honest line, `persist()`, the entry warning, the scoped-key line, "Forget key",
-the destination-host display, and the export nudge.
+> Revised 2026-09-21. The key half shipped; the tree half was re-ordered so the
+> highest-risk browser is served first. Tier 2 moved out of "shortly after".
 
-**Shortly after** (~1d): File System Access autosave, opt-in, Chrome/Edge.
+**Shipped 2026-09-21** (launch plan Phase B): the entry warning, the scoped-key line,
+"Forget key", the destination-host display, and the CSP — which landed with the deploy
+(`public/_headers`, `connect-src` limited to OpenRouter and localhost), ahead of its
+"cheap and unscheduled" slot below.
 
-**Cheap and unscheduled**: the CSP. Small, and it downgrades the severity of V1–V3.
+**Before launch** — the remaining Phase 3 "where data lives" box, ~1d total:
 
-**Gated on Phase 4 demand**: passphrase / WebAuthn unlock. OAuth PKCE moves up the
-moment it is verified to work — it is the only item that improves security *and*
-usability at the same time.
+| Order | Item | Cost | Why here |
+|---|---|---|---|
+| 1 | Tier 1 — `persist()` on first real write + `estimate()` | ~1 h | Cheapest real protection; feeds the honest line real numbers |
+| 2 | Tier 0 — export nudge, **browser-aware urgency** | ~3 h | The only durability story Safari has |
+| 3 | Tier 0.5 — restore on empty | ~2 h | Turns eviction into a two-click recovery |
+| 4 | Name `QuotaExceededError` as quota on the write paths | ~1 h | Today it reads as a generation failure |
+| 5 | Fix `persistError`'s write-to-report-a-write-failure | ~0.5 h | Handler breaks in the case it exists for |
+
+Items 4 and 5 are the defects recorded above. They are small, they are in the same
+files, and doing them here avoids a second pass through `useTreeStore`.
+
+**After launch, unscheduled** (~1d): File System Access autosave, opt-in, Chrome/Edge.
+Demoted from "shortly after" — it is convenience on a working mechanism, and it
+incidentally covers BYO-cloud via a synced folder.
+
+**Gated on Phase 4 demand**: passphrase / WebAuthn unlock; BYO-cloud (Drive / OneDrive)
+as a Track C item, and only for cross-device access rather than backup. OAuth PKCE for
+the *key* moves up the moment it is verified to work — it is the only item that improves
+security *and* usability at the same time.

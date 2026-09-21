@@ -122,9 +122,19 @@ headers present, no injected beacon, silent console, zero CSP violations.*
 1. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
    `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
 2. [Phase 3] Storage policy — **the key half is done** (Phase B: guidance, destination
-   host, "Forget key"). What remains is durability for trees: `persist()` on first real
-   write, `estimate()` for real numbers, export nudge at a real-work threshold.
-   Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
+   host, "Forget key"). What remains is durability for trees, **re-ordered 2026-09-21
+   after a cross-browser audit** (~1d): (1) `persist()` + `estimate()`; (2) export nudge
+   with **browser-aware urgency**; (3) **restore on empty** — offer import instead of a
+   blank canvas; (4) name `QuotaExceededError` as quota on the write paths; (5) fix
+   `persistError` (`useTreeStore.ts:397`), which answers a failed write with another
+   write and throws an unhandled rejection in exactly the quota case it exists for.
+   - Why the re-order: the app is **not** Chrome-only (nothing in `src/` is Chrome-gated;
+     export *and* import both ship and round-trip), so File System Access is convenience
+     on a working mechanism — yet the old plan gave Chrome the most help and **Safari,
+     which has a 7-day storage timer, the least**. That also collides with Phase 4's
+     "who came back a second time". Quota exhaustion turned out not to be the threat at
+     all; eviction is.
+   - Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
 3. [Debt] **CI that actually runs `npm run check`** — a GitHub Actions workflow plus
    branch protection on `main`. Today the only thing standing between a red test and
    the live site is remembering to run it; Cloudflare's build command type-checks and
@@ -141,7 +151,14 @@ headers present, no injected beacon, silent console, zero CSP violations.*
      ~2 min, domain already in-account. Best done early rather than well — indexing
      takes weeks to start and the clock runs from verification, so deferring costs data
      rather than saving work
-6. [Phase 3+] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync
+6. [Post-launch] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync.
+   **Demoted below the nudge 2026-09-21**; it also covers BYO-cloud for free, since
+   `showSaveFilePicker()` can target a synced Drive/OneDrive folder
+7. [Track C, declined for now] **BYO-cloud (Drive / OneDrive)** — technically viable with
+   no backend (OAuth PKCE, narrow `drive.file` / app-folder scopes, we never hold the
+   data). Held because it breaks "no third party", widens `connect-src`, and invites the
+   sync request that the refuse list exists to hold back. Reasoning:
+   [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md) § BYO-cloud
 
 ---
 

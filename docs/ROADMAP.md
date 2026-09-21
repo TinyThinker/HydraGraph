@@ -159,6 +159,7 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     describing it:
     - Trees: call `navigator.storage.persist()` on first real write (never called
       today), `estimate()` for real numbers, export nudge at a real-work threshold.
+      **Re-ordered 2026-09-21 after a cross-browser audit — see below.**
     - Key: **persist by default** — an OpenRouter key cannot be retrieved after
       creation, so refusing to store it costs the user more than it protects them.
       Warn at the point of entry to save it in a password manager; recommend a
@@ -167,11 +168,47 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
       **Shipped 2026-09-21** as `KeyGuidance.tsx` + `settingsStore.forgetApiKey`
       (launch plan Phase B). What keeps this box open is the *trees* half above —
       `persist()`, `estimate()`, the export nudge — none of which is started.
+  - **Cross-browser audit, 2026-09-21 — the remaining work re-ordered.** Two findings
+    changed the shape of this box, both written up in the note:
+    - **Quota exhaustion is not the threat; eviction is.** A `QuotaExceededError` aborts
+      the transaction atomically and leaves existing trees intact, and at ~2.5 KB/turn
+      against a multi-GB quota it takes ~a million turns to reach — except in a private
+      window. What actually deletes trees is eviction, and **Safari's is a 7-day timer**,
+      not a pressure response. `persist()` does not reliably override it.
+    - **The app is not Chrome-only, and the tier plan was upside down.** Nothing in
+      `src/` is Chrome-gated (`getReader`/`TextDecoder` streaming, guarded
+      `navigator.clipboard`, Dexie; no `showSaveFilePicker`, no `structuredClone`, no
+      service worker), and export **and import** both already ship and round-trip
+      (`treeExport.ts:40`, `:55`, `:170` + `ImportButton.tsx`). Note the limit precisely:
+      *downloading* works everywhere, but **writing to a chosen path repeatedly is
+      Chrome/Edge only** — a download gives the app no handle, so every export is a new
+      file. File System Access is therefore a missing *automation* rather than a missing
+      outcome: on Safari/Firefox the same file is reachable, at one deliberate click per
+      save, forever, if the user remembers. That is a real gap — yet the
+      plan gave Chrome both `persist()` and autosave while the highest-risk browser got
+      nothing. This also collides with Phase 4's "who came back a second time": a Safari
+      returner past day 7 opens an empty app.
+    - **New order** (~1d): (1) `persist()` + `estimate()`; (2) export nudge with
+      **browser-aware urgency** — feature-detected, never UA-sniffed; (3) **restore on
+      empty** — offer import instead of a blank canvas when the DB is empty but the user
+      has been here before, which turns eviction into a two-click recovery; (4) name
+      `QuotaExceededError` as quota; (5) fix `persistError`. Items 4–5 are the defects
+      below.
+  - **Two defects found during the audit**, both in `useTreeStore.ts`, both folded into
+    this box rather than carried as separate debt:
+    - `persistError` (`:397`) responds to a failed write by doing another write (`:405`),
+      unawaited at the `:436` call site — so if the original failure was quota, the
+      handler throws an unhandled rejection in exactly the case it exists for.
+    - Quota failures are never named: the throttled flush logs to `console.error`
+      (`:73`) silently, stream failures report as stream errors (`:446`), and only tree
+      creation surfaces anything (`:720`).
   - Deferred out of this box, tracked in the same note: File System Access autosave
-    (~1d, Chrome/Edge, local file — *not* sync and *not* a backend); a CSP
-    (`index.html` has none); passphrase / WebAuthn unlock (gated on Phase 4 demand);
+    (~1d, Chrome/Edge, local file — *not* sync and *not* a backend), now explicitly
+    **after** launch rather than "shortly after", since it incidentally covers BYO-cloud
+    via a synced folder; passphrase / WebAuthn unlock (gated on Phase 4 demand);
     OAuth PKCE, which would dissolve the key-storage question entirely if OpenRouter's
-    flow works as documented — verify before committing.
+    flow works as documented — verify before committing. The CSP listed here previously
+    **shipped 2026-09-21** with the deploy (`public/_headers`).
 
 **Gate:** a stranger with no API key understands the product within one minute.
 
@@ -207,6 +244,21 @@ Nothing here ships until Stop-4 evidence says which one matters. See
   of several chains still open. *(if people build big trees and can't converge)*
 - [ ] **Track C — Trust and reach:** read-only shared tree links compressed into the
   URL (no backend); storage-health warnings; real backup. *(if people ask to show someone their tree)*
+  - **BYO-cloud (Google Drive / OneDrive) belongs here, and only here.** Evaluated
+    2026-09-21 and declined for now — full reasoning in
+    [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md) § BYO-cloud.
+    Technically viable with no backend: both support OAuth 2.0 + PKCE, and the narrow
+    scopes (`drive.file`, `Files.ReadWrite.AppFolder`) see only files the app created,
+    so we would never hold the data or pay for it. It breaks **"no third party"**, not
+    "no backend" — which is a real but statable cost. The reasons to hold: (1) once a
+    tree is in Drive, *"open it on my laptop"* is the obvious next request, and that is
+    **sync** over a branching DAG — the cheapest-looking door into the most expensive
+    room on the refuse list; (2) it widens `connect-src`, the primary mitigation for the
+    key-exfiltration risks, for every user including those who never enable it; (3) it
+    buys little the free path doesn't — a synced folder via `showSaveFilePicker()` or
+    even a synced Downloads folder already puts exports in the cloud. Revisit only if
+    Phase 4 asks for **cross-device access** specifically, not backup; ship it as
+    one-way backup with explicit restore, never as reconciliation.
 
 Investigated but not scheduled: web search / tool calling — API shapes, what the node
 schema can absorb, and the UI decision are written up in
@@ -259,6 +311,16 @@ line in the cost receipt, and is exactly a Stop-4 decision.
     blocks fetching, while `noindex` needs the crawler to fetch and read the header —
     do both and the app can be indexed anyway as a bare URL, the opposite of the
     intent. Neither site has a `robots.txt`; keep it that way.
+- [ ] **Verify whether an installed web app escapes Safari's 7-day storage purge**
+  (~20 min, no code). "Add to Dock" on macOS Safari / "Add to Home Screen" on iOS
+  plausibly gets storage treated differently from a browser tab. If it does, a web app
+  manifest — a few lines, and **no service worker needed**, which keeps the CSP simple —
+  becomes the cheapest durability win available on the browser with the worst exposure.
+  **Apple has changed this behaviour more than once: verify current behaviour before
+  writing it into the UI or telling users anything.** Raised 2026-09-21 while deciding
+  against a desktop app; reasoning in
+  [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md) § "Is browser-local a
+  bad product?".
 - [ ] Edit a submitted prompt (not just regenerate).
 - [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).
@@ -349,3 +411,12 @@ collaboration · cloud sync · mobile authoring · plugin system · hosted proxy
 workspaces. Every one is a fight against a better-resourced project on ground it holds.
 **Sync** is the most-requested and the one that turns a free static page into a service
 with costs — hold it until asked twice; read-only share links give most of the benefit.
+
+**A desktop app is *deferred*, not refused** (decided 2026-09-21). It came up as a
+reaction to Safari's 7-day storage purge. It is the wrong trade *now* — it spends the
+"nobody installs anything, ever" advantage that Phase 4's post-a-link strategy depends
+on, and buys durability for a minority of a minority. But Tauri can wrap this same web
+app at any point, so **the door does not close** and nothing in the current design needs
+to hedge for it. Revisit only on Phase 4 evidence of actual data loss. Reasoning:
+[`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md) § "Is browser-local a
+bad product?".
