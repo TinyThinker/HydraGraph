@@ -39,7 +39,8 @@ or re-investigate. Stop when Phase B's "done when" is met and report.
 
 ```
 Read the Phase C section of docs/notes/launch-execution-plan.md in the
-HydraGraph repo, then build the hub here per that spec.
+HydraGraph repo — plus its "Decisions already made" table and step A8,
+which the hub inherits — then build the hub here per that spec.
 
 The decisions in that file are settled — follow them, don't re-derive
 or re-investigate. Stop when Phase C's "done when" is met and report.
@@ -361,6 +362,23 @@ Hydra Graph changes. Attach the apex `tinythinkerlabs.dev` to that project.
 - **Plain HTML and CSS.** No React, no framework, no build step. One static file.
 - Give it its own `_headers` with a CSP. The hub makes no API calls at all, so its
   `connect-src` should be `'none'` — far stricter than the app's.
+- **Ship `no-transform` in that same `_headers` from the first deploy.** This is a new
+  Cloudflare Pages project, so it gets the same edge-injected Web Analytics beacon the
+  app did, and a hub whose CSP is `script-src 'self'` with `connect-src 'none'` will
+  block it exactly the same way. Don't rediscover this — A8 has the full write-up, and
+  the short version is that **no dashboard toggle exists** for a project that was never
+  opted into Web Analytics. The line to ship:
+
+  ```
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+  ```
+
+  Verify it the same way, against the live hub:
+  `curl -s https://tinythinkerlabs.dev | grep -i cloudflareinsights` — want no output.
+
+  One tradeoff the app didn't have to weigh: `no-transform` also disables Polish, so if
+  the hub ends up carrying a large screenshot, it won't be edge-optimised. Compress it
+  at build time instead — don't drop the directive for it.
 - Dark theme, slate/indigo, matching the app so the two feel related.
 - Built to hold more projects later. One project card today, room for the next.
 
