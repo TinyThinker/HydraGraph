@@ -18,9 +18,17 @@
   assumed; docs corrected throughout. One thing is blocked on the live site, by design:
   Cloudflare Pages injects a Web Analytics beacon from `static.cloudflareinsights.com`
   and `script-src 'self'` refuses it. That gets fixed by turning Web Analytics off in
-  the dash, not by allowing the host — an allowance would let third-party script execute
-  in the app's origin with DOM and IndexedDB access, and IndexedDB is where the API key
-  lives. Server-side zone analytics reports traffic with no client-side code at all.
+  `public/_headers` via `Cache-Control: no-transform`, not by allowing the host.
+- **The beacon has no off switch in the dashboard, which is why looking for one failed.**
+  Cloudflare injects it at the edge, after Pages has served the response, so no build
+  output can remove it — and the "JS snippet injection" toggle only exists for a site
+  that has been *added* to Web Analytics, so a project never opted in shows nothing to
+  switch off. Cloudflare's documented opt-out is a response carrying `Cache-Control:
+  public, no-transform`, which tells the proxy it may not rewrite the payload.
+  `public/_headers` now sends `public, max-age=0, must-revalidate, no-transform` — the
+  first three are exactly what Pages already returned, so caching is unchanged and
+  `no-transform` is the only new behaviour. Applied to `/*` rather than `/` because the
+  SPA fallback serves HTML on every path.
 
 - **The build is deployable, and the CSP was verified against the real thing rather
   than reasoned about.** `public/_headers` ships a `Content-Security-Policy` whose

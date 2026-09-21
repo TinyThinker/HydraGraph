@@ -67,7 +67,7 @@ session wastes context.
 | Encryption / passphrase / WebAuthn | **Out of scope.** Gated on real user demand |
 | Backend | **No.** Evaluated at length and rejected — it closes half the threat table and opens a worse half |
 | Session-only key storage | **Rejected.** Would force key re-creation for anyone who didn't save it elsewhere |
-| Cloudflare Web Analytics | **Off**, decided 2026-09-21 after the beacon turned up as the live site's only CSP violation. Not a threat call — Cloudflare is already the host, and the beacon is cookieless. It's consistency: the plan says no third-party script, `script-src 'self'` is worth more as an absolute than as a list with exceptions, and server-side zone analytics already answers "is anyone visiting" for a `noindex` site shared with a few people. **Turn it off on every Pages project here, including Phase C's hub** |
+| Cloudflare Web Analytics | **Off**, decided 2026-09-21 after the beacon turned up as the live site's only CSP violation. Not a threat call — Cloudflare is already the host, and the beacon is cookieless. It's consistency: the plan says no third-party script, `script-src 'self'` is worth more as an absolute than as a list with exceptions, and server-side zone analytics already answers "is anyone visiting" for a `noindex` site shared with a few people. **There is no dashboard toggle for this on Pages** — the mechanism is `Cache-Control: no-transform`; see A8. Applies to Phase C's hub too |
 
 ## Do not do
 
@@ -214,11 +214,51 @@ returns 200, build stamp reads the deployed commit.
 
 **One violation, and it is the CSP working:** Cloudflare Pages auto-injects its Web
 Analytics beacon (`static.cloudflareinsights.com/beacon.min.js`), which `script-src
-'self'` blocks. The fix is to **turn Web Analytics off** in the Cloudflare dash, not to
-allow the host — see the *Do not do* list above. Allowing it would be a standing
-permission for third-party script to execute in the app's origin, with DOM and IndexedDB
-access, which is where the API key lives; that is the exact property the CSP was written
-to hold. Server-side zone analytics gives traffic numbers with no client-side code.
+'self'` blocks. Declined rather than allowed — see the decisions table. Fixed in A8; the
+dashboard is *not* where this gets turned off.
+
+### A8 — Stop the injected analytics beacon (`Cache-Control: no-transform`)
+
+The live site's only CSP violation was a Web Analytics beacon that Cloudflare injects
+**at the edge**, into the HTML response, after Pages has served it. The origin never
+emits the tag, so nothing in the build can remove it.
+
+**The dashboard is a dead end here.** Web Analytics has to be *added* for a site before
+the "JS snippet injection" toggle exists at all (`Analytics & Logs → Web Analytics →
+Manage Site → Advanced Options`), so a project that was never opted in shows nothing to
+switch off — you would have to opt in in order to opt out. On Pages specifically there
+is a reported case of injection continuing with no UI toggle anywhere. Do not send a
+future session hunting through the dash for a switch that isn't there.
+
+**What actually works,** per Cloudflare's own Web Analytics FAQ: a response carrying
+`Cache-Control: public, no-transform` tells the proxy it may not rewrite the payload, so
+the beacon is never injected. Added to `public/_headers`:
+
+```
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+```
+
+`max-age=0, must-revalidate` is exactly what Pages already returned for both HTML and
+hashed assets, so caching behaviour is unchanged — `no-transform` is the only new part.
+It also switches off Cloudflare's other edge rewrites (Rocket Loader, Email Obfuscation,
+Polish), none of which this app wants.
+
+Applied to `/*` on purpose, not just `/`: the SPA fallback serves `index.html` for any
+path, and an HTML response on any of them is injectable.
+
+*(No `#` comment in `_headers` explaining this. Cloudflare documents comment support, but
+a parse failure there would silently drop the CSP from a live site, and the file is small
+enough that the risk isn't worth the convenience. This section is the explanation.)*
+
+**Verify after deploy** — `no-transform` blocking injection is Cloudflare's documented
+behaviour, not something this repo can prove locally:
+
+```bash
+curl -s https://hydragraph.tinythinkerlabs.dev | grep -i cloudflareinsights   # want: no output
+curl -sI https://hydragraph.tinythinkerlabs.dev | grep -i -E 'cache-control|content-security'
+```
+
+Then re-run the A3 checklist headless; the console should be silent.
 
 ### Phase A is done when
 

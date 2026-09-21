@@ -107,12 +107,15 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     response; `__BUILD_SHA__` is stamped at build time and shown in the corner. The A3
     checklist passes against the live URL — demo seeds cold, receipt priced, catalog
     fetch 200.
-  - **Open before this box ticks: disable Cloudflare Web Analytics.** Pages injects
-    `static.cloudflareinsights.com/beacon.min.js`, which `script-src 'self'` blocks —
-    the only violation on the live site, and the CSP behaving correctly. Fix it in the
-    dash, never by allowing the host: third-party script in this origin gets DOM and
-    IndexedDB access, and IndexedDB is where the API key lives. Server-side zone
-    analytics gives traffic numbers with no client-side code.
+  - **Open before this box ticks: the injected analytics beacon.** Pages injects
+    `static.cloudflareinsights.com/beacon.min.js` at the edge, which `script-src 'self'`
+    blocks — the only violation on the live site, and the CSP behaving correctly.
+    Declined rather than allowed, for consistency with "no third-party script" rather
+    than out of any threat from Cloudflare. **There is no dashboard toggle**: the
+    injection toggle only exists once a site is opted *into* Web Analytics. The fix is
+    `Cache-Control: public, max-age=0, must-revalidate, no-transform` in
+    `public/_headers` (Cloudflare's documented opt-out) — shipped, pending a deploy to
+    verify against the live response. See A8 in the execution plan.
   - **Execution plan: [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md)**
     — three session-sized phases (deploy · key hardening · landing page), with the
     settled decisions and a do-not-do list so no session re-derives them.
