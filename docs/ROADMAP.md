@@ -124,7 +124,10 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
   - **The hub at the apex is built** (2026-09-21), in its own repo
     `TinyThinker/tinythinkerlabs-hub` — one static `index.html`, no build step, no
     JavaScript, CSP stricter than the app's (`script-src 'none'`, `connect-src 'none'`)
-    and `no-transform` from the first commit. Indexing was made an explicit call: the
+    and `no-transform` from the first commit. It ships as an **assets-only Worker**, not
+    Pages — Pages is the legacy flow now, and `wrangler.jsonc` omits `main` on purpose
+    because `_headers` does not apply to Worker-generated responses. This app stays on
+    Pages. Indexing was made an explicit call: the
     **hub is indexable, the app keeps `noindex`** — the app is a client-rendered SPA with
     no crawlable text, so it was never the SEO asset, and the hub is the page that
     carries the early-build caveat. Attaching `tinythinkerlabs.dev` to a second Pages

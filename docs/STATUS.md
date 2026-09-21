@@ -15,8 +15,9 @@ Last commit: 6fd65b1 — 2026-09-21
 Last commit message: docs: record the missing CI gate as carried debt
 
 The hub (launch plan Phase C) lives in a **separate repo** —
-`TinyThinker/tinythinkerlabs-hub`, first commit `5bdbf1b` — and never affects this
-repo's version, tests or deploys. It is built but not yet live.
+`TinyThinker/tinythinkerlabs-hub`, at `db6fce0` — and never affects this repo's
+version, tests or deploys. It is built but not yet live. It deploys as an assets-only
+**Worker**; this app stays on **Pages**, which still works and had no reason to move.
 v0.6.0 merged as a four-commit series (test fix · feature · two doc syncs); the
 commits on `main` since are unreleased — the counterfactual labelling, the receipt
 exclusion fix, the pill-label pass, Phase A of the launch plan (deploy + CSP +
@@ -116,13 +117,17 @@ Ordering rationale, with ROI and impact per item, lives in
 Phase B (key hardening) closed the same day. Phase C's page is **built** in its own
 repo; only the Cloudflare attach remains.*
 
-1. **[Phase C] Attach `tinythinkerlabs.dev` to a Pages project** — the hub itself is
+1. **[Phase C] Attach `tinythinkerlabs.dev` to the hub Worker** — the hub itself is
    **built and committed** (2026-09-21) in its own repo, `TinyThinker/tinythinkerlabs-hub`
-   (`5bdbf1b`): one static `index.html`, no build step, no JavaScript, `_headers` with
-   `script-src 'none'` / `connect-src 'none'` and `no-transform` from the first commit.
-   Verified headless — zero CSP violations, silent console. What's left is the Cloudflare
-   half, which is the user's: second Pages project (preset None, empty build command,
-   output `/`), attach the apex, then the two `curl` checks in the hub README
+   (`db6fce0`): one static `public/index.html`, no build step, no JavaScript, `_headers`
+   with `script-src 'none'` / `connect-src 'none'` and `no-transform` from the first
+   commit. Ships as an **assets-only Worker**, not Pages — Pages is the legacy flow now.
+   `wrangler.jsonc` omits `main` on purpose, because `_headers` does not apply to
+   Worker-generated responses. Verified against `wrangler dev`: all four headers on every
+   asset, unknown paths 404, zero CSP violations, silent console. What's left is the
+   user's half: create the Worker from the repo (empty build command, `npx wrangler
+   deploy`, path `/`), attach the apex under *Domains & Routes*, then the two `curl`
+   checks in the hub README
 2. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
    `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
 3. [Phase 3] Storage policy — **the key half is done** (Phase B: guidance, destination
