@@ -241,8 +241,9 @@ the beacon is never injected. Added to `public/_headers`:
 
 `max-age=0, must-revalidate` is exactly what Pages already returned for both HTML and
 hashed assets, so caching behaviour is unchanged — `no-transform` is the only new part.
-It also switches off Cloudflare's other edge rewrites (Rocket Loader, Email Obfuscation,
-Polish), none of which this app wants.
+It also switches off Cloudflare's other edge rewrites: Rocket Loader and Email
+Obfuscation, neither of which this app wants, and Polish, which is a Pro-plan feature
+and therefore not running here at all.
 
 Applied to `/*` on purpose, not just `/`: the SPA fallback serves `index.html` for any
 path, and an HTML response on any of them is injectable.
@@ -376,9 +377,10 @@ Hydra Graph changes. Attach the apex `tinythinkerlabs.dev` to that project.
   Verify it the same way, against the live hub:
   `curl -s https://tinythinkerlabs.dev | grep -i cloudflareinsights` — want no output.
 
-  One tradeoff the app didn't have to weigh: `no-transform` also disables Polish, so if
-  the hub ends up carrying a large screenshot, it won't be edge-optimised. Compress it
-  at build time instead — don't drop the directive for it.
+  `no-transform` also disables Cloudflare's other edge rewrites, Polish among them —
+  but **Polish is Pro-and-above, so on the Free plan nothing is being given up.** It
+  only becomes a question if this account is ever upgraded *and* the hub carries a
+  heavy screenshot. Even then: compress at build time, don't drop the directive.
 - Dark theme, slate/indigo, matching the app so the two feel related.
 - Built to hold more projects later. One project card today, room for the next.
 
