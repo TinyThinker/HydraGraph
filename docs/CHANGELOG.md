@@ -10,6 +10,18 @@
 
 ## Unreleased
 
+- **The app is live at `https://hydragraph.tinythinkerlabs.dev`** (2026-09-21, Cloudflare
+  Pages). The CSP, `X-Robots-Tag: noindex` and `Referrer-Policy: no-referrer` are all
+  present on the live response, the demo seeds cold into 16 turns / 4 forks, the receipt
+  prices at **$0.1803 vs ~$0.2557, ~30% saved, 0 excluded**, and the catalog fetch
+  returns 200. The subdomain is `hydragraph`, not the `hydra` the planning notes
+  assumed; docs corrected throughout. One thing is blocked on the live site, by design:
+  Cloudflare Pages injects a Web Analytics beacon from `static.cloudflareinsights.com`
+  and `script-src 'self'` refuses it. That gets fixed by turning Web Analytics off in
+  the dash, not by allowing the host — an allowance would let third-party script execute
+  in the app's origin with DOM and IndexedDB access, and IndexedDB is where the API key
+  lives. Server-side zone analytics reports traffic with no client-side code at all.
+
 - **The build is deployable, and the CSP was verified against the real thing rather
   than reasoned about.** `public/_headers` ships a `Content-Security-Policy` whose
   `connect-src` is limited to `openrouter.ai` plus localhost (Ollama) — so a

@@ -59,7 +59,7 @@ session wastes context.
 |---|---|
 | Host | **Cloudflare Pages**, connected to `github.com/TinyThinker/HydraGraph`. User already has a Cloudflare account |
 | Domain | **`tinythinkerlabs.dev`**, purchased 2026-09-20 through Cloudflare Registrar, so DNS is already in the user's Cloudflare account. The whole `.dev` TLD is HSTS-preloaded — browsers force HTTPS, there is no http variant to worry about |
-| URL layout | **The app lives at the root of its own subdomain: `hydra.tinythinkerlabs.dev/`.** No Vite multi-page build, no `/app/` subpath, no `base` setting |
+| URL layout | **The app lives at the root of its own subdomain: `hydragraph.tinythinkerlabs.dev/`.** No Vite multi-page build, no `/app/` subpath, no `base` setting |
 | Where projects get explained | **On the hub at `tinythinkerlabs.dev`**, not on each project's subdomain. One place to maintain copy, and every project's URL is stable forever |
 | Future projects | **Subdomain per project** (`<project>.tinythinkerlabs.dev`), never subpaths — subpaths share a browser origin, so one project's compromised dependency could read another's IndexedDB |
 | API key storage | **Persist by default.** An OpenRouter key cannot be retrieved after creation, so refusing to store it costs the user more than it protects them |
@@ -196,17 +196,32 @@ Write the exact click-path into the response, not into this file. Settings neede
 - Output directory: `dist`
 - Production branch: `main`
 
-Then attach the custom domain **`hydra.tinythinkerlabs.dev`** under the Pages project's
+Then attach the custom domain **`hydragraph.tinythinkerlabs.dev`** under the Pages project's
 *Custom domains* tab. Because the domain is registered with Cloudflare, the DNS record
 is created automatically — no manual CNAME, no nameserver change, and the certificate
 issues on its own within a few minutes.
 
 After it deploys, verify the live URL in a fresh profile against the same A3 checklist,
-and confirm the CSP header is actually present (`curl -I https://hydra.tinythinkerlabs.dev`).
+and confirm the CSP header is actually present (`curl -I https://hydragraph.tinythinkerlabs.dev`).
+
+**Done 2026-09-21.** The subdomain is **`hydragraph`**, not `hydra` — the earlier drafts
+of this file said `hydra` and have been corrected throughout. `curl -I` returns 200 with
+`content-security-policy`, `x-robots-tag: noindex` and `referrer-policy: no-referrer` all
+present. Re-ran the A3 checklist headless against the live URL: demo seeds cold (16 turns,
+4 forks), receipt reads **$0.1803 vs ~$0.2557, ~30% saved, 0 excluded**, catalog fetch
+returns 200, build stamp reads the deployed commit.
+
+**One violation, and it is the CSP working:** Cloudflare Pages auto-injects its Web
+Analytics beacon (`static.cloudflareinsights.com/beacon.min.js`), which `script-src
+'self'` blocks. The fix is to **turn Web Analytics off** in the Cloudflare dash, not to
+allow the host — see the *Do not do* list above. Allowing it would be a standing
+permission for third-party script to execute in the app's origin, with DOM and IndexedDB
+access, which is where the API key lives; that is the exact property the CSP was written
+to hold. Server-side zone analytics gives traffic numbers with no client-side code.
 
 ### Phase A is done when
 
-`https://hydra.tinythinkerlabs.dev` serves the app, the demo seeds cold, `curl -I` shows
+`https://hydragraph.tinythinkerlabs.dev` serves the app, the demo seeds cold, `curl -I` shows
 the CSP and `X-Robots-Tag`, and the console is clean.
 
 ---
@@ -287,7 +302,7 @@ people into Hydra Graph. This is the page that explains the project — the app'
 subdomain stays pure app.
 
 **Estimated:** ~2–3h. **Session boundary:** yes. Lowest priority — slipping this costs
-nothing, because `hydra.tinythinkerlabs.dev` already works on its own.
+nothing, because `hydragraph.tinythinkerlabs.dev` already works on its own.
 
 ### Where it lives
 
@@ -309,7 +324,7 @@ A line on what Tiny Thinker Labs is, then a card for Hydra Graph. Lead with what
 demo shows rather than a feature list: comparing several models at turn 30 of a real
 problem, on identical inherited context, with the cost. Say plainly that it needs no API
 key to explore, and that it is an early build. The primary action is one click to
-`hydra.tinythinkerlabs.dev`.
+`hydragraph.tinythinkerlabs.dev`.
 
 ### Decide before publishing
 
@@ -354,6 +369,9 @@ file so the next session knows where to start.
       **A7 is the user's:** Cloudflare Pages project + custom domain, then re-verify the
       live URL against the A3 checklist. Phase A's "done when" is not met until that
       lands.
-- [ ] Phase A7 — Cloudflare Pages project + `hydra.tinythinkerlabs.dev` (user)
+- [ ] Phase A7 — Cloudflare Pages project + `hydragraph.tinythinkerlabs.dev` (user).
+      **Live 2026-09-21** and passing the A3 checklist. One item open before Phase A's
+      "done when" is met: disable Cloudflare Web Analytics, whose injected beacon is the
+      only thing the CSP is blocking on the live site.
 - [ ] Phase B — Key hardening
 - [ ] Phase C — The hub at `tinythinkerlabs.dev` (separate repo)

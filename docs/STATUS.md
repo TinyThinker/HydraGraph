@@ -42,7 +42,7 @@ Test suite on `main`: **369 tests across 51 files**; `tsc -b` and `oxlint` clean
 ### Phase 3 — The front door (days 10–12)
 - [x] OpenRouter + Ollama are the only providers (native Gemini removed; Dexie v5 remaps old `gemini` rows to `google/*` slugs); live OpenRouter `/api/v1/models` price catalog (IndexedDB-cached, 1 h TTL, bundled snapshot fallback); searchable priced model pickers replace hand-typed ids in reader panel / fan-out / Settings; one provider-linked credential field; fan-out cheap→frontier price-tier spread
 - [x] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers — 16 turns / 4 forks, seeded on first run, priced off `BUNDLED_CATALOG` ($0.1794 vs $0.2545 linear, 29% saved)
-- [ ] Static deploy; the landing page is the app with the demo preloaded — **repo side done** (`public/_headers` CSP + noindex, `__BUILD_SHA__` stamp, CSP verified headless against the real headers); waiting on the Cloudflare Pages project and `hydra.tinythinkerlabs.dev`, which is the user's step
+- [ ] Static deploy; the landing page is the app with the demo preloaded — **live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21)**, serving the CSP, `noindex` and `Referrer-Policy`, demo seeding cold, catalog fetch 200. One item left before this box ticks: **turn off Cloudflare Web Analytics**, whose injected `static.cloudflareinsights.com` beacon is the only CSP violation on the live site (do not allow the host — that would let third-party script run in the origin that holds the API key)
 - [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app** (it is already written up in `SETUP.md` §4 — what's missing is a hint next to the Ollama option, not the prose)
 - [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`)
 
@@ -102,13 +102,13 @@ Phase 3 is the static deploy and honest onboarding copy.
 Ordering rationale, with ROI and impact per item, lives in
 [`notes/launch-priorities.md`](notes/launch-priorities.md).
 
-1. [Phase 3] Static deploy — **the repo side is done** (Phase A of
-   [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md): CSP + noindex in
-   `public/_headers`, `__BUILD_SHA__` stamp, headless CSP verification). The remaining
-   step is the user's: create the Cloudflare Pages project against
-   `github.com/TinyThinker/HydraGraph` (build `npm run build`, output `dist`, branch
-   `main`), attach `hydra.tinythinkerlabs.dev`, then re-run the A3 checklist on the
-   live URL. No `base` is needed — the app sits at the root of its own subdomain
+1. [Phase 3] Static deploy — **live at `https://hydragraph.tinythinkerlabs.dev`**
+   (Phase A of [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md)).
+   All A3 checks pass on the live URL. **One action left, in the Cloudflare dash, not
+   in this repo: disable Web Analytics** — its injected beacon is the single CSP
+   violation on the live site, and allowing the host would hand third-party script
+   DOM + IndexedDB access in the origin that stores the API key. Server-side zone
+   analytics covers traffic with no client-side code
 2. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
    `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
 3. [Phase 3] Storage policy — durability for trees, handling for the key. Was "one

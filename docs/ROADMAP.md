@@ -101,17 +101,24 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     ordinary rows. The only UI concession is `ProviderBanner`, which explains rather
     than warns while the demo is open.
 - [ ] Static deploy; the landing page *is* the app with the demo preloaded.
-  - **Phase A's repo work is done (2026-09-20).** `public/_headers` ships the CSP
-    (`connect-src` limited to OpenRouter and localhost), `X-Robots-Tag: noindex` and
-    `Referrer-Policy: no-referrer`; `__BUILD_SHA__` is stamped at build time and shown
-    in the corner. Verified headless against the real headers: zero violations. What
-    remains is the Cloudflare Pages project and the custom domain — the user's step.
+  - **Live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21).** `public/_headers`
+    ships the CSP (`connect-src` limited to OpenRouter and localhost), `X-Robots-Tag:
+    noindex` and `Referrer-Policy: no-referrer`, all three confirmed on the live
+    response; `__BUILD_SHA__` is stamped at build time and shown in the corner. The A3
+    checklist passes against the live URL — demo seeds cold, receipt priced, catalog
+    fetch 200.
+  - **Open before this box ticks: disable Cloudflare Web Analytics.** Pages injects
+    `static.cloudflareinsights.com/beacon.min.js`, which `script-src 'self'` blocks —
+    the only violation on the live site, and the CSP behaving correctly. Fix it in the
+    dash, never by allowing the host: third-party script in this origin gets DOM and
+    IndexedDB access, and IndexedDB is where the API key lives. Server-side zone
+    analytics gives traffic numbers with no client-side code.
   - **Execution plan: [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md)**
     — three session-sized phases (deploy · key hardening · landing page), with the
     settled decisions and a do-not-do list so no session re-derives them.
   - Host is Cloudflare Pages; domain is `tinythinkerlabs.dev`, bought 2026-09-20 via
     Cloudflare Registrar so DNS is already in-account.
-  - Layout: **the app at the root of `hydra.tinythinkerlabs.dev`** — no multi-page
+  - Layout: **the app at the root of `hydragraph.tinythinkerlabs.dev`** — no multi-page
     build, no `base`, no subpath. Projects are explained on the hub at the apex, so
     each project's URL is stable forever. Future projects get their own **subdomain** —
     subpaths share a browser origin, which would let one project's compromised
