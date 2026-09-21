@@ -213,6 +213,19 @@ line in the cost receipt, and is exactly a Stop-4 decision.
 
 ### Carried debt (none launch-blocking)
 
+- [ ] **Nothing runs the test suite except a human.** Checked 2026-09-21: there is no
+  `.github/` directory, no Actions workflow, no git hook and no husky. Deploys are
+  Cloudflare Pages on push to `main`, whose build command is `npm run build` =
+  `tsc -b && vite build` — that type-checks, but `npm run check` is
+  `tsc -b && npm run lint && npm run test`, so **lint and all 378 tests are skipped on
+  the deploy path**. A commit that type-checks but fails tests ships green.
+  Fix is a ~20-line GitHub Actions workflow (checkout · `npm ci` · `npm run check`) on
+  push/PR, plus a branch protection rule on `main` requiring it — without the rule the
+  workflow is advisory, since this repo is worked by committing straight to `main`.
+  Do **not** solve this by making Cloudflare's build command `npm run check && npm run
+  build`: that turns a red test into a failed deploy discovered after the fact, pays
+  build minutes to find it, and cannot gate a merge. Cloudflare deploys; the gate
+  belongs on GitHub.
 - [ ] Edit a submitted prompt (not just regenerate).
 - [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).

@@ -61,6 +61,7 @@ Test suite on `main`: **378 tests across 52 files**; `tsc -b` and `oxlint` clean
 - [ ] Investigated, not scheduled: web search / tool calling (`notes/tooling-research.md`, Dexie v7); canvas node labels — rename + generated titles (`notes/node-labels-research.md`, no migration needed)
 
 ### Carried debt (none launch-blocking)
+- [ ] **No CI — nothing runs the tests but a human** (checked 2026-09-21). No `.github/`, no workflow, no git hook. Cloudflare Pages deploys on push to `main` with build command `npm run build` (`tsc -b && vite build`), which type-checks but skips lint and all 378 tests. Wants a GitHub Actions workflow running `npm run check`, plus branch protection on `main` to make it binding. Cloudflare deploys; the gate belongs on GitHub, not in the build command
 - [ ] Edit a submitted prompt (not just regenerate)
 - [x] Throttle the chat pane's Markdown re-parse — 40 parses per 40 tokens → 6 (v0.5.1)
 - [ ] 200-node performance pass
@@ -120,9 +121,13 @@ Phase B (key hardening) closed the same day.*
    host, "Forget key"). What remains is durability for trees: `persist()` on first real
    write, `estimate()` for real numbers, export nudge at a real-work threshold.
    Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
-4. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
+4. [Debt] **CI that actually runs `npm run check`** — a GitHub Actions workflow plus
+   branch protection on `main`. Today the only thing standing between a red test and
+   the live site is remembering to run it; Cloudflare's build command type-checks and
+   nothing more. Small, and it stops being optional the moment anyone else commits
+5. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
    one number a skeptical reader will poke at
-5. [Phase 3+] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync
+6. [Phase 3+] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync
 
 ---
 
