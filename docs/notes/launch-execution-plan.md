@@ -455,4 +455,21 @@ file so the next session knows where to start.
       `SettingsCredentialField`, rendered straight after the input, with a DOM-order
       test pinning it there.
       **Phase C is next, and it runs in a different repo.**
-- [ ] Phase C — The hub at `tinythinkerlabs.dev` (separate repo)
+- [x] **Phase C (build) — done 2026-09-21, in `TinyThinker/tinythinkerlabs-hub`.** New
+      repo at `~/dev/projects/tinythinkerlabs-hub`, first commit `5bdbf1b`. One
+      `index.html` (markup + CSS in the file, zero `<script>` tags), `_headers`,
+      `favicon.svg`, `README.md`. CSP is stricter than the app's — `script-src 'none'`,
+      `connect-src 'none'` — and `no-transform` shipped from the first commit per A8
+      rather than being rediscovered. Verified headless against a local server that
+      applies `_headers` verbatim: zero CSP violations, silent console, zero failed
+      requests, `scrollWidth == clientWidth` at 390 px.
+      **Indexing decided, not left over:** hub indexable (canonical, description, Open
+      Graph, no `X-Robots-Tag`), app stays `noindex`. Rationale in the hub's README —
+      short version, the app is a client-rendered SPA whose crawlable HTML is an empty
+      `<div>`, so `noindex` costs it almost nothing, while the static hub is the real
+      crawl target *and* the page carrying the early-build caveat. Removing `noindex`
+      later leaves no residue.
+      **The Cloudflare half is the user's**, exactly like A7: create a second Pages
+      project from the hub repo (preset None, empty build command, output `/`), attach
+      the apex `tinythinkerlabs.dev`, then run the two `curl` checks in the hub README
+      and confirm a silent console. Phase C's "done when" is not met until that lands.

@@ -11,8 +11,12 @@
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last commit: 5b478cd — 2026-09-21
-Last commit message: docs: Polish is Pro-only, so no-transform costs nothing here
+Last commit: 6fd65b1 — 2026-09-21
+Last commit message: docs: record the missing CI gate as carried debt
+
+The hub (launch plan Phase C) lives in a **separate repo** —
+`TinyThinker/tinythinkerlabs-hub`, first commit `5bdbf1b` — and never affects this
+repo's version, tests or deploys. It is built but not yet live.
 v0.6.0 merged as a four-commit series (test fix · feature · two doc syncs); the
 commits on `main` since are unreleased — the counterfactual labelling, the receipt
 exclusion fix, the pill-label pass, Phase A of the launch plan (deploy + CSP +
@@ -109,12 +113,16 @@ Ordering rationale, with ROI and impact per item, lives in
 *Static deploy is done — live at `https://hydragraph.tinythinkerlabs.dev` since
 2026-09-21, all A3 checks green including a silent console. Phase A of
 [`notes/launch-execution-plan.md`](notes/launch-execution-plan.md) is closed, and
-Phase B (key hardening) closed the same day.*
+Phase B (key hardening) closed the same day. Phase C's page is **built** in its own
+repo; only the Cloudflare attach remains.*
 
-1. **[Phase C] The hub at `tinythinkerlabs.dev`** — a one-file static landing page in a
-   **separate repo**, with its own `_headers` (`connect-src 'none'`, and
-   `no-transform` from the first deploy). Lowest priority: slipping it costs nothing
-   because the app's subdomain already stands alone. Spec in the execution plan
+1. **[Phase C] Attach `tinythinkerlabs.dev` to a Pages project** — the hub itself is
+   **built and committed** (2026-09-21) in its own repo, `TinyThinker/tinythinkerlabs-hub`
+   (`5bdbf1b`): one static `index.html`, no build step, no JavaScript, `_headers` with
+   `script-src 'none'` / `connect-src 'none'` and `no-transform` from the first commit.
+   Verified headless — zero CSP violations, silent console. What's left is the Cloudflare
+   half, which is the user's: second Pages project (preset None, empty build command,
+   output `/`), attach the apex, then the two `curl` checks in the hub README
 2. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
    `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
 3. [Phase 3] Storage policy — **the key half is done** (Phase B: guidance, destination

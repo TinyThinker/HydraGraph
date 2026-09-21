@@ -10,6 +10,26 @@
 
 ## Unreleased
 
+- **The hub at the apex is built, in its own repo** (2026-09-21). Phase C of the launch
+  plan lives in `TinyThinker/tinythinkerlabs-hub` — one static `index.html`, no build
+  step, no framework, no JavaScript at all, dark slate/indigo so it reads as a sibling of
+  the app. It introduces Tiny Thinker Labs, then one project card that leads with what
+  the demo *shows* — a real session 16 turns deep, branched four ways, one question
+  fanned out to three models on identical inherited context, every turn priced against a
+  linear-thread counterfactual — says plainly that it needs no key and that it is an
+  early build, and sends one click to `hydragraph.tinythinkerlabs.dev`. Its `_headers`
+  carries a CSP **stricter than the app's**: `script-src 'none'` and `connect-src 'none'`,
+  because the page runs no script and makes no request. `Cache-Control: … no-transform`
+  ships from the first deploy rather than being rediscovered — a new Pages project gets
+  the same edge-injected analytics beacon, and there is no dashboard toggle for a project
+  never opted in (A8). **Indexing settled as an explicit choice:** the hub is indexable
+  (canonical + description + Open Graph, no `X-Robots-Tag`) while the app keeps `noindex`.
+  The app is a client-rendered SPA whose crawlable HTML is an empty `<div>`, so it was
+  never the SEO asset; the static hub is, and it is the page carrying the early-build
+  caveat. Verified headless against a server applying `_headers` verbatim — zero CSP
+  violations, silent console, no failed requests, no horizontal overflow at 390 px.
+  **Not live yet:** attaching `tinythinkerlabs.dev` to a Pages project is the user's step,
+  and Phase C's "done when" is not met until it lands.
 - **Nobody pastes a key now without being told what it costs them if it leaks**
   (2026-09-21). A new `KeyGuidance` component under the OpenRouter credential field
   says three things and no more: OpenRouter shows the key once so save it in a password
