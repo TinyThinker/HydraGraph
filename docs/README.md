@@ -8,7 +8,7 @@ Four questions, four files. If you read nothing else, read this table.
 | **What do I do next?** | [`ROADMAP.md`](ROADMAP.md) | Hand-maintained. The single source of truth for future work. |
 | **What already shipped?** | [`CHANGELOG.md`](CHANGELOG.md) | Hand-maintained. One line per change, newest first. |
 | **How does the system work?** | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Hand-maintained. The permanent design document. |
-| **How do I run it / configure a provider?** | [`SETUP.md`](SETUP.md) | Hand-maintained. |
+| **How do I run it / configure a provider / use CI and the AI PR review?** | [`SETUP.md`](SETUP.md) | Hand-maintained. |
 
 Repo-root [`README.md`](../README.md) is the public overview and quickstart. Repo-root
 [`CLAUDE.md`](../CLAUDE.md) is the contributor / AI-agent coding-constraints file.
@@ -85,7 +85,7 @@ docs/
   ROADMAP.md           Tier 2 — forward checklist (source of truth)
   CHANGELOG.md         Tier 2 — shipping history
   ARCHITECTURE.md      Tier 1 — the permanent design document
-  SETUP.md             Tier 1 — run + provider configuration
+  SETUP.md             Tier 1 — run + provider configuration + CI / AI PR review
   notes/               Tier 2 — rationale behind ROADMAP boxes (no checklists here)
     mvp-strategy.md            the competitive-scan / positioning essay
     launch-priorities.md       why the open ROADMAP boxes are ordered as they are

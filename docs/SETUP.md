@@ -161,7 +161,53 @@ siblings and hit **Compare** in the header to read them side by side.
 
 ---
 
-## 6. Troubleshooting
+## 6. CI and AI PR review
+
+Two GitHub Actions workflows live in `.github/workflows/`.
+
+### CI (`ci.yml`) — always on
+
+Runs `npm ci`, `npm run lint` and `npm run test` on every PR to `main` and every push to
+`main`. It does not run `tsc -b`; the Cloudflare Pages build does that. Run the full
+gate locally with `npm run check`.
+
+### AI PR review (`ai-pr-review.yml`) — opt-in
+
+Sends a PR's diff (first 60 KB; lockfiles, `dist/`, `build/`, `.min.`, `.map` and `.svg`
+filtered out) to DeepSeek through OpenRouter. If the model finds problems it posts one PR
+comment. If not, it posts nothing. **Your diff leaves GitHub and goes to OpenRouter and
+DeepSeek**, so do not use it on PRs that contain anything private.
+
+**One-time setup**
+
+1. Add the repo secret `OPENROUTER_API_KEY` (GitHub → Settings → Secrets and variables →
+   Actions → Secrets).
+2. Create the label: `gh label create ai-review --color 5319e7`
+
+**Use it**
+
+| Goal | How |
+|---|---|
+| Review one PR | Add the `ai-review` label. The review runs on label, then again on every push to that PR |
+| Stop reviewing one PR | Remove the label |
+| Turn it off everywhere | `gh variable set AI_REVIEW_ENABLED --body false` |
+| Turn it back on | `gh variable set AI_REVIEW_ENABLED --body true` (or delete the variable) |
+| Turn it off from the UI | Actions tab → *AI PR Review (DeepSeek)* → ⋯ → *Disable workflow* (only once the file is on `main`) |
+
+**Rules**
+
+- Draft PRs are skipped. Mark the PR ready first.
+- PRs from forks get no secret, so the job fails there.
+- The label is checked on every run: no label, no review, no cost.
+- A failed model call fails the job (exit 1). It does not block merging unless you add
+  it as a required check, which you should not.
+- To change what it looks for, edit `REVIEW_SYSTEM_PROMPT` in the workflow file. Output
+  is either `LGTM` (no comment) or a list of `[Blocker]` / `[Warning]` items.
+- It is a second opinion from a cheap model. Treat findings as leads to verify.
+
+---
+
+## 7. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|

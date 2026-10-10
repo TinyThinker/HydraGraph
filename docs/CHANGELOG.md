@@ -10,6 +10,13 @@
 
 ## Unreleased
 
+- **CI and an opt-in AI PR review** (2026-10-10). `ci.yml` (PR #1) runs lint and tests on
+  every PR and push to `main`. `ai-pr-review.yml` sends a PR diff to DeepSeek via
+  OpenRouter and comments only when it finds problems. It runs only on PRs labelled
+  `ai-review`, and the repo variable `AI_REVIEW_ENABLED=false` turns it off everywhere.
+  Fixed an un-exported `DIFF` variable that made every run fail with `KeyError`. Also
+  added `wrangler.jsonc` (Cloudflare assets config). Usage is in `SETUP.md` §6. Branch
+  protection on `main` is not confirmed.
 - **The hub is live at `https://tinythinkerlabs.dev`** (2026-09-21). Verified against
   the live apex: `HTTP/2 200`, the CSP verbatim on the response alongside
   `referrer-policy`, `x-content-type-options` and the `no-transform` `Cache-Control`;
