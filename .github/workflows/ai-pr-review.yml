@@ -1,0 +1,112 @@
+name: AI PR Review (DeepSeek)
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  deepseek_review:
+    # Opt-in per PR via the `ai-review` label.
+    # Global kill switch: set repo variable AI_REVIEW_ENABLED to `false`.
+    if: >-
+      github.event.pull_request.draft == false &&
+      vars.AI_REVIEW_ENABLED != 'false' &&
+      contains(github.event.pull_request.labels.*.name, 'ai-review')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Review React/TS SPA Diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_SYSTEM_PROMPT: |
+            You are a Principal Frontend Architect reviewing pull requests for a production TypeScript and React Single Page Application (SPA).
+            Your goal is to catch subtle runtime bugs, memory leaks, state desynchronization, and architectural flaws before they reach production.
+
+            DO NOT comment on code formatting, whitespace, indentation, or style preferences (oxlint handles static analysis).
+            DO NOT comment on trivial refactors unless they prevent a bug.
+
+            Review strictly against these core failure modes:
+
+            1. REACT LIFECYCLE & HOOK PITFALLS:
+               - Stale Closures: Missing dependencies or failing to use functional state updates (e.g., `setCount(c => c + 1)`) inside callbacks, timers, or effects.
+               - Async Race Conditions: Network requests in `useEffect` without abort controllers (`AbortController`) or cancellation flags, allowing out-of-order responses to corrupt state.
+               - Missing Cleanups: Failure to remove `window`/`document` event listeners, clear intervals/timeouts, or cancel subscriptions on unmount.
+               - Derived State Anti-patterns: Duplicating state in `useState` when it can be calculated during render or memoized via `useMemo`.
+
+            2. TYPESCRIPT & RUNTIME BOUNDARIES:
+               - Unsafe Type Escapes: Use of `any`, excessive `unknown as T` casts, or non-null assertions (`!`) that bypass compiler safety.
+               - Untyped Boundaries: External API payloads, localStorage reads, or URL search params passed directly into component state without schema validation or type narrowing.
+               - Incomplete State Discriminations: Missing exhaustive checks or failure to handle loading/error/empty states in async UI flows.
+
+            3. SPA PERFORMANCE & ARCHITECTURE:
+               - Re-render Thrashing: Unstable object or function references created inline and passed down to Context Providers or `React.memo` components.
+               - DOM & Memory Leaks: Retaining detached DOM nodes, uncleaned Intersection/MutationObservers, or persisting unbounded state in memory.
+               - Client Secrets: Accidental exposure of private backend keys or sensitive environment variables in client-side code.
+
+            FEEDBACK FORMAT:
+            - If no actionable bugs or regressions exist, respond ONLY with: LGTM
+            - For any issues found, use this structure:
+              - **[Blocker]** or **[Warning]**: Short title
+              - **Location**: Affected file and function/component
+              - **Issue**: Precise explanation of the runtime failure mode
+              - **Recommended Fix**: Concise TypeScript/React code snippet resolving the issue
+        run: |
+          # 1. Fetch diff, filtering out lockfiles, build artifacts, static SVGs, and sourcemaps
+          export DIFF=$(gh pr diff "$PR_NUMBER" | grep -v -E "lock\.|dist/|build/|\.min\.|\.map|\.svg" | head -c 60000)
+
+          if [ -z "$DIFF" ]; then
+            echo "No reviewable code changes detected."
+            exit 0
+          fi
+
+          # 2. Execute review via OpenRouter
+          python3 -c "
+          import os, json, urllib.request
+
+          diff_text = os.environ['DIFF']
+          system_prompt = os.environ['REVIEW_SYSTEM_PROMPT']
+          pr_num = os.environ['PR_NUMBER']
+
+          payload = {
+              'model': 'deepseek/deepseek-chat',
+              'messages': [
+                  {'role': 'system', 'content': system_prompt},
+                  {'role': 'user', 'content': f'Pull Request Diff:\n\n{diff_text}'}
+              ],
+              'temperature': 0.1
+          }
+
+          req = urllib.request.Request(
+              'https://openrouter.ai/api/v1/chat/completions',
+              data=json.dumps(payload).encode('utf-8'),
+              headers={
+                  'Authorization': f'Bearer {os.environ[\"OPENROUTER_API_KEY\"]}',
+                  'Content-Type': 'application/json',
+                  'HTTP-Referer': 'https://github.com',
+                  'X-Title': 'GitHub React PR Reviewer'
+              }
+          )
+
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  data = json.loads(resp.read().decode('utf-8'))
+                  review = data['choices'][0]['message']['content'].strip()
+
+              if review and review != 'LGTM':
+                  header = '### 🔍 AI Code Review (DeepSeek)\n\n'
+                  with open('/tmp/pr_review.md', 'w') as f:
+                      f.write(header + review)
+                  os.system(f'gh pr comment {pr_num} --body-file /tmp/pr_review.md')
+              else:
+                  print('Review passed with no blockers (LGTM).')
+          except Exception as e:
+              print(f'Review execution failed: {e}')
+              exit(1)
+          "
