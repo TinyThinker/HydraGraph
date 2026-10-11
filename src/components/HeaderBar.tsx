@@ -11,6 +11,7 @@ import { ImportButton } from './ImportButton'
 import { CostReceipt } from './CostReceipt'
 import { ProviderBanner } from './ProviderBanner'
 import { StorageBanner } from './StorageBanner'
+import { ExportNudge } from './ExportNudge'
 
 export function HeaderBar() {
   const [modalOpen, setModalOpen] = useState(false)
@@ -101,6 +102,7 @@ export function HeaderBar() {
       )}
       <StorageBanner />
       <ProviderBanner onOpenSettings={() => setModalOpen(true)} />
+      <ExportNudge />
       <SettingsModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </>
   )
