@@ -17,8 +17,8 @@ personas at turn 30 of a real problem, on identical inherited context, with the 
 ## Current State
 
 The engineering is largely done and tested (streaming, context engine, deterministic
-layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 378 tests
-across 52 files, `tsc` and `oxlint` clean as of 2026-10-11).
+layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 402 tests
+across 55 files, `tsc` and `oxlint` clean as of 2026-10-11).
 Phases 1–2 are complete — the first-run friction and the retry/cancel regression are
 fixed, and the deep-context arbitration demo (fan-out, compare, cost receipt) is
 built. The model-catalog work under Phase 3 is done; next up is the front door.
@@ -195,13 +195,19 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
       `QuotaExceededError` as quota; (5) fix `persistError`. Items 4–5 are the defects
       below.
   - **Two defects found during the audit**, both in `useTreeStore.ts`, both folded into
-    this box rather than carried as separate debt:
-    - `persistError` (`:397`) responds to a failed write by doing another write (`:405`),
+    this box rather than carried as separate debt. **Both fixed 2026-10-11** (spec
+    `specs/roadmap-items-phase3-front-door-2026-10-11/phase-1-write-failures.md`):
+    - [x] `persistError` (`:397`) responds to a failed write by doing another write (`:405`),
       unawaited at the `:436` call site — so if the original failure was quota, the
       handler throws an unhandled rejection in exactly the case it exists for.
-    - Quota failures are never named: the throttled flush logs to `console.error`
+      *Fixed:* `persistError`, `finalizeNode` and `cancelGeneration` now update memory
+      first and catch their DB write, so a failed write never leaves a node `streaming`.
+    - [x] Quota failures are never named: the throttled flush logs to `console.error`
       (`:73`) silently, stream failures report as stream errors (`:446`), and only tree
       creation surfaces anything (`:720`).
+      *Fixed:* `lib/storageErrors.ts` classifies quota (including Dexie's `AbortError`
+      wrapping); every write-failure path reports to `storageStatusStore`, and
+      `StorageBanner` says "Browser storage is full" in the header until dismissed.
   - Deferred out of this box, tracked in the same note: File System Access autosave
     (~1d, Chrome/Edge, local file — *not* sync and *not* a backend), now explicitly
     **after** launch rather than "shortly after", since it incidentally covers BYO-cloud

@@ -10,6 +10,16 @@
 
 ## Unreleased
 
+- **Write failures no longer strand a node or fail silently** (2026-10-11). Spec phase 1
+  of `specs/roadmap-items-phase3-front-door-2026-10-11/`. `persistError`, `finalizeNode`
+  and `cancelGeneration` update memory before their DB write and catch it, so a quota
+  failure on finish, error or Stop leaves the node `idle`/`error`, never `streaming`, and
+  throws no unhandled rejection. New `lib/storageErrors.ts` names quota errors (bare,
+  Dexie-wrapped, or as a transaction `AbortError`'s `inner`); new `storageStatusStore`
+  collects failures from those three paths, the throttled flush and `importTree` (which
+  now returns plain words, not the raw message); new `StorageBanner` under the header
+  shows them until dismissed. No export button in the banner yet: Phase 2 task 2.4
+  extracts `ExportButton` and can reuse it there. 402 tests across 55 files.
 - **Docs reconciled against source** (2026-10-11). `ARCHITECTURE.md` had stopped at
   v0.5.0: it now covers v0.5.1 (branch from a passage, token coalescing, throttled
   Markdown, `useComposerStore`), v0.6.0 (demo tree) and the unreleased deploy work (CSP,
