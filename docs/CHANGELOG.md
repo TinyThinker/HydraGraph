@@ -10,6 +10,20 @@
 
 ## Unreleased
 
+- **Tree durability: persist, export nudge, restore from the demo** (2026-10-11). Spec
+  phase 2 of `specs/roadmap-items-phase3-front-door-2026-10-11/`. New `lib/storageHealth.ts`
+  wraps `persist()` / `persisted()` / `estimate()`. `useDurabilityWatcher` (mounted in
+  `App`) asks the browser to persist storage once per session after 3 completed turns on
+  a non-demo tree, until it says yes, and stores the answer in the settings row
+  (`persistResult`). New `ExportButton` stamps a per-tree `exportedAt`; `ExportNudge`
+  under the header asks for an export after 6 turns, never for a backup that still
+  matches the tree, firm (3-day interval, "may clear them") unless persistence was
+  granted (14 days); dismiss snoozes 24 h. The demo banner gains "Returning? Import a
+  backup." (`useImportPicker`, shared with `ImportButton`). Settings says where data
+  lives, with usage from `estimate()` (`DataLocationNote`). `SettingsModal` now copies
+  settings into its draft only when it opens, so background writes don't wipe a key
+  being typed. No Dexie bump. 460 tests across 62 files. Manual cross-browser check
+  (spec 2.8) not run yet.
 - **Write failures no longer strand a node or fail silently** (2026-10-11). Spec phase 1
   of `specs/roadmap-items-phase3-front-door-2026-10-11/`. `persistError`, `finalizeNode`
   and `cancelGeneration` update memory before their DB write and catch it, so a quota

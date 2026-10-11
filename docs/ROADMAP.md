@@ -17,8 +17,8 @@ personas at turn 30 of a real problem, on identical inherited context, with the 
 ## Current State
 
 The engineering is largely done and tested (streaming, context engine, deterministic
-layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 402 tests
-across 55 files, `tsc` and `oxlint` clean as of 2026-10-11).
+layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 460 tests
+across 62 files, `tsc` and `oxlint` clean as of 2026-10-11).
 Phases 1–2 are complete — the first-run friction and the retry/cancel regression are
 fixed, and the deep-context arbitration demo (fan-out, compare, cost receipt) is
 built. The model-catalog work under Phase 3 is done; next up is the front door.
@@ -167,7 +167,8 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
       add a "Forget key" control; show which host the key will be sent to.
       **Shipped 2026-09-21** as `KeyGuidance.tsx` + `settingsStore.forgetApiKey`
       (launch plan Phase B). What keeps this box open is the *trees* half above —
-      `persist()`, `estimate()`, the export nudge — none of which is started.
+      `persist()`, `estimate()`, the export nudge — **code done 2026-10-11** (spec
+      phase 2, below); the box stays open until the manual cross-browser check runs.
   - **Cross-browser audit, 2026-09-21 — the remaining work re-ordered.** Two findings
     changed the shape of this box, both written up in the note:
     - **Quota exhaustion is not the threat; eviction is.** A `QuotaExceededError` aborts
@@ -190,10 +191,20 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
       returner past day 7 opens an empty app.
     - **New order** (~1d): (1) `persist()` + `estimate()`; (2) export nudge with
       **browser-aware urgency** — feature-detected, never UA-sniffed; (3) **restore on
-      empty** — offer import instead of a blank canvas when the DB is empty but the user
-      has been here before, which turns eviction into a two-click recovery; (4) name
-      `QuotaExceededError` as quota; (5) fix `persistError`. Items 4–5 are the defects
-      below.
+      empty** — offer import instead of a blank canvas; (4) name `QuotaExceededError` as
+      quota; (5) fix `persistError`. Items 4–5 are the defects below.
+    - **Items 1–3 built 2026-10-11** (spec
+      `specs/roadmap-items-phase3-front-door-2026-10-11/phase-2-tree-durability.md`).
+      Urgency keys off the `persist()` result, not the browser. Item 3 changed: the
+      "user has been here before" detection is gone, because eviction wipes every marker
+      the app could write (see the spec README). Instead the demo banner always offers
+      "Returning? Import a backup." A first-time visitor ignores it; an evicted returner
+      gets back in two clicks.
+    - [ ] Manual check on the deployed URL (spec task 2.8): Chrome + Safari (6 turns →
+      persist result recorded, nudge, export clears it, a second changed tree still
+      nudges, clear site data → import via the banner); Firefox prompt once after turn 3;
+      private-window quota error → `StorageBanner`, no turn left generating. Record what
+      Safari's `persist()` returns.
   - **Two defects found during the audit**, both in `useTreeStore.ts`, both folded into
     this box rather than carried as separate debt. **Both fixed 2026-10-11** (spec
     `specs/roadmap-items-phase3-front-door-2026-10-11/phase-1-write-failures.md`):
