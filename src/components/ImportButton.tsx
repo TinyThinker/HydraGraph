@@ -1,49 +1,14 @@
-import { useRef, useState } from 'react'
 import { Upload, X } from 'lucide-react'
-import { useTreeStore } from '../store/useTreeStore'
+import { useImportPicker } from './useImportPicker'
 
 export function ImportButton() {
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const importTree = useTreeStore((s) => s.importTree)
-
-  const handlePick = () => {
-    fileRef.current?.click()
-  }
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-
-    setError(null)
-
-    let text: string
-    try {
-      text = await file.text()
-    } catch {
-      setError('Could not read the file.')
-      return
-    }
-
-    const res = await importTree(text)
-    if (!res.ok) {
-      setError(res.error ?? 'Import failed.')
-    }
-  }
+  const { inputProps, pick, error, clearError } = useImportPicker()
 
   return (
     <div className="relative">
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/json,.json"
-        className="hidden"
-        onChange={handleFile}
-      />
+      <input {...inputProps} />
       <button
-        onClick={handlePick}
+        onClick={pick}
         title="Import a tree from JSON"
         className="text-slate-400 hover:text-slate-200 transition-colors p-2"
       >
@@ -54,7 +19,7 @@ export function ImportButton() {
           <div className="flex justify-between items-start gap-2">
             <span>{error}</span>
             <button
-              onClick={() => setError(null)}
+              onClick={clearError}
               className="flex-shrink-0 text-red-300 hover:text-red-100 transition-colors"
             >
               <X size={14} />

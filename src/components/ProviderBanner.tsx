@@ -2,6 +2,7 @@ import { AlertTriangle, Sparkles } from 'lucide-react'
 import { useSettingsStore, configuredProviders } from '../store/settingsStore'
 import { useTreeStore } from '../store/useTreeStore'
 import { isDemoTree } from '../lib/demoTree'
+import { useImportPicker } from './useImportPicker'
 
 /**
  * The strip under the header when no provider is configured.
@@ -10,10 +11,14 @@ import { isDemoTree } from '../lib/demoTree'
  * the responses are canned and need no key — so the strip explains what you're
  * looking at. On your own tree, a missing provider really is a blocker and the
  * warning stays. Renders nothing once a provider is configured.
+ *
+ * The demo voice also offers "Import a backup": an evicted returner boots into
+ * the demo too, and the app cannot tell them from a first-time visitor.
  */
 export function ProviderBanner({ onOpenSettings }: { onOpenSettings: () => void }) {
   const settings = useSettingsStore((s) => s.settings)
   const activeTreeId = useTreeStore((s) => s.activeTreeId)
+  const importer = useImportPicker()
 
   if (configuredProviders(settings).length > 0) return null
 
@@ -29,14 +34,28 @@ export function ProviderBanner({ onOpenSettings }: { onOpenSettings: () => void 
             You're in the demo tree — canned responses from a real session, no API key needed.
             Click any node to read it, open the three siblings below the fan-out with Compare, and
             the $ receipt in the header is already priced.
+            {importer.error && (
+              <span role="alert" className="block mt-1 text-red-300">
+                {importer.error}
+              </span>
+            )}
           </span>
         </div>
-        <button
-          onClick={onOpenSettings}
-          className="text-indigo-100 underline hover:text-white transition-colors flex-shrink-0"
-        >
-          Add a key
-        </button>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <button
+            onClick={onOpenSettings}
+            className="text-indigo-100 underline hover:text-white transition-colors"
+          >
+            Add a key
+          </button>
+          <input {...importer.inputProps} data-testid="demo-import-input" />
+          <button
+            onClick={importer.pick}
+            className="text-indigo-300 underline hover:text-white transition-colors text-xs"
+          >
+            Returning? Import a backup.
+          </button>
+        </div>
       </div>
     )
   }
