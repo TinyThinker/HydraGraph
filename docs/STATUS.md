@@ -72,6 +72,7 @@ Test suite on `main`: **378 tests across 52 files**; `tsc -b` and `oxlint` clean
 
 ### Carried debt (none launch-blocking)
 - [x] ~~No CI~~ — `ci.yml` (lint + test on PR and push) shipped 2026-10-10. Branch protection on `main` set 2026-10-11 (PR + `Lint & Test` required, no admin bypass; rules in `SETUP.md` §6). `tsc -b` is left to Cloudflare's build
+- [ ] Inline comments for the AI PR review — not scheduled; build only if a few real reviews prove useful (ROADMAP § Carried debt)
 - [ ] Edit a submitted prompt (not just regenerate)
 - [x] Throttle the chat pane's Markdown re-parse — 40 parses per 40 tokens → 6 (v0.5.1)
 - [ ] 200-node performance pass

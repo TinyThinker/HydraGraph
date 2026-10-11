@@ -326,6 +326,16 @@ line in the cost receipt, and is exactly a Stop-4 decision.
   against a desktop app; reasoning in
   [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md) § "Is browser-local a
   bad product?".
+- [ ] **Inline comments for the AI PR review** (added 2026-10-11, not scheduled).
+  Today `ai_review.py` posts one sticky PR-level comment. Inline means findings attached
+  to file lines via `POST /pulls/{n}/reviews` with `event: COMMENT`. Needs: the model
+  returns JSON (`file`, `line`, `severity`, `body`); the script numbers diff lines before
+  sending and checks each returned line against the diff hunks (GitHub 422s the whole
+  review on one bad line); unmappable findings fall back to the sticky comment; old bot
+  inline comments are deleted on each push, since review comments cannot be batch-edited.
+  About 60 lines in `.github/scripts/ai_review.py`. **Gate: run a few real reviews first
+  and only build this if the findings are good enough to put on lines.** Setup and
+  current behaviour: `SETUP.md` §6.
 - [ ] Edit a submitted prompt (not just regenerate).
 - [x] Throttle the chat pane's Markdown re-parse — `ChatMessage` re-parses the whole
   document per streamed token. Measured at 40 parses per 40 tokens; now 6 (v0.5.1).
