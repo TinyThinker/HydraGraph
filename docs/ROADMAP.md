@@ -17,8 +17,8 @@ personas at turn 30 of a real problem, on identical inherited context, with the 
 ## Current State
 
 The engineering is largely done and tested (streaming, context engine, deterministic
-layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 368 tests
-across 51 files, `tsc` and `oxlint` clean as of 2026-09-20).
+layout, 5 clean DB migrations, 2 provider clients — OpenRouter + Ollama — 378 tests
+across 52 files, `tsc` and `oxlint` clean as of 2026-10-11).
 Phases 1–2 are complete — the first-run friction and the retry/cancel regression are
 fixed, and the deep-context arbitration demo (fan-out, compare, cost receipt) is
 built. The model-catalog work under Phase 3 is done; next up is the front door.

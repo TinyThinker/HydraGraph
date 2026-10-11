@@ -2,7 +2,7 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-10-11 (branch protection); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
+> Last synced: 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
 > item below was checked against the code, not just re-read; updated again after
 > Phase A of the launch plan, then after Phase B)
 
@@ -11,8 +11,7 @@
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last commit: b534ff8 — 2026-10-10 (docs sync follows it)
-Last commit message: ci: add opt-in AI PR review (label-gated, kill switch)
+Last synced against `main` at 13b94cd — 2026-10-11 (Merge pull request #4, docs/branch-protection). The last source change is fc0118e, 2026-09-21; every commit after it is CI or docs.
 
 CI: `ci.yml` runs lint + tests on PRs and pushes to `main` (PR #1, merged 2026-10-04).
 `ai-pr-review.yml` is an opt-in DeepSeek review, gated by the `ai-review` label and the

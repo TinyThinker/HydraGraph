@@ -1,8 +1,8 @@
 # Software Design Document
 ## Spatial 2D Conversation Tree Architecture (CTA) for Deep LLM Research
 
-**Document Version:** 2.2.0  
-**Status:** As-built — reconciled against the source tree on 2026-09-03 (`main`, through v0.5.0 — OpenRouter + Ollama only, live OpenRouter price catalog, searchable model pickers; and v0.4.0 / Phase 2 — per-node dispatch overrides, fan-out, compare view, cost receipt)  
+**Document Version:** 2.3.0  
+**Status:** As-built — reconciled against the source tree on 2026-10-11 (`main`, through v0.6.0 plus unreleased work: deploy hardening with a CSP and build stamp, key guidance, receipt labelling, pill-label pass). v0.6.0 shipped the no-key demo tree; v0.5.1 branch-from-a-passage and streaming performance; v0.5.0 the live price catalog and OpenRouter + Ollama only  
 **Target Audience:** Principal Systems Architects, Lead Engineers, AI CLI Agents (Claude Code, Antigravity CLI)  
 **Author:** Lead AI Systems Architect
 
@@ -195,9 +195,9 @@ _This table records the versions actually installed in `package.json`. Update it
 
 ### 3.3 Main Architectural System Components
 
-The running application is a three-region shell (header / split workspace / reader panel) sitting on top of seven Zustand stores and a pure-function library. Nothing renders server-side; every module below ships to the browser.
+The running application is a three-region shell (header / split workspace / reader panel) sitting on top of eight Zustand stores and a pure-function library. Nothing renders server-side; every module below ships to the browser.
 
-**Application Shell (`src/App.tsx`, `src/main.tsx`):** Owns the one-time boot sequence — load persisted settings into *both* stores, kick off `useCatalogStore.loadCatalog()` (price catalog, non-blocking), load the tree index, restore `activeTreeId` (or create a `New Research` tree on first run) — then renders `HeaderBar`, `SplitLayout`, and `ReaderPanel`. In dev builds it also installs the render-tally harness on `window`.
+**Application Shell (`src/App.tsx`, `src/main.tsx`):** Owns the one-time boot sequence — load persisted settings into *both* stores, kick off `useCatalogStore.loadCatalog()` (price catalog, non-blocking), load the tree index, restore `activeTreeId` (or, on an empty database, seed the shipped demo tree via `useTreeStore.seedDemoTree()`, §5.6) — then renders `HeaderBar` (which mounts `ProviderBanner`), `SplitLayout`, `ReaderPanel`, `SelectionBranchButton` and `BuildStamp`. In dev builds it also installs the render-tally harness on `window`.
 
 **Canvas View Engine (React Flow layer):** `Canvas.tsx` is a thin JSX shell; all store→graph derivation lives in the `useCanvasGraph` hook (node wrappers, edge list, hidden-node filtering, active-path dimming, and a referentially-stable wrapper cache that prevents one node's change from re-rendering every other node). Four headless components mounted inside `<ReactFlow>` own the imperative viewport behaviours: `CanvasFitter` (fit-view on nonce), `CanvasSearchFocus` (pan + flash a search hit), `CanvasSelectionSync` (the single auto-center path shared by canvas clicks, chat clicks, and fresh spawns), and `CanvasViewport` (viewport persistence + keyboard navigation). Manual node dragging and manual node resizing are **disabled** — positions are 100% derived from tree structure.
 
@@ -219,7 +219,7 @@ The running application is a three-region shell (header / split workspace / read
 
 **Local Persistence Manager (`src/db/ChatDatabase.ts`):** Dexie subclass exposing `nodes`, `trees`, `settings`, and (since v5) `catalog` tables with five versioned schema migrations (see §3.4). Streaming writes are throttled (~400 ms) and layout writes are batched into a single `rw` transaction.
 
-**State Layer (7 Zustand stores):**
+**State Layer (8 Zustand stores):**
 
 | Store | File | Responsibility |
 |---|---|---|
@@ -229,6 +229,7 @@ The running application is a three-region shell (header / split workspace / read
 | `useReaderPanel` | `src/components/useReaderPanel.ts` | Which node, if any, the reader drawer is showing. |
 | `useSearchNav` | `src/components/useSearchNav.ts` | Search "fly to this node" target + nonce. |
 | `useCompareStore` | `src/store/useCompareStore.ts` | Compare-view overlay: `open`, the `anchorId` whose siblings are compared, and the `excludedIds` set the user has unchecked. Added in v0.4.0. |
+| `useComposerStore` | `src/store/useComposerStore.ts` | The chat composer's draft text, lifted out of `ChatInputBar`'s local state so anything on screen can seed it (branch-from-a-passage writes a Markdown quote here). Added in v0.5.1. |
 | `useCatalogStore` | `src/store/catalogStore.ts` | The OpenRouter price catalog: `models`, `fetchedAt`, `status`, `source` (`live` / `cache` / `bundled`), and `loadCatalog(force?)` (1 h TTL, IndexedDB cache, `BUNDLED_CATALOG` fallback). The price source for `pricing.ts`; cost components subscribe to it. Added in v0.5.0. |
 
 **Settings have one owner (`useSettingsStore`).** Since v0.3.1 `useTreeStore` no longer
@@ -258,14 +259,25 @@ remembered tree is gone, falls back to the newest tree (or creates one).
 | `bundledCatalog.ts` | `BUNDLED_CATALOG` — a committed catalog snapshot for offline / first-run / the no-key demo; regenerated by `scripts/refresh-catalog.mjs`. Added v0.5.0. |
 | `providerOptions.ts` | `providerOptions({ inherit? })` — the two-entry provider list (OpenRouter, Ollama) shared by every provider `<select>`. Added v0.5.0. |
 | `tierSpread.ts` | `tierSpread(models, configured, n)` — picks `n` models walking cheap→mid→frontier of the live catalog for the fan-out "spread across price tiers" fill. Added v0.5.0. |
-| `formatModelRef.ts` | `formatModelRef()` — `provider/model` helper text for fan-out rows. Added v0.5.0. |
-| `treeCost.ts` | `treeCostSummary(nodes, catalog?)` — this tree's actual spend vs. the one-linear-thread counterfactual ("context you didn't pay for"). Added v0.4.0. |
-| `stationSummary.ts` | 7-word / 48-char single-line pill label. |
+| `formatModelRef.ts` | `formatModelRef()` — `provider/model` helper text for fan-out rows (v0.5.0); `pillModelRef()` — the model shown on a pill's own row when a node departs from its inherited model, so fan-out siblings can be told apart. |
+| `quotePrompt.ts` | `formatQuoteSeed()` / `truncateQuote()` — turns a highlighted passage into a Markdown-quoted composer seed (500-char cap, 3-char minimum selection). Added v0.5.1. |
+| `tokenCoalescer.ts` | `createTokenCoalescer(commit)` — batches streamed chunks into one `appendTokenDelta` per animation frame (`requestAnimationFrame`, 16 ms timeout fallback). Pure timing; no store, React or Dexie. Added v0.5.1. |
+| `demoContent.ts` / `demoTree.ts` | The canned 16-turn demo transcript and `buildDemoTree()` / `DEMO_TREE_ID` / `isDemoTree()` that turn it into ordinary `TurnNode` rows. Added v0.6.0. |
+| `treeCost.ts` | `treeCostSummary(nodes, catalog?)` — this tree's actual spend vs. the one-linear-thread counterfactual ("context you didn't pay for"). Also exports the receipt's wording (`COUNTERFACTUAL_NOTE`, `ACTUAL_DETAIL`, …), names the reason a turn was excluded, and never reports a negative saving. Added v0.4.0. |
+| `stationSummary.ts` | Pill label: up to 12 words / 64 chars, shown on two lines (`line-clamp-2` does the trimming). Drops a leading Markdown blockquote when the prompt continues underneath it, so a branch seeded from a passage is labelled by what it asks, not what it quotes. |
 | `streamingClient.ts` | Provider SSE clients. |
 | `treeExport.ts` | Versioned JSON export doc, filename slug, download, parse + id-remapped import. |
 | `treeNav.ts` | Arrow-key target resolution + `isTypingTarget()` guard. |
 | `viewportCenter.ts` | `centerTarget()` — never zooms an already zoomed-in user back out. |
 | `renderTally.ts` | Dev-only render counting + a synthetic-tree seeder installed on `window`. |
+
+**Branch from a passage (v0.5.1).** `useTextSelection` watches the document selection and resolves the turn it belongs to from the nearest `data-node-id` ancestor (chat bubbles, the reader panel, compare columns). `SelectionBranchButton` floats over the highlight; clicking it selects that turn and writes `formatQuoteSeed(text)` into `useComposerStore`.
+
+**Streaming render path (v0.5.1).** Two throttles sit between the network and the screen. `createTokenCoalescer` (in `submitPrompt`'s `onToken`) commits at most one `appendTokenDelta` per animation frame. `useThrottledText` (`MARKDOWN_THROTTLE_MS = 100`) holds the Markdown parse of in-flight text — used by `ChatMessage`, `ReaderResponse` and `CompareColumn` — and publishes the final text immediately when streaming ends. `appendTokenDelta` itself stays synchronous.
+
+**Key guidance and the provider strip (v0.6.0 / unreleased).** `KeyGuidance` (in `SettingsModal`) names the host the key will be sent to, derived the same way `streamOpenRouter` derives it, warns about key exposure, and offers **Forget key**. `ProviderBanner` is the strip under the header: on the demo tree with no key it explains the tree is canned and offers "Add a key"; on the user's own tree it is the amber "no provider" warning; with a provider configured it renders nothing.
+
+**Build and deploy (unreleased).** The app is a static build on Cloudflare Pages. `public/_headers` sets a Content-Security-Policy (`default-src 'self'`; `connect-src` limited to `'self'`, `https://openrouter.ai` and localhost for Ollama; `frame-ancestors 'none'`), `X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`, and `Cache-Control: … no-transform` (Cloudflare's documented opt-out from injecting its Web Analytics beacon at the edge). `vite.config.ts` defines `__BUILD_SHA__` from `CF_PAGES_COMMIT_SHA` or `git rev-parse`, and `BuildStamp` shows it bottom-left so a bug report names its build. CI (`.github/workflows/ci.yml`) runs lint and tests on every PR and push to `main`; see `SETUP.md` §6.
 
 **Turn recovery UI.** `MessageActions.tsx` (mounted by `ChatMessage` and `ReaderPanel`)
 renders exactly one control per turn: **Stop** while it streams (`cancelGeneration`),
@@ -565,7 +577,7 @@ sequenceDiagram
 
     loop Streaming chunks
         Provider-->>API: data frame
-        API->>Store: appendTokenDelta(Node_X, chunk)
+        API->>Store: onToken(chunk) → coalesced to one appendTokenDelta per animation frame
         Store->>Store: liveText = new Map(liveText).set(Node_X, prev + chunk)
         Store-->>User: chat pane re-renders that one bubble
         Store--)DB: throttled flush of partial text (~400ms, coalesced)
@@ -589,7 +601,7 @@ sequenceDiagram
 | Node deleted mid-stream | `deleteNodeSubtree` aborts and cancels flushes for every id in the subtree before the Dexie delete, so no write can resurrect a removed row. |
 | `AbortError` | Swallowed by the streaming client — an intentional cancel is not an error. |
 
-Two module-scope maps back this: `pendingTimers` (node id → throttle timer) and `abortRegistry` (node id → abort fn). Both are transient session state and are never persisted.
+Chunks reach `appendTokenDelta` through `createTokenCoalescer` (one commit per animation frame), and the chat pane re-parses Markdown at most every 100 ms via `useThrottledText` (§3.3). Two module-scope maps back this: `pendingTimers` (node id → throttle timer) and `abortRegistry` (node id → abort fn). Both are transient session state and are never persisted.
 
 ### 5.4 Stale Propagation
 
@@ -697,15 +709,17 @@ Both high-risk items were resolved structurally rather than by optimisation: str
 
 ### 6.6 Verification Status
 
-Verified at v0.5.0 (2026-09-03):
+Verified at `main` `13b94cd` (2026-10-11):
 
 | Check | Command | Result |
 |---|---|---|
-| Types | `npm run typecheck` | clean |
+| Types | `tsc -b` | clean |
 | Lint | `npm run lint` | clean |
-| Tests | `npm test` | 41 files / 292 tests passing |
+| Tests | `npx vitest run` | 52 files / 378 tests passing |
 
-(For reference: v0.4.0 / Phase 2 was 35 files / 258 tests on 2026-09-02; `poc_enhancements_1` was 32 files / 253 tests on 2026-09-01; v0.3.1 / Phase 1 was 29 files / 225 tests.)
+CI (`ci.yml`) runs lint and tests on every PR and push to `main`; `tsc -b` runs in the Cloudflare build. Branch protection on `main` requires the `Lint & Test` check.
+
+(History: v0.5.0 was 41 files / 292 tests on 2026-09-03; v0.5.1 was 45 / 315; v0.6.0 was 49 / 337; v0.4.0 was 35 / 258; `poc_enhancements_1` was 32 / 253; v0.3.1 was 29 / 225.)
 
 ### 6.7 Open Items
 
@@ -725,6 +739,12 @@ IndexedDB cache, `BUNDLED_CATALOG` fallback); native Gemini removed (`LLMProvide
 `'openrouter' | 'ollama'`, DB v5 migration); hand-typed model-id inputs replaced by the
 `ModelSelect` combobox in the reader panel, fan-out, and Settings; two-provider
 Settings with one credential field; fan-out price-tier spread.
+
+Resolved in v0.5.1: branch from a highlighted passage (`useTextSelection`, `SelectionBranchButton`, `quotePrompt.ts`, `useComposerStore`); per-frame token coalescing and throttled Markdown parsing; the chat pane blanking when any response finished (a selection wipe).
+
+Resolved in v0.6.0: the no-key demo tree (`demoContent.ts`, `demoTree.ts`, `seedDemoTree()`, "Reset demo tree") and the calm `ProviderBanner`.
+
+Resolved since v0.6.0, unreleased: static deploy with a CSP, `noindex` and a build stamp; the `no-transform` fix for the injected analytics beacon; `KeyGuidance` and **Forget key**; pill labels readable and fan-out siblings distinguishable; the receipt no longer draws a modelled number like a measured one and names why a turn is excluded; CI and branch protection.
 
 - `TurnNode.width` / `TurnNode.height` are vestigial since fixed-size pills landed; they are retained only for backward compatibility with existing rows and v1 exports.
 - Editing a submitted prompt (as opposed to regenerating it) has no UI.
