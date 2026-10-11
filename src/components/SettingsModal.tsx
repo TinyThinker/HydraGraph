@@ -5,6 +5,7 @@ import { ProviderSelect } from './ProviderSelect'
 import { ModelSelect } from './ModelSelect'
 import { SettingsCredentialField } from './SettingsCredentialField'
 import { KeyGuidance } from './KeyGuidance'
+import { DataLocationNote } from './DataLocationNote'
 import type { LLMProvider } from '../types'
 
 interface SettingsModalProps {
@@ -122,6 +123,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               onChange={(m) => setDraft((d) => ({ ...d, defaultModel: m }))}
             />
           </div>
+          <DataLocationNote />
         </div>
 
         <div className="flex gap-2 px-6 py-4 border-t border-slate-700">
