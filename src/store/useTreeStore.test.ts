@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useTreeStore } from './useTreeStore'
 import { useSettingsStore, DEFAULT_SETTINGS } from './settingsStore'
 import { db } from '../db/ChatDatabase'
+import Dexie from 'dexie'
+import { useStorageStatusStore } from './storageStatusStore'
+import { QUOTA_MESSAGE } from '../lib/storageErrors'
 import type { TurnNode } from '../types'
 
 vi.mock('../lib/streamingClient', () => ({
@@ -1720,5 +1723,151 @@ describe('fanOutAndSubmit', () => {
     expect(ids).toEqual([])
     expect(useTreeStore.getState().nodes.size).toBe(countBefore)
     expect(vi.mocked(streamLLMResponse)).not.toHaveBeenCalled()
+  })
+})
+
+describe('end-of-stream writes survive a failing DB', () => {
+  let updateSpy: ReturnType<typeof vi.spyOn> | null = null
+
+  // Make every later db.nodes.update reject the way a full disk would.
+  const failNodeWrites = () => {
+    updateSpy = vi.spyOn(db.nodes, 'update').mockRejectedValue(new Dexie.QuotaExceededError('full'))
+  }
+
+  // Let the caught write rejection settle before asserting / restoring.
+  const settle = () => new Promise((r) => setTimeout(r, 0))
+
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({
+      nodes: new Map(),
+      trees: [],
+      activeTreeId: null,
+      liveText: new Map(),
+    })
+    useStorageStatusStore.setState({ writeFailure: null })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    updateSpy?.mockRestore()
+    updateSpy = null
+    vi.mocked(console.error).mockRestore()
+  })
+
+  it('a failing stream ends in error, not streaming, when the write fails', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, onToken, _onDone, onError) => {
+        onToken('partial')
+        failNodeWrites()
+        onError(new Error('HTTP 500'))
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    await useTreeStore.getState().submitPrompt(tree.rootNodeId, 'hi')
+    await settle()
+
+    const node = useTreeStore.getState().nodes.get(tree.rootNodeId)!
+    expect(node.status).toBe('error')
+    expect(node.errorMessage).toBe('HTTP 500')
+    expect(node.assistantResponse).toBe('partial')
+    expect(useTreeStore.getState().liveText.has(tree.rootNodeId)).toBe(false)
+    expect(useStorageStatusStore.getState().writeFailure?.kind).toBe('quota')
+  })
+
+  it('a successful stream ends idle with the full text when the write fails', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, onToken, onDone) => {
+        onToken('full ')
+        onToken('answer')
+        failNodeWrites()
+        onDone({ inputTokens: 3, outputTokens: 2 })
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    await useTreeStore.getState().submitPrompt(tree.rootNodeId, 'hi')
+    await settle()
+
+    const node = useTreeStore.getState().nodes.get(tree.rootNodeId)!
+    expect(node.status).toBe('idle')
+    expect(node.assistantResponse).toBe('full answer')
+    expect(node.outputTokens).toBe(2)
+    expect(useTreeStore.getState().liveText.has(tree.rootNodeId)).toBe(false)
+    expect(useStorageStatusStore.getState().writeFailure?.kind).toBe('quota')
+  })
+
+  it('cancel mid-stream ends idle when the write fails', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(async () => () => {})
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    await useTreeStore.getState().submitPrompt(tree.rootNodeId, 'hi')
+    useTreeStore.getState().appendTokenDelta(tree.rootNodeId, 'half')
+    failNodeWrites()
+
+    await expect(useTreeStore.getState().cancelGeneration(tree.rootNodeId)).resolves.toBeUndefined()
+
+    const node = useTreeStore.getState().nodes.get(tree.rootNodeId)!
+    expect(node.status).toBe('idle')
+    expect(node.assistantResponse).toBe('half')
+    expect(useTreeStore.getState().liveText.has(tree.rootNodeId)).toBe(false)
+    expect(useStorageStatusStore.getState().writeFailure?.kind).toBe('quota')
+  })
+
+  it('a rejected throttled flush is reported to the storage store', async () => {
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    failNodeWrites()
+    useTreeStore.getState().appendTokenDelta(tree.rootNodeId, 'abc')
+
+    await new Promise((r) => setTimeout(r, 450))
+
+    expect(useStorageStatusStore.getState().writeFailure).toEqual({
+      kind: 'quota',
+      message: QUOTA_MESSAGE,
+    })
+  })
+
+  it('a stream error with a working DB still persists and reports nothing', async () => {
+    const { streamLLMResponse } = await import('../lib/streamingClient')
+    vi.mocked(streamLLMResponse).mockImplementation(
+      async (_payload, _settings, _target, _onToken, _onDone, onError) => {
+        onError(new Error('HTTP 401'))
+        return () => {}
+      }
+    )
+
+    const tree = await useTreeStore.getState().createTree('My Tree')
+    await useTreeStore.getState().submitPrompt(tree.rootNodeId, 'hi')
+    await settle()
+
+    const dbNode = await db.nodes.get(tree.rootNodeId)
+    expect(dbNode!.status).toBe('error')
+    expect(dbNode!.errorMessage).toBe('HTTP 401')
+    expect(useStorageStatusStore.getState().writeFailure).toBeNull()
+  })
+
+  it('importTree returns plain words on a quota failure', async () => {
+    const source = await useTreeStore.getState().createTree('Source')
+    const text = JSON.stringify({
+      schemaVersion: 1,
+      exportedAt: Date.now(),
+      tree: source,
+      nodes: [...useTreeStore.getState().nodes.values()],
+    })
+    const quota = new Dexie.QuotaExceededError('raw')
+    const txSpy = vi.spyOn(db, 'transaction').mockRejectedValue(new Dexie.AbortError('aborted', quota))
+
+    const res = await useTreeStore.getState().importTree(text)
+    txSpy.mockRestore()
+
+    expect(res).toEqual({ ok: false, error: QUOTA_MESSAGE })
+    expect(useStorageStatusStore.getState().writeFailure?.kind).toBe('quota')
   })
 })
