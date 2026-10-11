@@ -45,14 +45,17 @@ All data (trees, nodes, settings, API keys) lives in the browser's IndexedDB
 
 ## 2. Open Settings
 
-Click the **gear icon** in the header bar. There are three controls, and the middle one
-changes with the provider:
+Click the **gear icon** in the header bar. A row at the top shows three steps —
+① Provider ② Key (URL for Ollama) ③ Test — and ticks each as it is done. The steps are
+guidance only: every field stays visible and **Save** always works. There are three
+controls, and the middle one changes with the provider:
 
 | Field | Notes |
 |---|---|
 | **Provider** | `OpenRouter` or `Ollama` — this is what routes the request |
 | **OpenRouter API key** | Shown for OpenRouter. Masked, with a reveal toggle; stored only in IndexedDB, sent as an `Authorization: Bearer` header. Under **Advanced**: the OpenRouter base URL. Alongside it: a **Refresh prices** button and the model catalog's source + age |
-| **Ollama URL** | Shown for Ollama. Defaults to `http://localhost:11434` |
+| **Ollama URL** | Shown for Ollama. Defaults to `http://localhost:11434`. Below it, a "Requests to Ollama failing?" hint with the `OLLAMA_ORIGINS` fix — see §4 |
+| **Test connection** | Under the credential field. Checks what is typed, before you save, and spends no tokens: OpenRouter `GET /key`, Ollama `GET /api/tags`. Says pass or fail in plain words |
 | **Default model** | A searchable, priced picker over the live catalog. Free-typed ids are still accepted — the catalog feeds suggestions and pricing, not validation |
 
 Click **Save**. Values survive a page reload, and the "no provider configured" banner
@@ -84,7 +87,9 @@ The resolved values are stamped back onto the turn, so a node records what actua
 
 1. Get a key from **https://openrouter.ai/keys**.
 2. Settings → **Provider** → `OpenRouter`.
-3. Paste the key into **OpenRouter API key**.
+3. Paste the key into **OpenRouter API key**, then press **Test connection**. A bad
+   key reads "OpenRouter rejected this key." A good one reads "Key accepted.", plus the
+   credit left if the key has a limit.
 4. Pick a **Default model** — e.g. `openai/gpt-4o-mini` (cheap),
    `anthropic/claude-3.5-sonnet` (mid), `deepseek/deepseek-r1` (cheap reasoning).
    The picker shows per-1M-token prices next to each id.
@@ -110,30 +115,44 @@ Requests go to `https://openrouter.ai/api/v1/chat/completions` with the key in a
    ```
 
 2. **Start Ollama with the app's origin allowed.** A browser page cannot call a local
-   Ollama server unless `OLLAMA_ORIGINS` includes the app's origin:
+   Ollama server unless `OLLAMA_ORIGINS` includes the app's origin. Settings → Provider
+   → `Ollama` shows a **"Requests to Ollama failing?"** hint with both commands below,
+   already filled in with the origin shown in the hint (the page you are on). Copy them
+   from there:
 
    ```bash
-   OLLAMA_ORIGINS=http://localhost:5173 ollama serve
+   OLLAMA_ORIGINS="<origin shown in the hint>" ollama serve
    ```
 
-   On macOS with Ollama running as a background service:
+   On macOS with the Ollama app running as a background service:
 
    ```bash
-   launchctl setenv OLLAMA_ORIGINS "http://localhost:5173"
-   # then restart Ollama
+   launchctl setenv OLLAMA_ORIGINS "<origin shown in the hint>"
+   # then quit and reopen Ollama
    ```
 
-   If you use `npm run preview` instead of `npm run dev`, the origin is
-   `http://localhost:4173` — set that instead (comma-separate for multiple).
+   Common origins: `https://hydragraph.tinythinkerlabs.dev` (the deployed app),
+   `http://localhost:5173` (`npm run dev`), `http://localhost:4173` (`npm run preview`).
+   Comma-separate to allow several.
 
 3. In Settings:
    - **Provider** → `Ollama`.
    - **Ollama URL** → `http://localhost:11434` (the default).
    - **Default model** → the exact model tag you pulled, e.g. `llama3.2`.
+   - **Test connection.** A pass reads "N models available", or warns if the default
+     model is not pulled yet (with the `ollama pull` command).
    - **Save.**
 
+**Chrome's Local Network Access prompt (Chrome 142+).** When a public HTTPS site such
+as the deployed app first reaches `localhost`, Chrome asks permission. Choose Allow. If
+you blocked it, change it in the site settings (icon left of the address bar). Pressing
+**Test connection** is a good way to get the prompt before your first chat turn.
+
 **Symptom of a missing `OLLAMA_ORIGINS`:** the generation fails *instantly* with a
-network/CORS error in the browser console — not an error message from the model.
+network/CORS error in the browser console — not an error message from the model. The
+browser cannot tell this apart from "Ollama is not running" or "Chrome permission
+blocked", so a failed test lists all three and opens the hint. A turn that fails this
+way also shows **Check connection**, which opens Settings.
 
 Ollama turns are priced at `$0.00` by design (local inference), so a receipt of zero
 there is correct rather than the OpenRouter defect above.
@@ -245,6 +264,8 @@ anything private.
 | Symptom | Likely cause |
 |---|---|
 | Ollama request fails immediately, CORS error in console | `OLLAMA_ORIGINS` not set / wrong origin — see §4 |
+| **Test connection** says it could not reach Ollama (network error) | One of three, and the browser can't say which: Ollama is not running; `OLLAMA_ORIGINS` does not include the origin shown in the hint; or Chrome's local-network permission was blocked (site settings, icon left of the address bar). See §4 |
+| **Test connection** says it could not reach a custom OpenRouter base URL | The app's CSP only allows `openrouter.ai`. Clear **Advanced → OpenRouter base URL** |
 | Cost receipt reads `$0.0000` after a real OpenRouter turn | Known gap, not your config — see the note in §3 |
 | OpenRouter `400` | Model slug doesn't exist upstream, or your key lacks access to it. Ids are free-text by design, so a typo reaches the API |
 | `401` / `403` | Bad or missing key for the selected provider — surfaces on the node as an error state with **Retry** |

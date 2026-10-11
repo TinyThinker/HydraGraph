@@ -10,6 +10,19 @@
 
 ## Unreleased
 
+- **Key setup: connection test, three steps, Ollama hint** (2026-10-11). Spec phase 3
+  of `specs/roadmap-items-phase3-front-door-2026-10-11/`. New `lib/connectionProbe.ts`
+  tests the typed (unsaved) values with a free, read-only request — OpenRouter
+  `GET {base}/key`, Ollama `GET {url}/api/tags` — 8 s timeout, and plain-word results:
+  "OpenRouter rejected this key.", "N models available", a not-pulled model with its
+  `ollama pull` command, or a network failure naming all three local causes (not
+  running, `OLLAMA_ORIGINS`, Chrome's Local Network Access prompt). `useConnectionTest`
+  lives in `SettingsModal`, which feeds `ConnectionTest`, the new `OllamaOriginsHint`
+  (origin filled in from the page, `launchctl` variant, opens on a network failure) and
+  `SettingsSteps` (① Provider ② Key ③ Test; guidance, Save never gated). An errored turn
+  with an auth or network error shows **Check connection** (`useSettingsModalStore`
+  lifts the modal's open state out of `HeaderBar`). `SettingsFooter` extracted. 510
+  tests across 66 files. Manual check on the deployed URL (spec 3.7) not run yet.
 - **Tree durability: persist, export nudge, restore from the demo** (2026-10-11). Spec
   phase 2 of `specs/roadmap-items-phase3-front-door-2026-10-11/`. New `lib/storageHealth.ts`
   wraps `persist()` / `persisted()` / `estimate()`. `useDurabilityWatcher` (mounted in
