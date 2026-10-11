@@ -2,7 +2,7 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
+> Last synced: 2026-10-11 (branch protection); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
 > item below was checked against the code, not just re-read; updated again after
 > Phase A of the launch plan, then after Phase B)
 
@@ -71,7 +71,8 @@ Test suite on `main`: **378 tests across 52 files**; `tsc -b` and `oxlint` clean
 - [ ] Investigated, not scheduled: web search / tool calling (`notes/tooling-research.md`, Dexie v7); canvas node labels — rename + generated titles (`notes/node-labels-research.md`, no migration needed)
 
 ### Carried debt (none launch-blocking)
-- [x] ~~No CI~~ — `ci.yml` (lint + test on PR and push) shipped 2026-10-10. **Still open: branch protection on `main` requiring it**, a GitHub setting not in the repo; without it the workflow is advisory. `tsc -b` is left to Cloudflare's build
+- [x] ~~No CI~~ — `ci.yml` (lint + test on PR and push) shipped 2026-10-10. Branch protection on `main` set 2026-10-11 (PR + `Lint & Test` required, no admin bypass; rules in `SETUP.md` §6). `tsc -b` is left to Cloudflare's build
+- [ ] Inline comments for the AI PR review — not scheduled; build only if a few real reviews prove useful (ROADMAP § Carried debt)
 - [ ] Edit a submitted prompt (not just regenerate)
 - [x] Throttle the chat pane's Markdown re-parse — 40 parses per 40 tokens → 6 (v0.5.1)
 - [ ] 200-node performance pass
@@ -139,9 +140,8 @@ headers present, no injected beacon, silent console, zero CSP violations.*
      "who came back a second time". Quota exhaustion turned out not to be the threat at
      all; eviction is.
    - Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
-3. [Debt] **Branch protection on `main` requiring the CI check.** The workflow exists
-   (`ci.yml`); without the rule it is advisory and a red test can still reach the
-   live site. GitHub → Settings → Branches. Not verifiable from the repo
+3. ~~[Debt] Branch protection on `main` requiring the CI check~~ — **done 2026-10-11**,
+   verified by a rejected direct push. All changes to `main` now go through a PR
 4. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
    one number a skeptical reader will poke at
 5. [Debt, hub] **Two dashboard-only follow-ups, both deferred 2026-09-21 for time.**
