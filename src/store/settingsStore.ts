@@ -55,6 +55,12 @@ interface SettingsStoreActions {
   // provider's default without touching the others.
   setDefaultModel: (model: string, provider?: LLMProvider) => Promise<void>
   resetSettings: () => Promise<void>
+  // Background writes from the durability watcher and export nudge.
+  recordDurability: (
+    patch: Pick<Partial<AppSettings>, 'persistResult' | 'exportNudgeDismissedAt'>,
+  ) => Promise<void>
+  // Stamp one tree's export time, keeping every other tree's entry.
+  recordExport: (treeId: string) => Promise<void>
 }
 
 export type SettingsStore = SettingsStoreState & SettingsStoreActions
@@ -124,5 +130,14 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     const defaults: AppSettings = { ...DEFAULT_SETTINGS }
     await db.settings.put(defaults)
     set({ settings: defaults })
+  },
+
+  recordDurability: async (patch) => {
+    await get().updateSettings(patch)
+  },
+
+  recordExport: async (treeId) => {
+    const exportedAt = { ...get().settings.exportedAt, [treeId]: Date.now() }
+    await get().updateSettings({ exportedAt })
   },
 }))

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useSettingsStore, DEFAULT_SETTINGS, configuredProviders } from './settingsStore'
 import { db } from '../db/ChatDatabase'
 
@@ -138,6 +138,48 @@ describe('settingsStore', () => {
 
       expect(state().settings).toEqual(DEFAULT_SETTINGS)
       expect(await db.settings.get('global_settings')).toEqual(DEFAULT_SETTINGS)
+    })
+  })
+
+  describe('durability fields', () => {
+    beforeEach(async () => {
+      await state().loadSettings()
+    })
+
+    it('an old row without the fields loads with them undefined', async () => {
+      const row = await db.settings.get('global_settings')
+      expect(row?.persistResult).toBeUndefined()
+      expect(state().settings.persistResult).toBeUndefined()
+      expect(state().settings.exportedAt).toBeUndefined()
+      expect(state().settings.exportNudgeDismissedAt).toBeUndefined()
+    })
+
+    it('recordDurability round-trips through IndexedDB', async () => {
+      await state().recordDurability({ persistResult: 'denied', exportNudgeDismissedAt: 123 })
+
+      useSettingsStore.setState({ settings: DEFAULT_SETTINGS, hydrated: false })
+      await state().loadSettings()
+
+      expect(state().settings.persistResult).toBe('denied')
+      expect(state().settings.exportNudgeDismissedAt).toBe(123)
+    })
+
+    it('recordExport stamps one tree and keeps the others', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(1000)
+      await state().recordExport('tree-a')
+      const first = state().settings.exportedAt
+
+      vi.spyOn(Date, 'now').mockReturnValue(2000)
+      await state().recordExport('tree-b')
+
+      expect(state().settings.exportedAt).toEqual({ 'tree-a': 1000, 'tree-b': 2000 })
+      expect(state().settings.exportedAt).not.toBe(first)
+      expect(first).toEqual({ 'tree-a': 1000 })
+      expect((await db.settings.get('global_settings'))?.exportedAt).toEqual({
+        'tree-a': 1000,
+        'tree-b': 2000,
+      })
+      vi.restoreAllMocks()
     })
   })
 

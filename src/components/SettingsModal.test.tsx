@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SettingsModal } from './SettingsModal'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settingsStore'
 import { useCatalogStore } from '../store/catalogStore'
@@ -78,6 +78,20 @@ describe('SettingsModal — provider-linked credential field', () => {
       defaultModel: 'anthropic/claude-3.5-sonnet',
     })
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('a background settings write leaves the open draft untouched', async () => {
+    render(<SettingsModal open onClose={() => {}} />)
+
+    const key = screen.getByLabelText('OpenRouter API key')
+    fireEvent.change(key, { target: { value: 'half-typed' } })
+
+    await act(async () => {
+      await useSettingsStore.getState().recordDurability({ persistResult: 'denied' })
+      await useSettingsStore.getState().recordExport('tree-a')
+    })
+
+    expect(screen.getByLabelText('OpenRouter API key')).toHaveValue('half-typed')
   })
 
   it('"Refresh prices" forces a catalog reload and shows a freshness line', () => {

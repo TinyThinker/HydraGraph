@@ -28,17 +28,20 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const [draft, setDraft] = useState(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
 
+  // Copy settings into the draft only when the modal opens. Background writes
+  // (durability, export stamps) change `settings` while it is open and must
+  // not wipe what the user is typing.
   useEffect(() => {
-    if (open) {
-      setDraft({
-        provider: settings.provider,
-        openRouterApiKey: settings.openRouterApiKey ?? '',
-        openRouterBaseUrl: settings.openRouterBaseUrl ?? '',
-        ollamaBaseUrl: settings.ollamaBaseUrl,
-        defaultModel: settings.defaultModel,
-      })
-    }
-  }, [open, settings])
+    if (!open) return
+    const s = useSettingsStore.getState().settings
+    setDraft({
+      provider: s.provider,
+      openRouterApiKey: s.openRouterApiKey ?? '',
+      openRouterBaseUrl: s.openRouterBaseUrl ?? '',
+      ollamaBaseUrl: s.ollamaBaseUrl,
+      defaultModel: s.defaultModel,
+    })
+  }, [open])
 
   if (!open) return null
 
@@ -61,7 +64,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   }
 
   // Wipe both copies: the persisted row and the field being edited. The draft
-  // resync effect above would clear the field anyway, but not before a render.
+  // does not re-sync from settings while open, so this clear is required.
   const handleForget = async () => {
     await forgetApiKey()
     setDraft((prev) => ({ ...prev, openRouterApiKey: '' }))

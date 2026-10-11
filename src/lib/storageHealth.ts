@@ -6,7 +6,9 @@
  * instead of an exception. No React, no stores.
  */
 
-export type PersistResult = 'granted' | 'denied' | 'unsupported'
+import type { PersistResult } from '../types'
+
+export type { PersistResult }
 
 export interface StorageEstimateBytes {
   usageBytes: number

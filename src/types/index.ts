@@ -1,5 +1,7 @@
 export type NodeStatus = 'idle' | 'streaming' | 'error'
 export type LLMProvider = 'openrouter' | 'ollama'
+// Outcome of navigator.storage.persist(); 'unsupported' also covers a throw.
+export type PersistResult = 'granted' | 'denied' | 'unsupported'
 
 export interface TurnNode {
   id: string
@@ -56,6 +58,12 @@ export interface AppSettings {
   defaultModels?: ProviderModelMap
   activeTreeId?: string
   provider: LLMProvider
+  // Durability bookkeeping. Wiped with the rest of the row on eviction, which
+  // is fine: after eviction there is nothing left to protect.
+  persistResult?: PersistResult
+  // Tree id → last export time (ms).
+  exportedAt?: Record<string, number>
+  exportNudgeDismissedAt?: number
 }
 
 export interface TokenUsage {
