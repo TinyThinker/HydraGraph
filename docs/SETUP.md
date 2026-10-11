@@ -174,9 +174,21 @@ gate locally with `npm run check`.
 ### AI PR review (`ai-pr-review.yml`) — opt-in
 
 Sends a PR's diff (first 60 KB; lockfiles, `dist/`, `build/`, `.min.`, `.map` and `.svg`
-filtered out) to DeepSeek through OpenRouter. If the model finds problems it posts one PR
-comment. If not, it posts nothing. **Your diff leaves GitHub and goes to OpenRouter and
-DeepSeek**, so do not use it on PRs that contain anything private.
+filtered out) to DeepSeek through OpenRouter. The logic is in
+`.github/scripts/ai_review.py`; the prompt is in the workflow file. **Your diff leaves
+GitHub and goes to OpenRouter and DeepSeek**, so do not use it on PRs that contain
+anything private.
+
+**What you see after a run**
+
+- **Job summary** (Actions → the run → Summary): always written. Says `LGTM`,
+  `findings posted` or `skipped`, plus model, diff size and token count. This is how you
+  confirm a passing run happened.
+- **One PR comment** from `github-actions[bot]`, marked `<!-- ai-pr-review -->`. Findings
+  create it. Later pushes edit it in place, not add new ones. If a later push passes, the
+  comment is edited to `✅ LGTM on <sha>`. With no findings ever, no comment exists.
+- **Truncation note**: if the filtered diff is over 60 KB, the comment and summary say
+  only the first 60 KB were reviewed.
 
 **One-time setup**
 
@@ -199,6 +211,7 @@ DeepSeek**, so do not use it on PRs that contain anything private.
 - Draft PRs are skipped. Mark the PR ready first.
 - PRs from forks get no secret, so the job fails there.
 - The label is checked on every run: no label, no review, no cost.
+- Comments are PR-level, not inline on file lines.
 - A failed model call fails the job (exit 1). It does not block merging unless you add
   it as a required check, which you should not.
 - To change what it looks for, edit `REVIEW_SYSTEM_PROMPT` in the workflow file. Output

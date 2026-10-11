@@ -25,6 +25,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REVIEW_SYSTEM_PROMPT: |
             You are a Principal Frontend Architect reviewing pull requests for a production TypeScript and React Single Page Application (SPA).
             Your goal is to catch subtle runtime bugs, memory leaks, state desynchronization, and architectural flaws before they reach production.
@@ -58,55 +59,15 @@ jobs:
               - **Issue**: Precise explanation of the runtime failure mode
               - **Recommended Fix**: Concise TypeScript/React code snippet resolving the issue
         run: |
-          # 1. Fetch diff, filtering out lockfiles, build artifacts, static SVGs, and sourcemaps
-          export DIFF=$(gh pr diff "$PR_NUMBER" | grep -v -E "lock\.|dist/|build/|\.min\.|\.map|\.svg" | head -c 60000)
+          # Diff, minus lockfiles, build artifacts, static SVGs and sourcemaps
+          FULL=$(gh pr diff "$PR_NUMBER" | grep -v -E "lock\.|dist/|build/|\.min\.|\.map|\.svg" || true)
 
-          if [ -z "$DIFF" ]; then
+          if [ -z "$FULL" ]; then
             echo "No reviewable code changes detected."
+            printf '### AI review: skipped\n\nNo reviewable changes after filtering.\n' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          # 2. Execute review via OpenRouter
-          python3 -c "
-          import os, json, urllib.request
-
-          diff_text = os.environ['DIFF']
-          system_prompt = os.environ['REVIEW_SYSTEM_PROMPT']
-          pr_num = os.environ['PR_NUMBER']
-
-          payload = {
-              'model': 'deepseek/deepseek-chat',
-              'messages': [
-                  {'role': 'system', 'content': system_prompt},
-                  {'role': 'user', 'content': f'Pull Request Diff:\n\n{diff_text}'}
-              ],
-              'temperature': 0.1
-          }
-
-          req = urllib.request.Request(
-              'https://openrouter.ai/api/v1/chat/completions',
-              data=json.dumps(payload).encode('utf-8'),
-              headers={
-                  'Authorization': f'Bearer {os.environ[\"OPENROUTER_API_KEY\"]}',
-                  'Content-Type': 'application/json',
-                  'HTTP-Referer': 'https://github.com',
-                  'X-Title': 'GitHub React PR Reviewer'
-              }
-          )
-
-          try:
-              with urllib.request.urlopen(req) as resp:
-                  data = json.loads(resp.read().decode('utf-8'))
-                  review = data['choices'][0]['message']['content'].strip()
-
-              if review and review != 'LGTM':
-                  header = '### 🔍 AI Code Review (DeepSeek)\n\n'
-                  with open('/tmp/pr_review.md', 'w') as f:
-                      f.write(header + review)
-                  os.system(f'gh pr comment {pr_num} --body-file /tmp/pr_review.md')
-              else:
-                  print('Review passed with no blockers (LGTM).')
-          except Exception as e:
-              print(f'Review execution failed: {e}')
-              exit(1)
-          "
+          export DIFF_BYTES=$(printf '%s' "$FULL" | wc -c | tr -d ' ')
+          export DIFF=$(printf '%s' "$FULL" | head -c 60000)
+          python3 .github/scripts/ai_review.py
