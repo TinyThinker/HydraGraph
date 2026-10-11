@@ -10,6 +10,12 @@
 
 ## Unreleased
 
+- **Docs reconciled against source** (2026-10-11). `ARCHITECTURE.md` had stopped at
+  v0.5.0: it now covers v0.5.1 (branch from a passage, token coalescing, throttled
+  Markdown, `useComposerStore`), v0.6.0 (demo tree) and the unreleased deploy work (CSP,
+  `no-transform`, build stamp, key guidance), with the 8-store table, new `lib/` modules
+  and the 52-file / 378-test verification (tsc, lint, vitest all re-run). `ROADMAP.md`'s
+  test count and `STATUS.md`'s last-commit line corrected.
 - **Branch protection on `main`** (2026-10-11). A PR is required, the `Lint & Test` check
   must pass on an up-to-date branch, force pushes and deletions are blocked, and admins
   cannot bypass. Verified: a direct push was rejected with `GH006`. First attempt
