@@ -108,6 +108,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             openRouterBaseUrl={draft.openRouterBaseUrl}
             ollamaBaseUrl={draft.ollamaBaseUrl}
             onChange={setField}
+            ollamaHintOpen={test.result?.ok === false && test.result.kind === 'network'}
             guidance={
               <KeyGuidance
                 openRouterBaseUrl={draft.openRouterBaseUrl}
