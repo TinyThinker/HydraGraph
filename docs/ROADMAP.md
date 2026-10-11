@@ -279,7 +279,11 @@ line in the cost receipt, and is exactly a Stop-4 decision.
 
 ### Carried debt (none launch-blocking)
 
-- [ ] **Nothing runs the test suite except a human.** Checked 2026-09-21: there is no
+- [x] ~~**Nothing runs the test suite except a human.**~~ **Workflow shipped 2026-10-10**
+  (PR #1, `ci.yml`: lint + test on PR and push). **Still open: branch protection on
+  `main` requiring it** — a GitHub setting, not in the repo; without it the workflow is
+  advisory. `tsc -b` is not in the workflow (Cloudflare's build does it). Original
+  diagnosis follows. Checked 2026-09-21: there is no
   `.github/` directory, no Actions workflow, no git hook and no husky. Deploys are
   Cloudflare Pages on push to `main`, whose build command is `npm run build` =
   `tsc -b && vite build` — that type-checks, but `npm run check` is

@@ -2,7 +2,7 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-09-21 (re-verified against source on 2026-09-20 — every open
+> Last synced: 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
 > item below was checked against the code, not just re-read; updated again after
 > Phase A of the launch plan, then after Phase B)
 
@@ -11,8 +11,12 @@
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last commit: 6fd65b1 — 2026-09-21
-Last commit message: docs: record the missing CI gate as carried debt
+Last commit: b534ff8 — 2026-10-10 (docs sync follows it)
+Last commit message: ci: add opt-in AI PR review (label-gated, kill switch)
+
+CI: `ci.yml` runs lint + tests on PRs and pushes to `main` (PR #1, merged 2026-10-04).
+`ai-pr-review.yml` is an opt-in DeepSeek review, gated by the `ai-review` label and the
+`AI_REVIEW_ENABLED` repo variable — see `SETUP.md` §6.
 
 The hub (launch plan Phase C) lives in a **separate repo** —
 `TinyThinker/tinythinkerlabs-hub`, at `db6fce0` — and never affects this repo's
@@ -67,7 +71,7 @@ Test suite on `main`: **378 tests across 52 files**; `tsc -b` and `oxlint` clean
 - [ ] Investigated, not scheduled: web search / tool calling (`notes/tooling-research.md`, Dexie v7); canvas node labels — rename + generated titles (`notes/node-labels-research.md`, no migration needed)
 
 ### Carried debt (none launch-blocking)
-- [ ] **No CI — nothing runs the tests but a human** (checked 2026-09-21). No `.github/`, no workflow, no git hook. Cloudflare Pages deploys on push to `main` with build command `npm run build` (`tsc -b && vite build`), which type-checks but skips lint and all 378 tests. Wants a GitHub Actions workflow running `npm run check`, plus branch protection on `main` to make it binding. Cloudflare deploys; the gate belongs on GitHub, not in the build command
+- [x] ~~No CI~~ — `ci.yml` (lint + test on PR and push) shipped 2026-10-10. **Still open: branch protection on `main` requiring it**, a GitHub setting not in the repo; without it the workflow is advisory. `tsc -b` is left to Cloudflare's build
 - [ ] Edit a submitted prompt (not just regenerate)
 - [x] Throttle the chat pane's Markdown re-parse — 40 parses per 40 tokens → 6 (v0.5.1)
 - [ ] 200-node performance pass
@@ -135,10 +139,9 @@ headers present, no injected beacon, silent console, zero CSP violations.*
      "who came back a second time". Quota exhaustion turned out not to be the threat at
      all; eviction is.
    - Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
-3. [Debt] **CI that actually runs `npm run check`** — a GitHub Actions workflow plus
-   branch protection on `main`. Today the only thing standing between a red test and
-   the live site is remembering to run it; Cloudflare's build command type-checks and
-   nothing more. Small, and it stops being optional the moment anyone else commits
+3. [Debt] **Branch protection on `main` requiring the CI check.** The workflow exists
+   (`ci.yml`); without the rule it is advisory and a red test can still reach the
+   live site. GitHub → Settings → Branches. Not verifiable from the repo
 4. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
    one number a skeptical reader will poke at
 5. [Debt, hub] **Two dashboard-only follow-ups, both deferred 2026-09-21 for time.**
