@@ -8,6 +8,8 @@ import { useSettingsStore } from './settingsStore'
 import { computeChildPosition, layoutTree } from '../lib/autoLayout'
 import { parseImportDoc, remapImportedTree } from '../lib/treeExport'
 import { buildDemoTree } from '../lib/demoTree'
+import { describeWriteError } from '../lib/storageErrors'
+import { reportWriteFailure } from './storageStatusStore'
 import type { TurnNode, ConversationTree, NodeStatus, TokenUsage } from '../types'
 
 interface TreeStoreState {
@@ -73,6 +75,7 @@ function scheduleThrottledFlush(nodeId: string) {
     if (liveText !== undefined) {
       db.nodes.update(nodeId, { assistantResponse: liveText }).catch((err) => {
         console.error(`[throttled flush error for ${nodeId}]`, err)
+        reportWriteFailure(err)
       })
     }
     pendingTimers.delete(nodeId)
@@ -340,7 +343,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
 
       const patch = { status: 'idle' as NodeStatus, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }
       const updated = { ...existing, ...patch, assistantResponse: finalText }
-      await db.nodes.update(id, { ...patch, assistantResponse: finalText })
+      // Memory first: a failed write must never leave the node streaming.
       set((state) => {
         const nextNodes = new Map(state.nodes)
         nextNodes.set(id, updated)
@@ -348,7 +351,13 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         nextLiveText.delete(id)
         return { nodes: nextNodes, liveText: nextLiveText }
       })
-      await touchActiveTree()
+      try {
+        await db.nodes.update(id, { ...patch, assistantResponse: finalText })
+        await touchActiveTree()
+      } catch (err) {
+        console.error(`[finalize write error for ${id}]`, err)
+        reportWriteFailure(err)
+      }
     },
 
     setActiveTree: (treeId) => set({ activeTreeId: treeId }),
@@ -403,7 +412,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         if (currentNode) {
           // Compute text: use liveText if present, otherwise fall back to node's current response
           const text = get().liveText.get(nodeId) ?? currentNode.assistantResponse
-          await db.nodes.update(nodeId, { status: 'error', assistantResponse: text, errorMessage: message })
+          // Memory first: a failed write must never leave the node streaming.
           set((state) => {
             const nextNodes = new Map(state.nodes)
             nextNodes.set(nodeId, { ...currentNode, status: 'error', assistantResponse: text, errorMessage: message })
@@ -411,6 +420,12 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
             nextLiveText.delete(nodeId)
             return { nodes: nextNodes, liveText: nextLiveText }
           })
+          try {
+            await db.nodes.update(nodeId, { status: 'error', assistantResponse: text, errorMessage: message })
+          } catch (writeErr) {
+            console.error(`[error-state write error for ${nodeId}]`, writeErr)
+            reportWriteFailure(writeErr)
+          }
         }
       }
 
@@ -538,10 +553,7 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       // Compute text: use liveText if present, otherwise fall back to node's current response
       const text = get().liveText.get(id) ?? node.assistantResponse
 
-      // Update DB with idle status and preserved text
-      await db.nodes.update(id, { status: 'idle', assistantResponse: text })
-
-      // Update memory immutably
+      // Update memory immutably, first: a failed write must not leave Stop without effect
       set((state) => {
         const nextNodes = new Map(state.nodes)
         nextNodes.set(id, { ...node, status: 'idle', assistantResponse: text })
@@ -549,6 +561,14 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
         nextLiveText.delete(id)
         return { nodes: nextNodes, liveText: nextLiveText }
       })
+
+      // Update DB with idle status and preserved text
+      try {
+        await db.nodes.update(id, { status: 'idle', assistantResponse: text })
+      } catch (err) {
+        console.error(`[cancel write error for ${id}]`, err)
+        reportWriteFailure(err)
+      }
     },
 
     deleteNodeSubtree: async (id) => {
@@ -718,7 +738,8 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
           await db.nodes.bulkAdd(nodes)
         })
       } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+        reportWriteFailure(err)
+        return { ok: false, error: describeWriteError(err).message }
       }
 
       set((state) => ({ trees: [tree, ...state.trees] }))

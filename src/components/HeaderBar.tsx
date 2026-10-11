@@ -10,6 +10,7 @@ import { SearchBar } from './SearchBar'
 import { ImportButton } from './ImportButton'
 import { CostReceipt } from './CostReceipt'
 import { ProviderBanner } from './ProviderBanner'
+import { StorageBanner } from './StorageBanner'
 
 export function HeaderBar() {
   const [modalOpen, setModalOpen] = useState(false)
@@ -110,6 +111,7 @@ export function HeaderBar() {
           </div>
         </div>
       )}
+      <StorageBanner />
       <ProviderBanner onOpenSettings={() => setModalOpen(true)} />
       <SettingsModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </>

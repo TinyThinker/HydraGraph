@@ -2,7 +2,7 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
+> Last synced: 2026-10-11 (write-failure handling, spec phase 1); previously 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
 > item below was checked against the code, not just re-read; updated again after
 > Phase A of the launch plan, then after Phase B)
 
@@ -11,7 +11,7 @@
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last synced against `main` at 13b94cd — 2026-10-11 (Merge pull request #4, docs/branch-protection). The last source change is fc0118e, 2026-09-21; every commit after it is CI or docs.
+Last synced against `main` at 9d62518 — 2026-10-11 (Merge pull request #5, docs/sync-2026-10-11), plus the write-failure work on branch `feat/write-failures` (not merged yet).
 
 CI: `ci.yml` runs lint + tests on PRs and pushes to `main` (PR #1, merged 2026-10-04).
 `ai-pr-review.yml` is an opt-in DeepSeek review, gated by the `ai-review` label and the
@@ -27,7 +27,7 @@ commits on `main` since are unreleased — the counterfactual labelling, the rec
 exclusion fix, the pill-label pass, Phase A of the launch plan (deploy + CSP +
 `no-transform`), and now Phase B (key hardening).
 
-Test suite on `main`: **378 tests across 52 files**; `tsc -b` and `oxlint` clean.
+Test suite: **402 tests across 55 files** with the write-failure branch (378 across 52 on `main`); `tsc -b` and `oxlint` clean.
 
 ---
 
@@ -129,9 +129,10 @@ headers present, no injected beacon, silent console, zero CSP violations.*
    host, "Forget key"). What remains is durability for trees, **re-ordered 2026-09-21
    after a cross-browser audit** (~1d): (1) `persist()` + `estimate()`; (2) export nudge
    with **browser-aware urgency**; (3) **restore on empty** — offer import instead of a
-   blank canvas; (4) name `QuotaExceededError` as quota on the write paths; (5) fix
-   `persistError` (`useTreeStore.ts:397`), which answers a failed write with another
-   write and throws an unhandled rejection in exactly the quota case it exists for.
+   blank canvas. Items (4) name `QuotaExceededError` as quota and (5) fix `persistError`
+   are **done 2026-10-11** (`storageErrors.ts`, `storageStatusStore`, `StorageBanner`;
+   spec phase 1). Next is spec phase 2,
+   `specs/roadmap-items-phase3-front-door-2026-10-11/phase-2-tree-durability.md`.
    - Why the re-order: the app is **not** Chrome-only (nothing in `src/` is Chrome-gated;
      export *and* import both ship and round-trip), so File System Access is convenience
      on a working mechanism — yet the old plan gave Chrome the most help and **Safari,
