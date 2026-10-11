@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Settings, LayoutGrid, DollarSign, Columns3 } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useCompareStore } from '../store/useCompareStore'
+import { useSettingsModalStore } from '../store/useSettingsModalStore'
 import { useActiveNodeId } from './useActiveNodeId'
 import { SettingsModal } from './SettingsModal'
 import { TreeSwitcher } from './TreeSwitcher'
@@ -14,7 +15,9 @@ import { StorageBanner } from './StorageBanner'
 import { ExportNudge } from './ExportNudge'
 
 export function HeaderBar() {
-  const [modalOpen, setModalOpen] = useState(false)
+  const modalOpen = useSettingsModalStore((s) => s.open)
+  const openSettings = useSettingsModalStore((s) => s.openSettings)
+  const closeSettings = useSettingsModalStore((s) => s.closeSettings)
   const [confirmRelayout, setConfirmRelayout] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
   const relayoutActiveTree = useTreeStore((s) => s.relayoutActiveTree)
@@ -66,7 +69,7 @@ export function HeaderBar() {
             <Columns3 size={20} />
           </button>
           <button
-            onClick={() => setModalOpen(true)}
+            onClick={openSettings}
             className="text-slate-400 hover:text-slate-200 transition-colors p-2"
           >
             <Settings size={20} />
@@ -101,9 +104,9 @@ export function HeaderBar() {
         </div>
       )}
       <StorageBanner />
-      <ProviderBanner onOpenSettings={() => setModalOpen(true)} />
+      <ProviderBanner onOpenSettings={openSettings} />
       <ExportNudge />
-      <SettingsModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <SettingsModal open={modalOpen} onClose={closeSettings} />
     </>
   )
 }

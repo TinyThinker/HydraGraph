@@ -1,12 +1,17 @@
 import { useState } from 'react'
-import { RotateCcw, Square } from 'lucide-react'
+import { PlugZap, RotateCcw, Square } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
+import { useSettingsModalStore } from '../store/useSettingsModalStore'
 import type { TurnNode } from '../types'
 
 const BTN =
   'nodrag inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-0.5 ' +
   'text-[11px] font-medium text-slate-300 transition-colors hover:bg-slate-700 ' +
   'hover:text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed'
+
+// Bad key (401/403 from either provider) or a request that never got an answer
+// (Chrome / Safari / Firefox wording for a fetch TypeError).
+const CONNECTION_ERROR = /^(OpenRouter|Ollama) 40[13]\b|failed to fetch|load failed|networkerror/i
 
 /**
  * The recovery controls for a single turn: Stop while it streams, Retry after an
@@ -16,6 +21,7 @@ const BTN =
  *
  * Regenerate only shows on the active turn (it is a deliberate re-run); Retry
  * always shows on an errored turn so a bad key or rate limit is never a dead end.
+ * When the error looks like auth or network, "Check connection" opens Settings.
  */
 export function MessageActions({
   node,
@@ -57,7 +63,7 @@ export function MessageActions({
     }
   }
 
-  return (
+  const retry = (
     <button
       type="button"
       className={BTN}
@@ -67,5 +73,20 @@ export function MessageActions({
     >
       <RotateCcw size={11} /> {isError ? 'Retry' : 'Regenerate'}
     </button>
+  )
+  if (!isError || !CONNECTION_ERROR.test(node.errorMessage ?? '')) return retry
+
+  return (
+    <span className="inline-flex gap-1">
+      {retry}
+      <button
+        type="button"
+        className={BTN}
+        onClick={() => useSettingsModalStore.getState().openSettings()}
+        title="Open Settings and test the connection"
+      >
+        <PlugZap size={11} /> Check connection
+      </button>
+    </span>
   )
 }
