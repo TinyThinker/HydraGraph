@@ -9,6 +9,8 @@ import { DataLocationNote } from './DataLocationNote'
 import { ConnectionTest } from './ConnectionTest'
 import { SettingsFooter } from './SettingsFooter'
 import { useConnectionTest } from './useConnectionTest'
+import { SettingsSteps } from './SettingsSteps'
+import { useSetupSteps } from './useSetupSteps'
 import type { LLMProvider } from '../types'
 
 interface SettingsModalProps {
@@ -33,6 +35,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const [saving, setSaving] = useState(false)
   const test = useConnectionTest(draft)
   const resetTest = test.reset
+  const setup = useSetupSteps(draft, test.state)
 
   // Copy settings into the draft only when the modal opens. Background writes
   // (durability, export stamps) change `settings` while it is open and must
@@ -97,6 +100,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         </div>
 
         <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <SettingsSteps steps={setup.steps} current={setup.current} />
           <ProviderSelect
             value={draft.provider}
             onChange={(value) => setDraft((prev) => ({ ...prev, provider: value }))}
