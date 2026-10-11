@@ -9,6 +9,7 @@ import { ReaderPanel } from './components/ReaderPanel'
 import { CompareView } from './components/CompareView'
 import { SelectionBranchButton } from './components/SelectionBranchButton'
 import { BuildStamp } from './components/BuildStamp'
+import { useDurabilityWatcher } from './components/useDurabilityWatcher'
 import { installRenderHarness } from './lib/renderTally'
 
 export default function App() {
@@ -51,6 +52,10 @@ export default function App() {
     }
     boot()
   }, [])
+
+  // Asks the browser to keep the data once real work exists. Waits for boot so
+  // settings and trees are loaded.
+  useDurabilityWatcher(ready)
 
   if (!ready) return <div className="h-full bg-slate-950" />
   return (
