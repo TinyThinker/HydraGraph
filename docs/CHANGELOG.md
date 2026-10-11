@@ -10,6 +10,11 @@
 
 ## Unreleased
 
+- **Branch protection on `main`** (2026-10-11). A PR is required, the `Lint & Test` check
+  must pass on an up-to-date branch, force pushes and deletions are blocked, and admins
+  cannot bypass. Verified: a direct push was rejected with `GH006`. First attempt
+  succeeded because "Do not allow bypassing" was off; a test commit was pushed and
+  reverted (`5844599`, `238be32`). Rules are in `SETUP.md` §6.
 - **CI and an opt-in AI PR review** (2026-10-10). `ci.yml` (PR #1) runs lint and tests on
   every PR and push to `main`. `ai-pr-review.yml` sends a PR diff to DeepSeek via
   OpenRouter and comments only when it finds problems. It runs only on PRs labelled

@@ -171,6 +171,21 @@ Runs `npm ci`, `npm run lint` and `npm run test` on every PR to `main` and every
 `main`. It does not run `tsc -b`; the Cloudflare Pages build does that. Run the full
 gate locally with `npm run check`.
 
+### Branch protection on `main`
+
+Set in GitHub → Settings → Branches (a GitHub setting, not in the repo). Rules:
+
+- Require a pull request before merging. Required approvals: 0 (solo repo).
+- Require status check **Lint & Test** (the `ci.yml` job name) and an up-to-date branch.
+- Force pushes and deletions blocked.
+- **Do not allow bypassing the above settings: on.** With it off, an admin push goes
+  straight through and GitHub only prints `Bypassed rule violations`.
+
+Rules for the check: do not add path filters to `ci.yml`, or a PR that skips it can never
+merge. Do not make the AI review a required check; it is opt-in and advisory. To verify
+the rule, push an empty commit to `main`. It must be rejected with `GH006`. In an
+emergency, untick the bypass box, push, and tick it again.
+
 ### AI PR review (`ai-pr-review.yml`) — opt-in
 
 Sends a PR's diff (first 60 KB; lockfiles, `dist/`, `build/`, `.min.`, `.map` and `.svg`
