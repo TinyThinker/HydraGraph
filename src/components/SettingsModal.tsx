@@ -5,6 +5,7 @@ import { ProviderSelect } from './ProviderSelect'
 import { ModelSelect } from './ModelSelect'
 import { SettingsCredentialField } from './SettingsCredentialField'
 import { KeyGuidance } from './KeyGuidance'
+import { DataLocationNote } from './DataLocationNote'
 import type { LLMProvider } from '../types'
 
 interface SettingsModalProps {
@@ -28,17 +29,20 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const [draft, setDraft] = useState(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
 
+  // Copy settings into the draft only when the modal opens. Background writes
+  // (durability, export stamps) change `settings` while it is open and must
+  // not wipe what the user is typing.
   useEffect(() => {
-    if (open) {
-      setDraft({
-        provider: settings.provider,
-        openRouterApiKey: settings.openRouterApiKey ?? '',
-        openRouterBaseUrl: settings.openRouterBaseUrl ?? '',
-        ollamaBaseUrl: settings.ollamaBaseUrl,
-        defaultModel: settings.defaultModel,
-      })
-    }
-  }, [open, settings])
+    if (!open) return
+    const s = useSettingsStore.getState().settings
+    setDraft({
+      provider: s.provider,
+      openRouterApiKey: s.openRouterApiKey ?? '',
+      openRouterBaseUrl: s.openRouterBaseUrl ?? '',
+      ollamaBaseUrl: s.ollamaBaseUrl,
+      defaultModel: s.defaultModel,
+    })
+  }, [open])
 
   if (!open) return null
 
@@ -61,7 +65,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   }
 
   // Wipe both copies: the persisted row and the field being edited. The draft
-  // resync effect above would clear the field anyway, but not before a render.
+  // does not re-sync from settings while open, so this clear is required.
   const handleForget = async () => {
     await forgetApiKey()
     setDraft((prev) => ({ ...prev, openRouterApiKey: '' }))
@@ -119,6 +123,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               onChange={(m) => setDraft((d) => ({ ...d, defaultModel: m }))}
             />
           </div>
+          <DataLocationNote />
         </div>
 
         <div className="flex gap-2 px-6 py-4 border-t border-slate-700">

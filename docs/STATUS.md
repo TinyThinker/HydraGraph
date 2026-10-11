@@ -2,7 +2,7 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-10-11 (write-failure handling, spec phase 1); previously 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
+> Last synced: 2026-10-11 (tree durability, spec phase 2); previously 2026-10-11 (write-failure handling, spec phase 1); previously 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
 > item below was checked against the code, not just re-read; updated again after
 > Phase A of the launch plan, then after Phase B)
 
@@ -11,7 +11,7 @@
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last synced against `main` at 9d62518 — 2026-10-11 (Merge pull request #5, docs/sync-2026-10-11), plus the write-failure work on branch `feat/write-failures` (not merged yet).
+Last synced against `main` at 9d62518 — 2026-10-11 (Merge pull request #5, docs/sync-2026-10-11), plus the write-failure and tree-durability work on branch `feat/write-failures` (not merged yet; spec phases 1–2).
 
 CI: `ci.yml` runs lint + tests on PRs and pushes to `main` (PR #1, merged 2026-10-04).
 `ai-pr-review.yml` is an opt-in DeepSeek review, gated by the `ai-review` label and the
@@ -27,7 +27,7 @@ commits on `main` since are unreleased — the counterfactual labelling, the rec
 exclusion fix, the pill-label pass, Phase A of the launch plan (deploy + CSP +
 `no-transform`), and now Phase B (key hardening).
 
-Test suite: **402 tests across 55 files** with the write-failure branch (378 across 52 on `main`); `tsc -b` and `oxlint` clean.
+Test suite: **460 tests across 62 files** on `feat/write-failures` (378 across 52 on `main`); `tsc -b` and `oxlint` clean.
 
 ---
 
@@ -54,7 +54,7 @@ Test suite: **402 tests across 55 files** with the write-failure branch (378 acr
 - [x] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers — 16 turns / 4 forks, seeded on first run, priced off `BUNDLED_CATALOG` ($0.1794 vs $0.2545 linear, 29% saved)
 - [x] Static deploy; the landing page is the app with the demo preloaded — **live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21)**, serving the CSP, `noindex` and `Referrer-Policy`, demo seeding cold, catalog fetch 200, **zero CSP violations and a silent console**. The edge-injected `static.cloudflareinsights.com` beacon was the last holdout; no dashboard toggle exists for it, so `Cache-Control: … no-transform` in `public/_headers` (A8) is what stops it — verified against the live response
 - [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app** (it is already written up in `SETUP.md` §4 — what's missing is a hint next to the Ollama option, not the prose)
-- [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`). **The key half shipped 2026-09-21** — `KeyGuidance` under the credential field (save it / scope it / early-build warning), the destination host named and flagged when it isn't `openrouter.ai`, and a "Forget key" button backed by `settingsStore.forgetApiKey`. What's left is the *trees* half: `navigator.storage.persist()` on first real write, `estimate()` for real numbers, the export nudge
+- [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`). **The key half shipped 2026-09-21** — `KeyGuidance` under the credential field (save it / scope it / early-build warning), the destination host named and flagged when it isn't `openrouter.ai`, and a "Forget key" button backed by `settingsStore.forgetApiKey`. The *trees* half is **built 2026-10-11** on `feat/write-failures` (spec phase 2): `persist()` after 3 completed turns, `estimate()` in Settings, the export nudge after 6, "Import a backup" on the demo banner. Open until the manual cross-browser check on the deployed URL runs
 
 ### Phase 4 — Post it, then listen (days 13–14)
 - [ ] Ship where people already think in tokens: local-model communities, BYOK power users, prompt engineers
@@ -106,8 +106,8 @@ is now recorded honestly rather than hidden. See Carried debt.
 Phases 1–2 cleared the shipping blockers and built the deep-context arbitration
 demo; Phase 3's catalog work, the no-key demo tree and the static deploy are done,
 as is the key half of the storage policy. What's left of Phase 3 is the three-step
-key setup with a connection test, the in-app Ollama `OLLAMA_ORIGINS` hint, and
-tree durability (`persist()` + export nudge).
+key setup with a connection test, the in-app Ollama `OLLAMA_ORIGINS` hint, and the
+manual cross-browser check of tree durability (code done 2026-10-11, not merged).
 
 ---
 
@@ -131,8 +131,11 @@ headers present, no injected beacon, silent console, zero CSP violations.*
    with **browser-aware urgency**; (3) **restore on empty** — offer import instead of a
    blank canvas. Items (4) name `QuotaExceededError` as quota and (5) fix `persistError`
    are **done 2026-10-11** (`storageErrors.ts`, `storageStatusStore`, `StorageBanner`;
-   spec phase 1). Next is spec phase 2,
-   `specs/roadmap-items-phase3-front-door-2026-10-11/phase-2-tree-durability.md`.
+   spec phase 1). Items (1)–(3) are **built 2026-10-11** (spec phase 2); (3) became an
+   always-on "Returning? Import a backup." link on the demo banner, since the app cannot
+   detect a returner after eviction. **Next:** merge `feat/write-failures`, deploy, then
+   run the manual check in spec task 2.8 (Chrome, Safari, Firefox, private window) and
+   record here what Safari's `persist()` returns — *not yet recorded*.
    - Why the re-order: the app is **not** Chrome-only (nothing in `src/` is Chrome-gated;
      export *and* import both ship and round-trip), so File System Access is convenience
      on a working mechanism — yet the old plan gave Chrome the most help and **Safari,

@@ -58,6 +58,11 @@ changes with the provider:
 Click **Save**. Values survive a page reload, and the "no provider configured" banner
 clears immediately.
 
+**Where your data lives.** Trees and settings are stored in this browser's IndexedDB
+only; Settings shows the space used and whether the browser agreed to keep it. Export
+trees from the header (download icon) — the app nudges you after 6 turns on a tree. To
+restore, use the upload icon, or "Returning? Import a backup." on the demo banner.
+
 **GPT, Claude, Gemini and DeepSeek are reached through OpenRouter** as `vendor/model`
 slugs (`openai/gpt-4o`, `anthropic/claude-3.7-sonnet`, `google/gemini-2.5-pro`,
 `deepseek/deepseek-r1`). There is no separate native provider for any of them — the

@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { Settings, LayoutGrid, Download, DollarSign, Columns3 } from 'lucide-react'
+import { Settings, LayoutGrid, DollarSign, Columns3 } from 'lucide-react'
 import { useTreeStore } from '../store/useTreeStore'
 import { useCompareStore } from '../store/useCompareStore'
 import { useActiveNodeId } from './useActiveNodeId'
-import { downloadTreeExport } from '../lib/treeExport'
 import { SettingsModal } from './SettingsModal'
 import { TreeSwitcher } from './TreeSwitcher'
 import { SearchBar } from './SearchBar'
+import { ExportButton } from './ExportButton'
 import { ImportButton } from './ImportButton'
 import { CostReceipt } from './CostReceipt'
 import { ProviderBanner } from './ProviderBanner'
 import { StorageBanner } from './StorageBanner'
+import { ExportNudge } from './ExportNudge'
 
 export function HeaderBar() {
   const [modalOpen, setModalOpen] = useState(false)
@@ -43,19 +44,7 @@ export function HeaderBar() {
           >
             <LayoutGrid size={20} />
           </button>
-          <button
-            onClick={() => {
-              const id = useTreeStore.getState().activeTreeId
-              const tree = useTreeStore.getState().trees.find((t) => t.id === id)
-              if (!tree) return
-              const nodes = [...useTreeStore.getState().nodes.values()].filter((n) => n.treeId === tree.id)
-              downloadTreeExport(tree, nodes)
-            }}
-            title="Export this tree as JSON"
-            className="text-slate-400 hover:text-slate-200 transition-colors p-2"
-          >
-            <Download size={20} />
-          </button>
+          <ExportButton />
           <ImportButton />
           <button
             onClick={() => setShowReceipt((v) => !v)}
@@ -113,6 +102,7 @@ export function HeaderBar() {
       )}
       <StorageBanner />
       <ProviderBanner onOpenSettings={() => setModalOpen(true)} />
+      <ExportNudge />
       <SettingsModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </>
   )
