@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MessageActions } from './MessageActions'
+import { useSettingsModalStore } from '../store/useSettingsModalStore'
 import type { TurnNode } from '../types'
 
 const submitPrompt = vi.fn(async () => () => {})
@@ -63,5 +64,24 @@ describe('MessageActions', () => {
       <MessageActions node={node({ userPrompt: '', status: 'idle' })} isActive />,
     )
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it.each([
+    'OpenRouter 401: {"error":{"message":"No auth credentials found"}}',
+    'Ollama 403: forbidden',
+    'Failed to fetch',
+    'Load failed',
+    'NetworkError when attempting to fetch resource.',
+  ])('offers Check connection for %s, which opens Settings', (errorMessage) => {
+    useSettingsModalStore.setState({ open: false })
+    render(<MessageActions node={node({ status: 'error', errorMessage })} />)
+    fireEvent.click(screen.getByRole('button', { name: /check connection/i }))
+    expect(useSettingsModalStore.getState().open).toBe(true)
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
+  })
+
+  it('does not offer Check connection for other errors', () => {
+    render(<MessageActions node={node({ status: 'error', errorMessage: 'OpenRouter 429: rate limited' })} />)
+    expect(screen.queryByRole('button', { name: /check connection/i })).not.toBeInTheDocument()
   })
 })

@@ -6,6 +6,11 @@ import { ModelSelect } from './ModelSelect'
 import { SettingsCredentialField } from './SettingsCredentialField'
 import { KeyGuidance } from './KeyGuidance'
 import { DataLocationNote } from './DataLocationNote'
+import { ConnectionTest } from './ConnectionTest'
+import { SettingsFooter } from './SettingsFooter'
+import { useConnectionTest } from './useConnectionTest'
+import { SettingsSteps } from './SettingsSteps'
+import { useSetupSteps } from './useSetupSteps'
 import type { LLMProvider } from '../types'
 
 interface SettingsModalProps {
@@ -28,12 +33,19 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
   const [draft, setDraft] = useState(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
+  const test = useConnectionTest(draft)
+  const resetTest = test.reset
+  const setup = useSetupSteps(draft, test.state)
 
   // Copy settings into the draft only when the modal opens. Background writes
   // (durability, export stamps) change `settings` while it is open and must
-  // not wipe what the user is typing.
+  // not wipe what the user is typing. Closing drops the test result and aborts
+  // a probe still in flight.
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      resetTest()
+      return
+    }
     const s = useSettingsStore.getState().settings
     setDraft({
       provider: s.provider,
@@ -42,7 +54,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       ollamaBaseUrl: s.ollamaBaseUrl,
       defaultModel: s.defaultModel,
     })
-  }, [open])
+  }, [open, resetTest])
 
   if (!open) return null
 
@@ -88,6 +100,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         </div>
 
         <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <SettingsSteps steps={setup.steps} current={setup.current} />
           <ProviderSelect
             value={draft.provider}
             onChange={(value) => setDraft((prev) => ({ ...prev, provider: value }))}
@@ -99,6 +112,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             openRouterBaseUrl={draft.openRouterBaseUrl}
             ollamaBaseUrl={draft.ollamaBaseUrl}
             onChange={setField}
+            ollamaHintOpen={test.result?.ok === false && test.result.kind === 'network'}
             guidance={
               <KeyGuidance
                 openRouterBaseUrl={draft.openRouterBaseUrl}
@@ -107,6 +121,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               />
             }
           />
+          <ConnectionTest state={test.state} result={test.result} onRun={() => void test.run()} />
 
           <div>
             <label
@@ -126,21 +141,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           <DataLocationNote />
         </div>
 
-        <div className="flex gap-2 px-6 py-4 border-t border-slate-700">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-slate-200 bg-slate-700 hover:bg-slate-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 disabled:cursor-not-allowed transition-colors"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
+        <SettingsFooter saving={saving} onCancel={onClose} onSave={() => void handleSave()} />
       </div>
     </div>
   )

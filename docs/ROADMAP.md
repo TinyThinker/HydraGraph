@@ -146,8 +146,14 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     var, the macOS `launchctl` variant, the instant-fail symptom, and a
     troubleshooting row. What is missing is a hint next to the Ollama option in
     Settings, where someone hits the wall. This item is smaller than it reads.
-  - `SettingsModal` is currently a flat form (provider · credential · default model ·
-    Save) with no step state and no connection probe anywhere in `src/`.
+  - **Built 2026-10-11** on `feat/write-failures` (spec phase 3): **Test connection**
+    on draft values (OpenRouter `GET /key`, Ollama `GET /api/tags`, 8 s timeout, no
+    tokens spent), a ① Provider ② Key ③ Test row, the `OLLAMA_ORIGINS` hint next to the
+    Ollama option (opens itself on a network failure, names Chrome's Local Network
+    Access prompt), and **Check connection** on a turn that failed with an auth or
+    network error. Open until the manual check on the deployed URL runs (spec 3.7:
+    good/bad key, Ollama with and without `OLLAMA_ORIGINS`, Chrome allow/block, Safari
+    HTTPS → `localhost`).
 - [ ] One honest line about where data lives, plus an export nudge after real work.
   - Export already ships (`HeaderBar` → `downloadTreeExport`); only the sentence and
     the nudge trigger are missing.

@@ -230,6 +230,7 @@ The running application is a three-region shell (header / split workspace / read
 | `useSearchNav` | `src/components/useSearchNav.ts` | Search "fly to this node" target + nonce. |
 | `useCompareStore` | `src/store/useCompareStore.ts` | Compare-view overlay: `open`, the `anchorId` whose siblings are compared, and the `excludedIds` set the user has unchecked. Added in v0.4.0. |
 | `useComposerStore` | `src/store/useComposerStore.ts` | The chat composer's draft text, lifted out of `ChatInputBar`'s local state so anything on screen can seed it (branch-from-a-passage writes a Markdown quote here). Added in v0.5.1. |
+| `useSettingsModalStore` | `src/store/useSettingsModalStore.ts` | Whether the Settings modal is open (`openSettings` / `closeSettings`). Lifted out of `HeaderBar` so a failed turn's **Check connection** can open it. Unreleased. |
 | `useCatalogStore` | `src/store/catalogStore.ts` | The OpenRouter price catalog: `models`, `fetchedAt`, `status`, `source` (`live` / `cache` / `bundled`), and `loadCatalog(force?)` (1 h TTL, IndexedDB cache, `BUNDLED_CATALOG` fallback). The price source for `pricing.ts`; cost components subscribe to it. Added in v0.5.0. |
 
 **Settings have one owner (`useSettingsStore`).** Since v0.3.1 `useTreeStore` no longer
@@ -266,6 +267,7 @@ remembered tree is gone, falls back to the newest tree (or creates one).
 | `treeCost.ts` | `treeCostSummary(nodes, catalog?)` — this tree's actual spend vs. the one-linear-thread counterfactual ("context you didn't pay for"). Also exports the receipt's wording (`COUNTERFACTUAL_NOTE`, `ACTUAL_DETAIL`, …), names the reason a turn was excluded, and never reports a negative saving. Added v0.4.0. |
 | `stationSummary.ts` | Pill label: up to 12 words / 64 chars, shown on two lines (`line-clamp-2` does the trimming). Drops a leading Markdown blockquote when the prompt continues underneath it, so a branch seeded from a passage is labelled by what it asks, not what it quotes. |
 | `streamingClient.ts` | Provider SSE clients. |
+| `connectionProbe.ts` | `probeConnection(input, fetch?)` — Settings' **Test connection**: OpenRouter `GET {base}/key`, Ollama `GET {url}/api/tags`; returns `ok` (+ detail) or `auth` / `network` / `http` / `timeout` / `missing` with a plain message. 8 s timeout composed with the caller's signal; `fetch` injectable. Unreleased. |
 | `treeExport.ts` | Versioned JSON export doc, filename slug, download, parse + id-remapped import. |
 | `treeNav.ts` | Arrow-key target resolution + `isTypingTarget()` guard. |
 | `viewportCenter.ts` | `centerTarget()` — never zooms an already zoomed-in user back out. |
@@ -277,13 +279,17 @@ remembered tree is gone, falls back to the newest tree (or creates one).
 
 **Key guidance and the provider strip (v0.6.0 / unreleased).** `KeyGuidance` (in `SettingsModal`) names the host the key will be sent to, derived the same way `streamOpenRouter` derives it, warns about key exposure, and offers **Forget key**. `ProviderBanner` is the strip under the header: on the demo tree with no key it explains the tree is canned and offers "Add a key"; on the user's own tree it is the amber "no provider" warning; with a provider configured it renders nothing.
 
+**Key setup (unreleased).** `SettingsModal` owns the connection test (`useConnectionTest(draft)`): it runs `probeConnection` on the *draft* values, and a result belongs to the inputs it ran with — editing any field, closing the modal, or unmounting aborts the probe and reads `idle` again. Three components read that one result: `ConnectionTest` (button + result line), `OllamaOriginsHint` (inside `SettingsCredentialField`'s Ollama branch; `OLLAMA_ORIGINS` commands with `window.location.origin` filled in, forced open after a `network` failure), and `SettingsSteps` (① Provider ② Key ③ Test from `useSetupSteps`). Steps are guidance only; Save is never gated. `MessageActions` adds **Check connection** beside **Retry** when an errored turn's message looks like a 401/403 or a fetch network failure.
+
 **Build and deploy (unreleased).** The app is a static build on Cloudflare Pages. `public/_headers` sets a Content-Security-Policy (`default-src 'self'`; `connect-src` limited to `'self'`, `https://openrouter.ai` and localhost for Ollama; `frame-ancestors 'none'`), `X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`, and `Cache-Control: … no-transform` (Cloudflare's documented opt-out from injecting its Web Analytics beacon at the edge). `vite.config.ts` defines `__BUILD_SHA__` from `CF_PAGES_COMMIT_SHA` or `git rev-parse`, and `BuildStamp` shows it bottom-left so a bug report names its build. CI (`.github/workflows/ci.yml`) runs lint and tests on every PR and push to `main`; see `SETUP.md` §6.
 
 **Turn recovery UI.** `MessageActions.tsx` (mounted by `ChatMessage` and `ReaderPanel`)
 renders exactly one control per turn: **Stop** while it streams (`cancelGeneration`),
 **Retry** on an errored turn (always shown), **Regenerate** on the active idle turn —
 both the latter call `submitPrompt(node.id, node.userPrompt)`. This is the only live
-surface for those two store actions since the pill refactor.
+surface for those two store actions since the pill refactor. The one exception to "one
+control": an errored turn whose message looks like auth or network also gets **Check
+connection**, which opens Settings via `useSettingsModalStore`.
 
 The six pre-pill full-card components (`NodeFooter`, `PromptSection`, `ResponseArea`,
 `ContextMeter`, `ModelPicker`, `SystemPromptEditor`) and their tests were **deleted** in

@@ -2,7 +2,7 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-10-11 (tree durability, spec phase 2); previously 2026-10-11 (write-failure handling, spec phase 1); previously 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
+> Last synced: 2026-10-11 (key setup, spec phase 3); previously 2026-10-11 (tree durability, spec phase 2); previously 2026-10-11 (write-failure handling, spec phase 1); previously 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
 > item below was checked against the code, not just re-read; updated again after
 > Phase A of the launch plan, then after Phase B)
 
@@ -11,7 +11,7 @@
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last synced against `main` at 9d62518 — 2026-10-11 (Merge pull request #5, docs/sync-2026-10-11), plus the write-failure and tree-durability work on branch `feat/write-failures` (not merged yet; spec phases 1–2).
+Last synced against `main` at 9d62518 — 2026-10-11 (Merge pull request #5, docs/sync-2026-10-11), plus the write-failure, tree-durability and key-setup work on branch `feat/write-failures` (not merged yet; spec phases 1–3).
 
 CI: `ci.yml` runs lint + tests on PRs and pushes to `main` (PR #1, merged 2026-10-04).
 `ai-pr-review.yml` is an opt-in DeepSeek review, gated by the `ai-review` label and the
@@ -27,7 +27,7 @@ commits on `main` since are unreleased — the counterfactual labelling, the rec
 exclusion fix, the pill-label pass, Phase A of the launch plan (deploy + CSP +
 `no-transform`), and now Phase B (key hardening).
 
-Test suite: **460 tests across 62 files** on `feat/write-failures` (378 across 52 on `main`); `tsc -b` and `oxlint` clean.
+Test suite: **510 tests across 66 files** on `feat/write-failures` (378 across 52 on `main`); `tsc -b` and `oxlint` clean.
 
 ---
 
@@ -53,7 +53,7 @@ Test suite: **460 tests across 62 files** on `feat/write-failures` (378 across 5
 - [x] OpenRouter + Ollama are the only providers (native Gemini removed; Dexie v5 remaps old `gemini` rows to `google/*` slugs); live OpenRouter `/api/v1/models` price catalog (IndexedDB-cached, 1 h TTL, bundled snapshot fallback); searchable priced model pickers replace hand-typed ids in reader panel / fan-out / Settings; one provider-linked credential field; fan-out cheap→frontier price-tier spread
 - [x] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers — 16 turns / 4 forks, seeded on first run, priced off `BUNDLED_CATALOG` ($0.1794 vs $0.2545 linear, 29% saved)
 - [x] Static deploy; the landing page is the app with the demo preloaded — **live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21)**, serving the CSP, `noindex` and `Referrer-Policy`, demo seeding cold, catalog fetch 200, **zero CSP violations and a silent console**. The edge-injected `static.cloudflareinsights.com` beacon was the last holdout; no dashboard toggle exists for it, so `Cache-Control: … no-transform` in `public/_headers` (A8) is what stops it — verified against the live response
-- [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app** (it is already written up in `SETUP.md` §4 — what's missing is a hint next to the Ollama option, not the prose)
+- [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app**. **Built 2026-10-11** on `feat/write-failures` (spec phase 3): Test connection on draft values, ① Provider ② Key ③ Test row, `OllamaOriginsHint`, Check connection on a failed turn. Open until the manual check on the deployed URL runs
 - [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`). **The key half shipped 2026-09-21** — `KeyGuidance` under the credential field (save it / scope it / early-build warning), the destination host named and flagged when it isn't `openrouter.ai`, and a "Forget key" button backed by `settingsStore.forgetApiKey`. The *trees* half is **built 2026-10-11** on `feat/write-failures` (spec phase 2): `persist()` after 3 completed turns, `estimate()` in Settings, the export nudge after 6, "Import a backup" on the demo banner. Open until the manual cross-browser check on the deployed URL runs
 
 ### Phase 4 — Post it, then listen (days 13–14)
@@ -105,9 +105,9 @@ is now recorded honestly rather than hidden. See Carried debt.
 
 Phases 1–2 cleared the shipping blockers and built the deep-context arbitration
 demo; Phase 3's catalog work, the no-key demo tree and the static deploy are done,
-as is the key half of the storage policy. What's left of Phase 3 is the three-step
-key setup with a connection test, the in-app Ollama `OLLAMA_ORIGINS` hint, and the
-manual cross-browser check of tree durability (code done 2026-10-11, not merged).
+as is the key half of the storage policy. What's left of Phase 3 is the
+manual cross-browser check of tree durability and of key setup (both built 2026-10-11
+on `feat/write-failures`, not merged).
 
 ---
 
@@ -123,8 +123,12 @@ of 2026-09-21** — all three phases. The app is live at
 assets-only Worker in its own repo). Both URLs verified against the live response:
 headers present, no injected beacon, silent console, zero CSP violations.*
 
-1. [Phase 3] Key setup in three steps with a live connection test; surface the Ollama
-   `OLLAMA_ORIGINS` gotcha in the app (the prose exists in `SETUP.md` §4)
+1. [Phase 3] Key setup — **built 2026-10-11** (spec phase 3). **Next:** merge
+   `feat/write-failures`, deploy, then run spec task 3.7 on the deployed URL: good key,
+   bad key, Ollama with and without `OLLAMA_ORIGINS`, in Chrome and Safari; in Chrome,
+   Local Network Access allowed then blocked, with the prompt's exact wording (match the
+   hint's copy to it). Record here what Safari does for HTTPS → `http://localhost` —
+   *not yet recorded*. If Safari blocks it, add a mixed-content line to the hint (spec 3.4)
 2. [Phase 3] Storage policy — **the key half is done** (Phase B: guidance, destination
    host, "Forget key"). What remains is durability for trees, **re-ordered 2026-09-21
    after a cross-browser audit** (~1d): (1) `persist()` + `estimate()`; (2) export nudge

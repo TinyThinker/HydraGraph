@@ -4,6 +4,7 @@ import { HeaderBar } from './HeaderBar'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settingsStore'
 import { useTreeStore } from '../store/useTreeStore'
 import { useSelectionStore } from '../store/useSelectionStore'
+import { useSettingsModalStore } from '../store/useSettingsModalStore'
 import { db } from '../db/ChatDatabase'
 import type { TurnNode } from '../types'
 
@@ -71,5 +72,16 @@ describe('HeaderBar Compare button', () => {
     useSelectionStore.setState({ selectedNodeId: 'a' })
     render(<HeaderBar />)
     expect(screen.getByTitle('Compare sibling branches')).toBeEnabled()
+  })
+})
+
+describe('HeaderBar Settings modal', () => {
+  afterEach(() => useSettingsModalStore.setState({ open: false }))
+
+  it('opens from the shared store, so other components can open it', () => {
+    render(<HeaderBar />)
+    expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument()
+    act(() => useSettingsModalStore.getState().openSettings())
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
   })
 })

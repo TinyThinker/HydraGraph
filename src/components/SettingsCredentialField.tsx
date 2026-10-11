@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { MaskedInput } from './MaskedInput'
+import { OllamaOriginsHint } from './OllamaOriginsHint'
 import { useCatalogStore } from '../store/catalogStore'
 import type { LLMProvider } from '../types'
 
@@ -31,6 +32,8 @@ interface SettingsCredentialFieldProps {
    * which has no key to guide.
    */
   guidance?: ReactNode
+  /** Force the Ollama `OLLAMA_ORIGINS` hint open (last test hit a network error). */
+  ollamaHintOpen?: boolean
 }
 
 /**
@@ -46,6 +49,7 @@ export function SettingsCredentialField({
   ollamaBaseUrl,
   onChange,
   guidance,
+  ollamaHintOpen = false,
 }: SettingsCredentialFieldProps) {
   const [showKey, setShowKey] = useState(false)
   const source = useCatalogStore((s) => s.source)
@@ -54,18 +58,21 @@ export function SettingsCredentialField({
 
   if (provider === 'ollama') {
     return (
-      <div>
-        <label htmlFor="settings-ollama-url" className="block text-xs font-medium text-slate-400 mb-2">
-          Ollama URL
-        </label>
-        <input
-          id="settings-ollama-url"
-          type="text"
-          value={ollamaBaseUrl}
-          onChange={(e) => onChange('ollamaBaseUrl', e.target.value)}
-          className={INPUT_CLASS}
-          placeholder="http://localhost:11434"
-        />
+      <div className="space-y-3">
+        <div>
+          <label htmlFor="settings-ollama-url" className="block text-xs font-medium text-slate-400 mb-2">
+            Ollama URL
+          </label>
+          <input
+            id="settings-ollama-url"
+            type="text"
+            value={ollamaBaseUrl}
+            onChange={(e) => onChange('ollamaBaseUrl', e.target.value)}
+            className={INPUT_CLASS}
+            placeholder="http://localhost:11434"
+          />
+        </div>
+        <OllamaOriginsHint open={ollamaHintOpen} />
       </div>
     )
   }

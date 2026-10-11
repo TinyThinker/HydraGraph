@@ -94,6 +94,25 @@ describe('SettingsModal — provider-linked credential field', () => {
     expect(screen.getByLabelText('OpenRouter API key')).toHaveValue('half-typed')
   })
 
+  it('Test connection probes the typed key, not the saved one, and saves nothing', async () => {
+    useSettingsStore.setState({
+      settings: { ...DEFAULT_SETTINGS, openRouterApiKey: 'saved-key' },
+      hydrated: true,
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 401 }))
+
+    render(<SettingsModal open onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText('OpenRouter API key'), { target: { value: 'bad-key' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('OpenRouter rejected this key.')
+    const call = fetchSpy.mock.calls.find(([url]) => String(url).endsWith('/key'))
+    expect(call?.[1]?.headers).toEqual({ Authorization: 'Bearer bad-key' })
+    expect(useSettingsStore.getState().settings.openRouterApiKey).toBe('saved-key')
+  })
+
   it('"Refresh prices" forces a catalog reload and shows a freshness line', () => {
     const spy = vi
       .spyOn(useCatalogStore.getState(), 'loadCatalog')
