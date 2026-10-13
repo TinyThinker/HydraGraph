@@ -95,6 +95,7 @@ docs/
     persona-library-plan.md    editable personas + per-tree default (Dexie v6)
     tooling-research.md        web search / tool calling assessment (Dexie v7)
     node-labels-research.md    pill legibility, hover card, generated titles (no migration)
+    phase3-manual-checks.md    Fernando's by-hand checks closing the two Phase 3 boxes
   archive/
     2026-08_original-tasks.md        the original Phase 1–4 task matrix
     2026-08_state-diagnosis.md       the re-engineer-era "current state" doc
