@@ -184,6 +184,23 @@ export function remapImportedTree(doc: TreeExportDoc, makeId: () => string = () 
     createdAt: now,
     updatedAt: now,
   }
+  // Reports travel with the tree row, but their leaves name the old node ids.
+  // Leaves that don't map are dropped (the report then reads as stale). The
+  // source digest holds no ids, so it stays valid. Files from before reports
+  // have no field and import unchanged.
+  if (Array.isArray(doc.tree.reports)) {
+    tree.reports = doc.tree.reports
+      .filter((r) => r && typeof r.id === 'string' && typeof r.text === 'string' && Array.isArray(r.leafIds))
+      .map((r) => ({
+        ...r,
+        leafIds: r.leafIds.flatMap((id) => {
+          const mapped = idMap.get(id)
+          return mapped ? [mapped] : []
+        }),
+      }))
+  } else {
+    delete tree.reports
+  }
 
   const nodes: TurnNode[] = doc.nodes.map((n) => ({
     ...n,
