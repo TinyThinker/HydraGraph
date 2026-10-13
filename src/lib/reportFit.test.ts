@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkFit, contextWindowFor, estimateTokens } from './reportFit'
+import { checkFit, contextWindowFor, estimateTokens, reportWriterStatus } from './reportFit'
 import type { CatalogModel } from './openRouterCatalog'
 
 const catalog: CatalogModel[] = [
@@ -46,5 +46,20 @@ describe('contextWindowFor', () => {
 
   it('has no window for Ollama', () => {
     expect(contextWindowFor('ollama', 'a/big', catalog)).toBeNull()
+  })
+})
+
+describe('reportWriterStatus', () => {
+  it('blocks Ollama even with a key', () => {
+    expect(reportWriterStatus('ollama', { openRouterApiKey: 'sk-or-x' })).toMatchObject({ ok: false, reason: 'ollama' })
+  })
+
+  it('blocks OpenRouter without a key', () => {
+    expect(reportWriterStatus('openrouter', {})).toMatchObject({ ok: false, reason: 'no-key' })
+    expect(reportWriterStatus('openrouter', { openRouterApiKey: '  ' })).toMatchObject({ ok: false, reason: 'no-key' })
+  })
+
+  it('allows OpenRouter with a key', () => {
+    expect(reportWriterStatus('openrouter', { openRouterApiKey: 'sk-or-x' })).toEqual({ ok: true })
   })
 })

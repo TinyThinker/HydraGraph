@@ -39,3 +39,23 @@ export function contextWindowFor(provider: LLMProvider, model: string, catalog: 
   if (provider !== 'openrouter') return null
   return catalog.find((m) => m.id === model)?.contextWindow ?? null
 }
+
+export type ReportWriterStatus = { ok: true } | { ok: false; reason: 'ollama' | 'no-key'; message: string }
+
+export const REPORT_BLOCK_MESSAGES = {
+  ollama: 'Reports use OpenRouter for now. Pick an OpenRouter model.',
+  'no-key': 'Add an OpenRouter key in Settings to write reports.',
+} as const
+
+/**
+ * Whether a report may be sent with this provider. Reports are OpenRouter-only:
+ * Ollama silently cuts the oldest input past its context setting, and that path
+ * is untested. Chat turns on Ollama are unaffected.
+ */
+export function reportWriterStatus(provider: LLMProvider, settings: { openRouterApiKey?: string }): ReportWriterStatus {
+  if (provider === 'ollama') return { ok: false, reason: 'ollama', message: REPORT_BLOCK_MESSAGES.ollama }
+  if (!settings.openRouterApiKey?.trim()) {
+    return { ok: false, reason: 'no-key', message: REPORT_BLOCK_MESSAGES['no-key'] }
+  }
+  return { ok: true }
+}
