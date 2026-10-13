@@ -1,5 +1,6 @@
+import { buildReportPayload, collectReportTurns } from './reportContext'
 import type { CatalogModel } from './openRouterCatalog'
-import type { ContextResolutionResult, LLMProvider } from '../types'
+import type { ContextResolutionResult, LLMProvider, TurnNode } from '../types'
 
 /** Room left for the report itself when checking whether a selection fits. */
 export const OUTPUT_RESERVE_TOKENS = 8000
@@ -58,4 +59,38 @@ export function reportWriterStatus(provider: LLMProvider, settings: { openRouter
     return { ok: false, reason: 'no-key', message: REPORT_BLOCK_MESSAGES['no-key'] }
   }
   return { ok: true }
+}
+
+export interface ReportPlan {
+  turns: TurnNode[]
+  payload: ContextResolutionResult
+  inputTokens: number
+  fit: FitResult
+  writer: ReportWriterStatus
+}
+
+/**
+ * Everything the composer shows and `generate` checks before sending: the
+ * transcript, its size, whether it fits, and whether this writer is allowed.
+ * Pure — the caller passes in the store snapshots.
+ */
+export function planReport(input: {
+  leafIds: string[]
+  nodes: Map<string, TurnNode>
+  brief: string
+  provider: LLMProvider
+  model: string
+  settings: { openRouterApiKey?: string }
+  catalog: CatalogModel[]
+}): ReportPlan {
+  const turns = collectReportTurns(input.leafIds, input.nodes)
+  const payload = buildReportPayload(turns, input.brief)
+  const inputTokens = estimateTokens(payload)
+  const fit = checkFit({ inputTokens, contextWindow: contextWindowFor(input.provider, input.model, input.catalog) })
+  return { turns, payload, inputTokens, fit, writer: reportWriterStatus(input.provider, input.settings) }
+}
+
+/** "Too big for <model>: ~N tokens, limit M" — shared by the store and the composer. */
+export function tooBigMessage(model: string, fit: FitResult): string {
+  return `Too big for ${model}: ~${fit.needed.toLocaleString('en-US')} tokens, limit ${(fit.limit ?? 0).toLocaleString('en-US')}`
 }
