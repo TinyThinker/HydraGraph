@@ -153,7 +153,7 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     Access prompt), and **Check connection** on a turn that failed with an auth or
     network error. Open until the manual check on the deployed URL runs (spec 3.7:
     good/bad key, Ollama with and without `OLLAMA_ORIGINS`, Chrome allow/block, Safari
-    HTTPS → `localhost`). Steps: [`notes/phase3-manual-checks.md`](notes/phase3-manual-checks.md) § B.
+    HTTPS → `localhost`). Steps: [`notes/manual-checks.md`](notes/manual-checks.md) § B.
 - [ ] One honest line about where data lives, plus an export nudge after real work.
   - Export already ships (`HeaderBar` → `downloadTreeExport`); only the sentence and
     the nudge trigger are missing.
@@ -207,7 +207,7 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
       "Returning? Import a backup." A first-time visitor ignores it; an evicted returner
       gets back in two clicks.
     - [ ] Manual check on the deployed URL (spec task 2.8; steps in
-      [`notes/phase3-manual-checks.md`](notes/phase3-manual-checks.md) § A): Chrome + Safari (6 turns →
+      [`notes/manual-checks.md`](notes/manual-checks.md) § A): Chrome + Safari (6 turns →
       persist result recorded, nudge, export clears it, a second changed tree still
       nudges, clear site data → import via the banner); Firefox prompt once after turn 3;
       private-window quota error → `StorageBanner`, no turn left generating. Record what
@@ -306,6 +306,13 @@ Nothing here ships until Stop-4 evidence says which one matters. See
   - **Spec:** [`specs/roadmap-items-track-b-reports-2026-10-11/`](../specs/roadmap-items-track-b-reports-2026-10-11/README.md)
     — 9 phases: 1 core · 2 summarize fallback · 3 outline (A) · 4 source links (C) ·
     5 demo report (G) · 6 ledger (B) · 7 shelf (D) · 8 continue (F) · 9 compare (E).
+  - **Phase 1 (core report) built 2026-10-13** on `feat/track-b-reports`: tick branches
+    in report mode, composer with the default brief and a fit check (OpenRouter only),
+    streamed report with copy / download `.md` / regenerate / edit selection / delete,
+    stale badge, a "Reports" row in the receipt, reports carried through export/import.
+    Open until the manual check on the deployed URL runs
+    ([`notes/manual-checks.md`](notes/manual-checks.md) § C), including tuning the
+    default brief on real models. Next: Phase 2 (summarize fallback).
 - [ ] **Track C — Trust and reach:** read-only shared tree links compressed into the
   URL (no backend); storage-health warnings; real backup. *(if people ask to show someone their tree)*
   - **BYO-cloud (Google Drive / OneDrive) belongs here, and only here.** Evaluated

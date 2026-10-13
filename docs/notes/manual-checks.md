@@ -1,15 +1,14 @@
-# Phase 3 manual checks (owner: Fernando)
+# Manual checks (owner: Fernando)
 
-The code for both open Phase 3 boxes merged to `main` in PR #8 (2026-10-11) and is live
-at `https://hydragraph.tinythinkerlabs.dev`. These two boxes stay open until the checks
-below run by hand. An agent cannot run them: they need real browsers, a real key and a
-local Ollama.
+Checks an agent cannot run: they need real browsers, a real key and a local Ollama, on
+the deployed URL `https://hydragraph.tinythinkerlabs.dev`. Each section names the
+ROADMAP box it closes. When a section is done: tick its box, add a CHANGELOG line, write
+the results into `STATUS.md`, and delete the section here. Delete the file when it is
+empty.
 
-Source: `specs/roadmap-items-phase3-front-door-2026-10-11/`, tasks 2.8 and 3.7.
-
-When both are done: tick the two Phase 3 boxes in `ROADMAP.md`, add a CHANGELOG line,
-write the results into `STATUS.md`, and move this file to
-`docs/archive/2026-10_phase3-manual-checks.md`.
+**Sections A and B** close the two open Phase 3 boxes. The code merged to `main` in
+PR #8 (2026-10-11) and is live. Source: `specs/roadmap-items-phase3-front-door-2026-10-11/`,
+tasks 2.8 and 3.7.
 
 ## A. Tree durability (spec task 2.8)
 
@@ -62,3 +61,22 @@ On `https://hydragraph.tinythinkerlabs.dev`, in **Chrome and Safari**:
 
 7. Send a turn with a bad key. Confirm "Check connection" appears on the failed turn
    and runs the same test.
+
+## C. Track B reports, spec phase 1 (task 1.11)
+
+Runs after `feat/track-b-reports` merges and deploys. Needs an OpenRouter key with a
+little credit. Source: `specs/roadmap-items-track-b-reports-2026-10-11/phase-1-core-report.md`.
+
+1. Open the demo tree. Header → Reports button (file icon). Tick three branches on the
+   canvas; their paths light up.
+2. Generate. The report streams in, then shows model · tokens · cost · date.
+3. **Judge the default brief:** one argument, not branch by branch; disagreements named;
+   `[tN]` citations. Try two or three writer models. Tune `DEFAULT_BRIEF`
+   (`src/lib/reportBrief.ts`) if it reads like a dump.
+4. Reload. The report is still there.
+5. Export the tree, import it. Open the imported copy's report: no amber badge.
+6. Regenerate one source turn. The report shows "Sources changed since this was written".
+7. Pick a small-window model (8k–32k) with a big selection. Generate is disabled and the
+   line says "Too big for this model" before anything is sent.
+8. Cost receipt ($ button) shows a "Reports · N" row; the saved figure did not change.
+

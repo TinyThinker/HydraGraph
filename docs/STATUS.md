@@ -2,7 +2,7 @@
 
 > Hand-maintained snapshot. Update it directly whenever `ROADMAP.md` or
 > `CHANGELOG.md` changes — there is no generator for this file.
-> Last synced: 2026-10-13 (PR #8 merged; Track B spec added); previously 2026-10-11 (key setup, spec phase 3); previously 2026-10-11 (tree durability, spec phase 2); previously 2026-10-11 (write-failure handling, spec phase 1); previously 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
+> Last synced: 2026-10-13 (Track B reports, spec phase 1, on `feat/track-b-reports`); previously 2026-10-13 (PR #8 merged; Track B spec added); previously 2026-10-11 (key setup, spec phase 3); previously 2026-10-11 (tree durability, spec phase 2); previously 2026-10-11 (write-failure handling, spec phase 1); previously 2026-10-11 (docs reconciliation: ARCHITECTURE, ROADMAP, STATUS); previously 2026-10-10 (CI + AI review docs); previously 2026-09-21 (re-verified against source on 2026-09-20 — every open
 > item below was checked against the code, not just re-read; updated again after
 > Phase A of the launch plan, then after Phase B)
 
@@ -11,7 +11,7 @@
 ## Version
 
 Current: v0.6.0, plus unreleased work on `main` (see CHANGELOG § Unreleased)
-Last synced against `main` at 0ef5d59 — 2026-10-11 (Merge pull request #8, feat/write-failures: spec phases 1–3, write failures, tree durability, key setup). Live on Pages.
+Last synced against `main` at 0ef5d59 — 2026-10-11 (Merge pull request #8, feat/write-failures: spec phases 1–3, write failures, tree durability, key setup). Live on Pages. Plus Track B spec phase 1 (core reports) on branch `feat/track-b-reports`, not merged.
 
 CI: `ci.yml` runs lint + tests on PRs and pushes to `main` (PR #1, merged 2026-10-04).
 `ai-pr-review.yml` is an opt-in DeepSeek review, gated by the `ai-review` label and the
@@ -27,7 +27,7 @@ commits on `main` since are unreleased — the counterfactual labelling, the rec
 exclusion fix, the pill-label pass, Phase A of the launch plan (deploy + CSP +
 `no-transform`), and now Phase B (key hardening).
 
-Test suite: **510 tests across 66 files** on `main`; `tsc -b` and `oxlint` clean.
+Test suite: **560 tests across 72 files** on `feat/track-b-reports` (510 across 66 on `main`); `tsc -b` and `oxlint` clean.
 
 ---
 
@@ -53,8 +53,8 @@ Test suite: **510 tests across 66 files** on `main`; `tsc -b` and `oxlint` clean
 - [x] OpenRouter + Ollama are the only providers (native Gemini removed; Dexie v5 remaps old `gemini` rows to `google/*` slugs); live OpenRouter `/api/v1/models` price catalog (IndexedDB-cached, 1 h TTL, bundled snapshot fallback); searchable priced model pickers replace hand-typed ids in reader panel / fan-out / Settings; one provider-linked credential field; fan-out cheap→frontier price-tier spread
 - [x] Demo tree shipped with the app: canned responses, no key required, fully explorable, receipt already showing numbers — 16 turns / 4 forks, seeded on first run, priced off `BUNDLED_CATALOG` ($0.1794 vs $0.2545 linear, 29% saved)
 - [x] Static deploy; the landing page is the app with the demo preloaded — **live at `https://hydragraph.tinythinkerlabs.dev` (2026-09-21)**, serving the CSP, `noindex` and `Referrer-Policy`, demo seeding cold, catalog fetch 200, **zero CSP violations and a silent console**. The edge-injected `static.cloudflareinsights.com` beacon was the last holdout; no dashboard toggle exists for it, so `Cache-Control: … no-transform` in `public/_headers` (A8) is what stops it — verified against the live response
-- [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app**. **Shipped 2026-10-11** (PR #8, spec phase 3): Test connection on draft values, ① Provider ② Key ③ Test row, `OllamaOriginsHint`, Check connection on a failed turn. Open until the manual check on the deployed URL runs ([`notes/phase3-manual-checks.md`](notes/phase3-manual-checks.md) § B)
-- [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`). **The key half shipped 2026-09-21** — `KeyGuidance` under the credential field (save it / scope it / early-build warning), the destination host named and flagged when it isn't `openrouter.ai`, and a "Forget key" button backed by `settingsStore.forgetApiKey`. The *trees* half **shipped 2026-10-11** (PR #8, spec phase 2): `persist()` after 3 completed turns, `estimate()` in Settings, the export nudge after 6, "Import a backup" on the demo banner. Open until the manual cross-browser check on the deployed URL runs ([`notes/phase3-manual-checks.md`](notes/phase3-manual-checks.md) § A)
+- [ ] Key setup in three steps with a live connection test; surface the Ollama `OLLAMA_ORIGINS` gotcha **in the app**. **Shipped 2026-10-11** (PR #8, spec phase 3): Test connection on draft values, ① Provider ② Key ③ Test row, `OllamaOriginsHint`, Check connection on a failed turn. Open until the manual check on the deployed URL runs ([`notes/manual-checks.md`](notes/manual-checks.md) § B)
+- [ ] One honest line about where data lives, plus an export nudge after real work (export itself already exists — `HeaderBar` → `downloadTreeExport`). **The key half shipped 2026-09-21** — `KeyGuidance` under the credential field (save it / scope it / early-build warning), the destination host named and flagged when it isn't `openrouter.ai`, and a "Forget key" button backed by `settingsStore.forgetApiKey`. The *trees* half **shipped 2026-10-11** (PR #8, spec phase 2): `persist()` after 3 completed turns, `estimate()` in Settings, the export nudge after 6, "Import a backup" on the demo banner. Open until the manual cross-browser check on the deployed URL runs ([`notes/manual-checks.md`](notes/manual-checks.md) § A)
 
 ### Phase 4 — Post it, then listen (days 13–14)
 - [ ] Ship where people already think in tokens: local-model communities, BYOK power users, prompt engineers
@@ -65,7 +65,7 @@ Test suite: **510 tests across 66 files** on `main`; `tsc -b` and `oxlint` clean
 ### Later — Open track (gated on evidence from Phase 4)
 - [ ] Track A — Deepen arbitration: persona presets (design ready, `notes/persona-library-plan.md`, Dexie v6), response diffing, per-branch model memory, cheap-first routing
 - [x] ~~Track B — branch from a text selection~~ shipped in v0.5.1, pulled forward ahead of the gate
-- [ ] Track B (remaining) — report from selected branches: tick branches, one model call writes a cohesive document (summarize per branch first if it doesn't fit), editable default brief, stored outside the tree on the tree record. Plus ideas A–G (outline first, ledger, source links, shelf, compare, continue, demo report). Shaped 2026-10-11; spec: `specs/roadmap-items-track-b-reports-2026-10-11/` (9 phases; v1 = 1–5)
+- [ ] Track B (remaining) — report from selected branches: tick branches, one model call writes a cohesive document (summarize per branch first if it doesn't fit), editable default brief, stored outside the tree on the tree record. Plus ideas A–G (outline first, ledger, source links, shelf, compare, continue, demo report). Shaped 2026-10-11; spec: `specs/roadmap-items-track-b-reports-2026-10-11/` (9 phases; v1 = 1–5). **Phase 1 (core report) built 2026-10-13** on `feat/track-b-reports`; open until the manual check ([`notes/manual-checks.md`](notes/manual-checks.md) § C). Next: Phase 2
 - [ ] Track C — Trust and reach: read-only shared tree links compressed into the URL; storage-health warnings; real backup
 - [ ] Investigated, not scheduled: web search / tool calling (`notes/tooling-research.md`, Dexie v7); canvas node labels — rename + generated titles (`notes/node-labels-research.md`, no migration needed)
 
@@ -107,7 +107,7 @@ Phases 1–2 cleared the shipping blockers and built the deep-context arbitratio
 demo; Phase 3's catalog work, the no-key demo tree and the static deploy are done,
 as is the key half of the storage policy. What's left of Phase 3 is the
 manual cross-browser check of tree durability and of key setup (both shipped 2026-10-11
-in PR #8). Steps: [`notes/phase3-manual-checks.md`](notes/phase3-manual-checks.md).
+in PR #8). Steps: [`notes/manual-checks.md`](notes/manual-checks.md).
 
 ---
 
@@ -125,7 +125,7 @@ headers present, no injected beacon, silent console, zero CSP violations.*
 
 1. [Phase 3] Key setup — **shipped 2026-10-11** (PR #8, spec phase 3). **Next (manual,
    Fernando):** run spec task 3.7 on the deployed URL
-   ([`notes/phase3-manual-checks.md`](notes/phase3-manual-checks.md) § B): good key,
+   ([`notes/manual-checks.md`](notes/manual-checks.md) § B): good key,
    bad key, Ollama with and without `OLLAMA_ORIGINS`, in Chrome and Safari; in Chrome,
    Local Network Access allowed then blocked, with the prompt's exact wording (match the
    hint's copy to it). Record here what Safari does for HTTPS → `http://localhost` —
@@ -139,7 +139,7 @@ headers present, no injected beacon, silent console, zero CSP violations.*
    spec phase 1). Items (1)–(3) **shipped 2026-10-11** (PR #8, spec phase 2); (3) became an
    always-on "Returning? Import a backup." link on the demo banner, since the app cannot
    detect a returner after eviction. **Next (manual, Fernando):** run the check in spec task 2.8
-   ([`notes/phase3-manual-checks.md`](notes/phase3-manual-checks.md) § A) (Chrome, Safari, Firefox, private window) and
+   ([`notes/manual-checks.md`](notes/manual-checks.md) § A) (Chrome, Safari, Firefox, private window) and
    record here what Safari's `persist()` returns — *not yet recorded*.
    - Why the re-order: the app is **not** Chrome-only (nothing in `src/` is Chrome-gated;
      export *and* import both ship and round-trip), so File System Access is convenience
@@ -148,11 +148,15 @@ headers present, no injected beacon, silent console, zero CSP violations.*
      "who came back a second time". Quota exhaustion turned out not to be the threat at
      all; eviction is.
    - Design + risk table: [`notes/storage-and-key-plan.md`](notes/storage-and-key-plan.md)
-3. ~~[Debt] Branch protection on `main` requiring the CI check~~ — **done 2026-10-11**,
+3. [Track B] Reports — **spec phase 1 built 2026-10-13** on `feat/track-b-reports`
+   (pulled ahead of the Phase 4 gate by decision on 2026-10-13). **Next:** merge, deploy,
+   run [`notes/manual-checks.md`](notes/manual-checks.md) § C — it includes tuning the
+   default brief on two or three real models. Then spec phase 2 (summarize fallback)
+4. ~~[Debt] Branch protection on `main` requiring the CI check~~ — **done 2026-10-11**,
    verified by a rejected direct push. All changes to `main` now go through a PR
-4. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
+5. [Debt] Record OpenRouter's reported `usage.cost` — cheap, and it strengthens the
    one number a skeptical reader will poke at
-5. [Debt, hub] **Two dashboard-only follow-ups, both deferred 2026-09-21 for time.**
+6. [Debt, hub] **Two dashboard-only follow-ups, both deferred 2026-09-21 for time.**
    Neither touches code, neither lives in this repo, neither is blocking:
    - **`www.tinythinkerlabs.dev` does not resolve** (checked live — no connection). The
      apex works and is what every link points at, but people type `www`. Cloudflare
@@ -162,10 +166,10 @@ headers present, no injected beacon, silent console, zero CSP violations.*
      ~2 min, domain already in-account. Best done early rather than well — indexing
      takes weeks to start and the clock runs from verification, so deferring costs data
      rather than saving work
-6. [Post-launch] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync.
+7. [Post-launch] File System Access autosave (~1d, Chrome/Edge) — a local file, not sync.
    **Demoted below the nudge 2026-09-21**; it also covers BYO-cloud for free, since
    `showSaveFilePicker()` can target a synced Drive/OneDrive folder
-7. [Track C, declined for now] **BYO-cloud (Drive / OneDrive)** — technically viable with
+8. [Track C, declined for now] **BYO-cloud (Drive / OneDrive)** — technically viable with
    no backend (OAuth PKCE, narrow `drive.file` / app-folder scopes, we never hold the
    data). Held because it breaks "no third party", widens `connect-src`, and invites the
    sync request that the refuse list exists to hold back. Reasoning:
