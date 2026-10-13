@@ -5,7 +5,7 @@ import { db } from '../db/ChatDatabase'
 import Dexie from 'dexie'
 import { useStorageStatusStore } from './storageStatusStore'
 import { QUOTA_MESSAGE } from '../lib/storageErrors'
-import type { TurnNode } from '../types'
+import type { TreeReport, TurnNode } from '../types'
 
 vi.mock('../lib/streamingClient', () => ({
   streamLLMResponse: vi.fn(),
@@ -1868,6 +1868,60 @@ describe('end-of-stream writes survive a failing DB', () => {
     txSpy.mockRestore()
 
     expect(res).toEqual({ ok: false, error: QUOTA_MESSAGE })
+    expect(useStorageStatusStore.getState().writeFailure?.kind).toBe('quota')
+  })
+})
+
+describe('reports on the tree row', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    useTreeStore.setState({ nodes: new Map(), trees: [], activeTreeId: null, liveText: new Map() })
+  })
+
+  const report = (over: Partial<TreeReport> = {}): TreeReport => ({
+    id: 'rep-1',
+    createdAt: 1,
+    updatedAt: 1,
+    title: 'Report',
+    leafIds: ['x'],
+    brief: 'b',
+    provider: 'openrouter',
+    model: 'm',
+    text: '# Report',
+    status: 'idle',
+    sourceDigest: 'abc',
+    ...over,
+  })
+
+  it('saves, updates and deletes a report, and it survives loadAllTrees', async () => {
+    const tree = await useTreeStore.getState().createTree('T')
+    await useTreeStore.getState().saveReport(tree.id, report())
+    await useTreeStore.getState().saveReport(tree.id, report({ id: 'rep-2' }))
+    await useTreeStore.getState().saveReport(tree.id, report({ text: 'edited' }))
+
+    useTreeStore.setState({ trees: [] })
+    await useTreeStore.getState().loadAllTrees()
+    const loaded = useTreeStore.getState().trees.find((t) => t.id === tree.id)!
+    expect(loaded.reports?.map((r) => [r.id, r.text])).toEqual([
+      ['rep-1', 'edited'],
+      ['rep-2', '# Report'],
+    ])
+
+    await useTreeStore.getState().deleteReport(tree.id, 'rep-1')
+    expect((await db.trees.get(tree.id))!.reports?.map((r) => r.id)).toEqual(['rep-2'])
+  })
+
+  it('a quota failure keeps the report in memory and raises the storage banner', async () => {
+    const tree = await useTreeStore.getState().createTree('T')
+    useStorageStatusStore.setState({ writeFailure: null })
+    const spy = vi.spyOn(db.trees, 'update').mockRejectedValue(new Dexie.QuotaExceededError('full'))
+
+    await useTreeStore.getState().saveReport(tree.id, report())
+    spy.mockRestore()
+
+    const inMemory = useTreeStore.getState().trees.find((t) => t.id === tree.id)!
+    expect(inMemory.reports?.[0].id).toBe('rep-1')
     expect(useStorageStatusStore.getState().writeFailure?.kind).toBe('quota')
   })
 })

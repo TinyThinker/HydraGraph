@@ -45,6 +45,30 @@ export interface ConversationTree {
   // global settings store when resolving which provider/model a prompt uses.
   defaultProvider?: LLMProvider
   defaultModel?: string
+  // Reports written from ticked branches. Lives beside the turns, not among
+  // them: no node has more than one parent.
+  reports?: TreeReport[]
+}
+
+export interface TreeReport {
+  id: string
+  createdAt: number
+  updatedAt: number
+  // First heading of the output, else "Report".
+  title: string
+  // Ticked turns; each one includes its whole path to the root.
+  leafIds: string[]
+  brief: string
+  provider: LLMProvider
+  model: string
+  // Final markdown. Live streaming text never lands here.
+  text: string
+  status: 'idle' | 'error'
+  errorMessage?: string
+  inputTokens?: number
+  outputTokens?: number
+  // reportSourceDigest() of the turns it was written from; a mismatch = stale.
+  sourceDigest: string
 }
 
 export type ProviderModelMap = Partial<Record<LLMProvider, string>>

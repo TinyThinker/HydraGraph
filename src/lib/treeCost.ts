@@ -1,4 +1,4 @@
-import type { TurnNode } from '../types'
+import type { TreeReport, TurnNode } from '../types'
 import type { CatalogModel } from './openRouterCatalog'
 import { resolvePrice, turnCostUSD } from './pricing'
 
@@ -134,3 +134,29 @@ export function treeCostSummary(
     unmeasuredTurns,
   }
 }
+
+export interface ReportsCost {
+  /** Reports on the tree. */
+  count: number
+  /** Σ cost of the reports with tokens and a known price. */
+  costUSD: number
+  /** Reports left out: no token counts (stopped, failed) or no catalog price. */
+  unpriced: number
+}
+
+/**
+ * What the tree's reports cost. Kept apart from {@link treeCostSummary}: a
+ * report is real spend, but it has no linear-thread equivalent, so it must
+ * not move the counterfactual or the "saved" figure.
+ */
+export function reportsCostUSD(reports: TreeReport[] | undefined, catalog?: CatalogModel[]): ReportsCost {
+  let costUSD = 0
+  let unpriced = 0
+  for (const r of reports ?? []) {
+    const cost = turnCostUSD({ modelUsed: r.model, provider: r.provider, inputTokens: r.inputTokens, outputTokens: r.outputTokens }, catalog)
+    if (cost === null) unpriced++
+    else costUSD += cost
+  }
+  return { count: reports?.length ?? 0, costUSD, unpriced }
+}
+

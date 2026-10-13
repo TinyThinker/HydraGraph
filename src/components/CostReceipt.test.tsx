@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { CostReceipt } from './CostReceipt'
 import { COUNTERFACTUAL_NOTE, COUNTERFACTUAL_DETAIL, ACTUAL_DETAIL } from '../lib/treeCost'
 import { useTreeStore } from '../store/useTreeStore'
-import type { TurnNode } from '../types'
+import type { ConversationTree, TurnNode } from '../types'
 
 function node(overrides: Partial<TurnNode>): TurnNode {
   return {
@@ -25,7 +25,7 @@ function node(overrides: Partial<TurnNode>): TurnNode {
 
 describe('CostReceipt', () => {
   beforeEach(() => {
-    useTreeStore.setState({ nodes: new Map(), activeTreeId: 'tree-1' })
+    useTreeStore.setState({ nodes: new Map(), trees: [], activeTreeId: 'tree-1' })
   })
 
   // Prompts and responses are long on purpose: the saving row only appears
@@ -57,6 +57,26 @@ describe('CostReceipt', () => {
     expect(screen.getByText(/This tree · 3 turns · 1 forks/)).toBeInTheDocument()
     expect(screen.getByText(/Same 3 turns, one linear thread/)).toBeInTheDocument()
     expect(screen.getByText(/Context you didn't pay for/)).toBeInTheDocument()
+  })
+
+  it('adds a Reports row without moving the saving', () => {
+    threePricedTurns()
+    const { unmount } = render(<CostReceipt />)
+    const savedBefore = screen.getByText(/saved ·/).textContent
+    expect(screen.queryByTestId('receipt-reports')).toBeNull()
+    unmount()
+
+    const tree: ConversationTree = {
+      id: 'tree-1', title: 'T', rootNodeId: 'a', defaultSystemPrompt: '', createdAt: 0, updatedAt: 0,
+      reports: [{
+        id: 'r1', createdAt: 0, updatedAt: 0, title: 'R', leafIds: ['b'], brief: '', provider: 'openrouter',
+        model: 'openai/gpt-4o-mini', text: '', status: 'idle', inputTokens: 50_000, outputTokens: 2_000, sourceDigest: '',
+      }],
+    }
+    useTreeStore.setState({ trees: [tree] })
+    render(<CostReceipt />)
+    expect(screen.getByTestId('receipt-reports').textContent).toMatch(/^Reports · 1\$0\.\d{4}$/)
+    expect(screen.getByText(/saved ·/).textContent).toBe(savedBefore)
   })
 
   it('shows a muted message when there are no priced turns', () => {

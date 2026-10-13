@@ -146,14 +146,14 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
     var, the macOS `launchctl` variant, the instant-fail symptom, and a
     troubleshooting row. What is missing is a hint next to the Ollama option in
     Settings, where someone hits the wall. This item is smaller than it reads.
-  - **Built 2026-10-11** on `feat/write-failures` (spec phase 3): **Test connection**
+  - **Shipped 2026-10-11** (PR #8, spec phase 3): **Test connection**
     on draft values (OpenRouter `GET /key`, Ollama `GET /api/tags`, 8 s timeout, no
     tokens spent), a ① Provider ② Key ③ Test row, the `OLLAMA_ORIGINS` hint next to the
     Ollama option (opens itself on a network failure, names Chrome's Local Network
     Access prompt), and **Check connection** on a turn that failed with an auth or
     network error. Open until the manual check on the deployed URL runs (spec 3.7:
     good/bad key, Ollama with and without `OLLAMA_ORIGINS`, Chrome allow/block, Safari
-    HTTPS → `localhost`).
+    HTTPS → `localhost`). Steps: [`notes/manual-checks.md`](notes/manual-checks.md) § B.
 - [ ] One honest line about where data lives, plus an export nudge after real work.
   - Export already ships (`HeaderBar` → `downloadTreeExport`); only the sentence and
     the nudge trigger are missing.
@@ -206,7 +206,8 @@ Nobody installs anything, ever. That is the whole advantage — spend it.
       the app could write (see the spec README). Instead the demo banner always offers
       "Returning? Import a backup." A first-time visitor ignores it; an evicted returner
       gets back in two clicks.
-    - [ ] Manual check on the deployed URL (spec task 2.8): Chrome + Safari (6 turns →
+    - [ ] Manual check on the deployed URL (spec task 2.8; steps in
+      [`notes/manual-checks.md`](notes/manual-checks.md) § A): Chrome + Safari (6 turns →
       persist result recorded, nudge, export clears it, a second changed tree still
       nudges, clear site data → import via the banner); Firefox prompt once after turn 3;
       private-window quota error → `StorageBanner`, no turn left generating. Record what
@@ -263,8 +264,55 @@ Nothing here ships until Stop-4 evidence says which one matters. See
     library + per-tree default, **Dexie v6** (which also drops the vestigial
     `TurnNode.width` / `height` below).
 - [ ] **Track B — Close the loop:** ~~branch from a text selection~~ (shipped in v0.5.1,
-  pulled forward ahead of the Stop-4 gate); synthesis nodes whose context is the union
-  of several chains still open. *(if people build big trees and can't converge)*
+  pulled forward ahead of the Stop-4 gate); a synthesized report from selected branches
+  still open. *(if people build big trees and can't converge)*
+  - **Report from selected branches** (shaped 2026-10-11; replaces the earlier
+    "synthesis node" idea). Tick branches on the canvas; one model call writes a
+    cohesive document from them. Not a transcript export: one argument start to finish,
+    disagreements between branches named (never silently resolved), points cited by turn.
+  - Selection unit is the **whole branch** (leaf → root). Shared ancestry is sent once.
+    Single-turn picks only if people ask.
+  - **Fits → send directly. Doesn't fit → summarize each branch first**, then write the
+    report from the summaries. "Fits" = selected text + room for the output under the
+    model's context limit. Show tokens and cost before sending.
+  - **One editable default brief**, no template library. Presets come later from the
+    edits people repeat (candidate home: the persona library).
+  - **The report lives outside the tree.** No multi-parent node, so canvas, layout and
+    context engine are untouched. It is a record attached to the tree: selected leaf
+    ids, brief, model, output, tokens, cost. Opens in its own panel, can be regenerated,
+    adds a line to the cost receipt.
+  - Storage: start as a non-indexed field on the tree record (no migration). Its own
+    table only if needed, which means a Dexie bump queued with v6.
+  - **Reports are OpenRouter-only for now; Ollama is shelved** (2026-10-11). No practical
+    way to test it on the dev machine (MacBook Air M4 too slow running both), and Ollama
+    truncates oversized input silently, so an untested path would drop early turns. The
+    composer blocks it with a message. Lifting it = explicit `num_ctx` + `/api/show` for
+    the window (design kept in spec Phase 1, "Shelved").
+  - **Ideas added after a PM review (2026-10-11)**, each its own spec phase:
+    - **A — Outline first.** Approve / reorder sections before the full write; rewrite
+      one section at a time.
+    - **B — Disagreement ledger.** List where branches conflict; the user rules on each
+      before writing. The arbitration pitch applied to the output.
+    - **C — Source links.** Paragraphs carry turn chips; click lights up the canvas;
+      paragraphs whose sources changed go amber.
+    - **D — Passage shelf.** Collect highlighted passages from anywhere; write from the
+      shelf instead of whole branches.
+    - **E — Compare reports.** Two or three writer models, side by side, keep one.
+    - **F — Continue from report.** New tree seeded with the report as its first turn.
+    - **G — Demo report.** The no-key demo tree ships with a finished report.
+  - **v1 = core + summarize fallback + A + C + G. v2 = B, D, E, F**, gated on what
+    people do with v1. Recommended timing: first build after launch; watch Phase 4
+    feedback for "cool, but then what?" as the signal to pull it forward.
+  - **Spec:** [`specs/roadmap-items-track-b-reports-2026-10-11/`](../specs/roadmap-items-track-b-reports-2026-10-11/README.md)
+    — 9 phases: 1 core · 2 summarize fallback · 3 outline (A) · 4 source links (C) ·
+    5 demo report (G) · 6 ledger (B) · 7 shelf (D) · 8 continue (F) · 9 compare (E).
+  - **Phase 1 (core report) built 2026-10-13** on `feat/track-b-reports`: tick branches
+    in report mode, composer with the default brief and a fit check (OpenRouter only),
+    streamed report with copy / download `.md` / regenerate / edit selection / delete,
+    stale badge, a "Reports" row in the receipt, reports carried through export/import.
+    Open until the manual check on the deployed URL runs
+    ([`notes/manual-checks.md`](notes/manual-checks.md) § C), including tuning the
+    default brief on real models. Next: Phase 2 (summarize fallback).
 - [ ] **Track C — Trust and reach:** read-only shared tree links compressed into the
   URL (no backend); storage-health warnings; real backup. *(if people ask to show someone their tree)*
   - **BYO-cloud (Google Drive / OneDrive) belongs here, and only here.** Evaluated

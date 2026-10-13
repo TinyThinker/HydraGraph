@@ -95,6 +95,7 @@ docs/
     persona-library-plan.md    editable personas + per-tree default (Dexie v6)
     tooling-research.md        web search / tool calling assessment (Dexie v7)
     node-labels-research.md    pill legibility, hover card, generated titles (no migration)
+    manual-checks.md           Fernando's by-hand checks on the deployed URL (Phase 3, Track B)
   archive/
     2026-08_original-tasks.md        the original Phase 1–4 task matrix
     2026-08_state-diagnosis.md       the re-engineer-era "current state" doc
@@ -105,6 +106,7 @@ docs/
     2026-09_read-hook-trimmer-analysis.md  the corrected follow-up analysis
     2026-10_tree-durability-phase2.md      spec phase 2 build record (commits, deviations)
     2026-10_key-setup-phase3.md            spec phase 3 build record (commits, deviations)
+    2026-10_track-b-core-report.md         Track B spec phase 1 build record (commits, deviations)
 ```
 
 ## Local-only files (not part of this system)

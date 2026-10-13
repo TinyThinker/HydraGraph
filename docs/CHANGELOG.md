@@ -10,6 +10,23 @@
 
 ## Unreleased
 
+- **Reports from selected branches, core** (2026-10-13). Spec phase 1 of
+  `specs/roadmap-items-track-b-reports-2026-10-11/`. A Reports button in the header
+  opens `ReportPanel`; while its composer shows, a pill click ticks that turn and its
+  path to the root (`useReportStore`, one boolean selector per pill). `lib/reportContext.ts`
+  builds one transcript from the union of the ticked paths (trunk once, `[tN]` tags,
+  branch points and personas named) plus a length-based source digest.
+  `lib/reportFit.ts` checks chars/4 + 15% + an 8k output reserve against the catalog's
+  context window and blocks Ollama and a missing key before any request. The default
+  brief (`lib/reportBrief.ts`) asks for one argument, disagreements named with both
+  sides, no invented facts, `[tN]` citations. Reports stream into the report store and
+  save as `ConversationTree.reports` on the tree row (no Dexie bump; memory first, quota
+  goes to the storage banner). `ReportView`: rendered markdown, model · tokens · cost ·
+  date, copy, download `.md`, regenerate, edit selection, delete, a list when there are
+  several, and an amber badge when the sources changed. The receipt gains a "Reports"
+  row outside the linear-thread comparison. Export/import remaps report leaf ids. 560
+  tests across 72 files. The brief is untuned on real models; manual check (task 1.11)
+  not run yet.
 - **Key setup: connection test, three steps, Ollama hint** (2026-10-11). Spec phase 3
   of `specs/roadmap-items-phase3-front-door-2026-10-11/`. New `lib/connectionProbe.ts`
   tests the typed (unsaved) values with a free, read-only request — OpenRouter

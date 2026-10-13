@@ -6,6 +6,7 @@ import { useCatalogStore } from './store/catalogStore'
 import { SplitLayout } from './components/SplitLayout'
 import { HeaderBar } from './components/HeaderBar'
 import { ReaderPanel } from './components/ReaderPanel'
+import { ReportPanel } from './components/ReportPanel'
 import { CompareView } from './components/CompareView'
 import { SelectionBranchButton } from './components/SelectionBranchButton'
 import { BuildStamp } from './components/BuildStamp'
@@ -64,6 +65,7 @@ export default function App() {
       <div className="flex-1 min-h-0 flex">
         <SplitLayout />
         <ReaderPanel />
+        <ReportPanel />
       </div>
       <CompareView />
       <SelectionBranchButton />

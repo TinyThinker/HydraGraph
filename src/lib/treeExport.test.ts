@@ -8,7 +8,8 @@ import {
   remapImportedTree,
 } from './treeExport'
 import type { TreeExportDoc } from './treeExport'
-import type { ConversationTree, TurnNode } from '../types'
+import { collectReportTurns, reportSourceDigest } from './reportContext'
+import type { ConversationTree, TreeReport, TurnNode } from '../types'
 
 function createTestTree(overrides: Partial<ConversationTree> = {}): ConversationTree {
   return {
@@ -469,3 +470,39 @@ describe('treeExport', () => {
     })
   })
 })
+
+describe('reports travel through export and import', () => {
+  const root = createTestNode({ id: 'r', childrenIds: ['a', 'b'] })
+  const a = createTestNode({ id: 'a', parentId: 'r', assistantResponse: 'branch a' })
+  const b = createTestNode({ id: 'b', parentId: 'r', assistantResponse: 'branch b, longer' })
+  const nodes = [root, a, b]
+  const report: TreeReport = {
+    id: 'rep-1', createdAt: 1, updatedAt: 1, title: 'R', leafIds: ['a', 'b', 'deleted-turn'], brief: 'x',
+    provider: 'openrouter', model: 'm', text: '# R', status: 'idle',
+    sourceDigest: reportSourceDigest(collectReportTurns(['a', 'b'], new Map(nodes.map((n) => [n.id, n])))),
+  }
+
+  function roundTrip(tree: ConversationTree) {
+    const parsed = parseImportDoc(serializeExportDoc(buildExportDoc(tree, nodes)))
+    if (!parsed.ok) throw new Error(parsed.error)
+    let n = 0
+    return remapImportedTree(parsed.doc, () => `new-${n++}`)
+  }
+
+  it('keeps the report, points its leaves at the new ids, and is not stale', () => {
+    const { tree, nodes: imported } = roundTrip({ ...createTestTree({ rootNodeId: 'r' }), reports: [report] })
+    const map = new Map(imported.map((n) => [n.id, n]))
+    const [copy] = tree.reports!
+    const newA = imported.find((n) => n.assistantResponse === 'branch a')!.id
+    const newB = imported.find((n) => n.assistantResponse === 'branch b, longer')!.id
+    expect(copy.leafIds).toEqual([newA, newB])
+    expect(copy.text).toBe('# R')
+    expect(reportSourceDigest(collectReportTurns(copy.leafIds, map))).toBe(copy.sourceDigest)
+  })
+
+  it('an export from before reports imports unchanged', () => {
+    const { tree } = roundTrip(createTestTree({ rootNodeId: 'r' }))
+    expect('reports' in tree).toBe(false)
+  })
+})
+

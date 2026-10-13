@@ -13,6 +13,7 @@ import { CostReceipt } from './CostReceipt'
 import { ProviderBanner } from './ProviderBanner'
 import { StorageBanner } from './StorageBanner'
 import { ExportNudge } from './ExportNudge'
+import { ReportButton } from './ReportButton'
 
 export function HeaderBar() {
   const modalOpen = useSettingsModalStore((s) => s.open)
@@ -68,6 +69,7 @@ export function HeaderBar() {
           >
             <Columns3 size={20} />
           </button>
+          <ReportButton />
           <button
             onClick={openSettings}
             className="text-slate-400 hover:text-slate-200 transition-colors p-2"

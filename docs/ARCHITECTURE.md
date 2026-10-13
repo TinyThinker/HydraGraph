@@ -658,6 +658,33 @@ Three properties worth preserving:
 - **Its receipt is arithmetic over its own text**, computed with the real `resolveContextPayload` (persona overrides included) and priced against `BUNDLED_CATALOG`, so every model referenced in `demoContent.ts` must exist in that snapshot. `demoTree.test.ts` fails if one doesn't.
 - **Seeding is idempotent on fixed ids** (`demo-*`), so re-seeding — first run, or "Reset demo tree" in the switcher — replaces rows instead of accumulating copies, and never touches the visitor's own trees. The tree record deliberately omits `viewportX/Y/Zoom` so `CanvasViewport` falls back to `fitView()` and a first-time visitor sees the whole tree.
 
+### 5.7 Reports from Selected Branches
+
+A report turns ticked branches into one document. It lives **beside** the tree, never in it: no node has two parents, so layout, the context engine and dispatch are untouched.
+
+```
+useReportStore              selecting · leafIds · includedIds (pills read one boolean each)
+        │                   panelOpen · composing · activeReportId · generating · liveText
+        ▼
+lib/reportContext.ts        collectReportTurns(leafIds, nodes) — union of paths, trunk once,
+        │                    depth-first from the root · buildReportPayload(turns, brief) —
+        │                    system = brief, one user message with [tN]-tagged turns
+        ▼
+lib/reportFit.ts            planReport(): chars/4 × 1.15 + 8k reserve vs. catalog contextWindow;
+        │                    reportWriterStatus(): OpenRouter with a key only
+        ▼
+streamLLMResponse           deltas → createTokenCoalescer → useReportStore.liveText
+        ▼
+useTreeStore.saveReport()   ConversationTree.reports[] on the tree row (non-indexed, no
+                             Dexie bump). Memory first, then db.trees.update
+```
+
+- **Record:** `TreeReport` — `leafIds`, `brief`, `provider`, `model`, `text`, `status`, tokens, `sourceDigest`. `'streaming'` is never persisted; live text stays in `useReportStore.liveText`.
+- **Citations:** `[tN]` tags are positions in the transcript order from `collectReportTurns`, so they are recomputed from `leafIds`, not stored.
+- **Staleness:** `sourceDigest` is FNV-1a over `promptLen:responseLen` per turn. No node ids, so it survives export → import (which remaps `leafIds` through the import id map). A ticked turn that no longer exists also marks the report stale.
+- **Cost:** `reportsCostUSD()` feeds a separate receipt row. Reports never enter `treeCostSummary`, so they do not move the counterfactual or the saving.
+- **Ollama is shelved** as a writer: it truncates oversized input silently. The lift (`num_ctx`, `/api/show`) is in the spec's phase 1 "Shelved" section.
+
 ## 6. Execution Strategy & Delivered Build Status
 
 The original plan was a Targeted MVP (Phases 1–3) followed by Post-MVP Enhancements (Phase 4). All four are implemented. A subsequent POC-enhancement track (archived under `docs/archive/2026-08_poc-enhancements/`) then reshaped the UI from a single-pane card canvas into the dual-pane subway layout described in §4. The condensed shipping history is in [`CHANGELOG.md`](CHANGELOG.md).

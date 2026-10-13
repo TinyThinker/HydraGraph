@@ -10,9 +10,11 @@ import {
   ChevronRight,
   ChevronDown,
   History,
+  Check,
 } from 'lucide-react'
 import { useTreeStore, collectSubtreeIds } from '../store/useTreeStore'
 import { useSettingsStore } from '../store/settingsStore'
+import { useReportStore } from '../store/useReportStore'
 import { useReaderPanel } from './useReaderPanel'
 import { useRenderTally } from '../lib/renderTally'
 import { stationSummary } from '../lib/stationSummary'
@@ -55,6 +57,11 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({
       : 0,
   )
 
+  // One boolean each, so ticking a branch re-renders only the pills it touches.
+  const reportMode = useReportStore((s) => s.selecting)
+  const ticked = useReportStore((s) => s.leafIds.includes(data.id))
+  const onTickedPath = useReportStore((s) => s.includedIds.has(data.id))
+
   const roleLabel =
     data.parentId === null ? 'Root' : data.userPrompt.trim() ? 'You' : 'Assistant'
   // A primitive selector on purpose: settings change rarely, so this does not
@@ -66,10 +73,20 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({
   return (
     <div
       onDoubleClick={() => openReader(data.id)}
+      // Capture phase, so React Flow's own click-to-select never sees it.
+      // Buttons inside the pill (collapse, actions) keep working.
+      onClickCapture={(e) => {
+        if (!reportMode || (e.target as HTMLElement).closest('button')) return
+        e.stopPropagation()
+        useReportStore.getState().toggle(data.id)
+      }}
       data-has-token={liveText ? 'true' : undefined}
+      data-report-ticked={ticked ? 'true' : undefined}
       className={`relative flex h-full w-full items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 shadow-lg ${
         statusRing[data.status] ?? statusRing.idle
-      } ${selected ? 'ring-2 ring-indigo-400' : ''} ${data.stale ? 'opacity-70' : ''}`}
+      } ${selected ? 'ring-2 ring-indigo-400' : ''} ${data.stale ? 'opacity-70' : ''} ${
+        ticked ? 'outline outline-2 outline-offset-2 outline-indigo-300' : onTickedPath ? 'outline outline-1 outline-offset-2 outline-indigo-400/50' : ''
+      } ${reportMode ? 'cursor-pointer' : ''}`}
     >
       <Handle type="target" position={Position.Top} className="!border-slate-800 !bg-indigo-500" />
 
@@ -111,6 +128,15 @@ export const TurnNodeComponent = memo(function TurnNodeComponent({
         >
           {data.isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
+      )}
+
+      {ticked && (
+        <span
+          aria-label="In report"
+          className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-white"
+        >
+          <Check size={10} strokeWidth={3} />
+        </span>
       )}
 
       {data.stale && <span className="sr-only">{STALE_SENTENCE}</span>}

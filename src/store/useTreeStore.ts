@@ -10,7 +10,7 @@ import { parseImportDoc, remapImportedTree } from '../lib/treeExport'
 import { buildDemoTree } from '../lib/demoTree'
 import { describeWriteError } from '../lib/storageErrors'
 import { reportWriteFailure } from './storageStatusStore'
-import type { TurnNode, ConversationTree, NodeStatus, TokenUsage } from '../types'
+import type { TurnNode, ConversationTree, NodeStatus, TokenUsage, TreeReport } from '../types'
 
 interface TreeStoreState {
   nodes: Map<string, TurnNode>
@@ -45,6 +45,12 @@ interface TreeStoreActions {
   toggleCollapse: (id: string) => Promise<void>
   relayoutActiveTree: () => Promise<void>
   renameTree: (treeId: string, title: string) => Promise<void>
+  /**
+   * Upsert a report on the tree row by id. Memory first, then the write; a
+   * failed write goes to the storage banner and memory keeps the report.
+   */
+  saveReport: (treeId: string, report: TreeReport) => Promise<void>
+  deleteReport: (treeId: string, reportId: string) => Promise<void>
   deleteTree: (treeId: string) => Promise<void>
   importTree: (text: string) => Promise<{ ok: boolean; error?: string; treeId?: string }>
   /**
@@ -127,6 +133,17 @@ export function collectSubtreeIds(rootId: string, nodes: Map<string, TurnNode>):
 }
 
 export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get) => {
+  // Reports ride on the tree row. Memory first, so the panel never loses a
+  // finished report to a full disk; the banner tells the user it isn't saved.
+  const writeReports = async (treeId: string, reports: TreeReport[]) => {
+    set((state) => ({ trees: state.trees.map((t) => (t.id === treeId ? { ...t, reports } : t)) }))
+    try {
+      await db.trees.update(treeId, { reports })
+    } catch (err) {
+      reportWriteFailure(err)
+    }
+  }
+
   const touchActiveTree = async () => {
     const { activeTreeId, trees } = get()
     if (!activeTreeId) return
@@ -691,6 +708,22 @@ export const useTreeStore = create<TreeStoreState & TreeStoreActions>((set, get)
       set((state) => ({
         trees: state.trees.map((t) => (t.id === treeId ? { ...t, title: trimmed } : t)),
       }))
+    },
+
+    saveReport: async (treeId, report) => {
+      const tree = get().trees.find((t) => t.id === treeId)
+      if (!tree) return
+      const existing = tree.reports ?? []
+      const reports = existing.some((r) => r.id === report.id)
+        ? existing.map((r) => (r.id === report.id ? report : r))
+        : [...existing, report]
+      await writeReports(treeId, reports)
+    },
+
+    deleteReport: async (treeId, reportId) => {
+      const tree = get().trees.find((t) => t.id === treeId)
+      if (!tree?.reports) return
+      await writeReports(treeId, tree.reports.filter((r) => r.id !== reportId))
     },
 
     deleteTree: async (treeId) => {
