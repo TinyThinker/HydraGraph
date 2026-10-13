@@ -106,6 +106,7 @@ docs/
     2026-09_read-hook-trimmer-analysis.md  the corrected follow-up analysis
     2026-10_tree-durability-phase2.md      spec phase 2 build record (commits, deviations)
     2026-10_key-setup-phase3.md            spec phase 3 build record (commits, deviations)
+    2026-10_track-b-core-report.md         Track B spec phase 1 build record (commits, deviations)
 ```
 
 ## Local-only files (not part of this system)
