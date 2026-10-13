@@ -2,6 +2,7 @@ import { X, Plus } from 'lucide-react'
 import { useReportStore } from '../store/useReportStore'
 import { useTreeStore } from '../store/useTreeStore'
 import { ReportComposer } from './ReportComposer'
+import { ReportView } from './ReportView'
 
 /**
  * Right-side panel for reports, same frame as ReaderPanel. Shows the composer
@@ -11,13 +12,11 @@ export function ReportPanel() {
   const panelOpen = useReportStore((s) => s.panelOpen)
   const composing = useReportStore((s) => s.composing)
   const generating = useReportStore((s) => s.generating)
-  const liveText = useReportStore((s) => s.liveText)
   const activeReportId = useReportStore((s) => s.activeReportId)
-  const report = useTreeStore((s) =>
-    s.trees.find((t) => t.id === s.activeTreeId)?.reports?.find((r) => r.id === activeReportId),
-  )
+  const tree = useTreeStore((s) => s.trees.find((t) => t.id === s.activeTreeId))
+  const report = tree?.reports?.find((r) => r.id === activeReportId)
 
-  if (!panelOpen) return null
+  if (!panelOpen || !tree) return null
   const showComposer = composing || (!report && !generating)
   const { compose, closePanel, cancel } = useReportStore.getState()
 
@@ -55,7 +54,7 @@ export function ReportPanel() {
         {showComposer ? (
           <ReportComposer />
         ) : (
-          <div className="whitespace-pre-wrap text-sm text-slate-200">{liveText ?? report?.text}</div>
+          <ReportView tree={tree} report={report} />
         )}
       </div>
     </div>
