@@ -3,6 +3,7 @@ import { useTreeStore } from '../store/useTreeStore'
 import { useCatalogStore } from '../store/catalogStore'
 import {
   treeCostSummary,
+  reportsCostUSD,
   COUNTERFACTUAL_NOTE,
   COUNTERFACTUAL_DETAIL,
   ACTUAL_DETAIL,
@@ -24,6 +25,19 @@ export function CostReceipt() {
   const nodes = useTreeStore((s) => s.nodes)
   const models = useCatalogStore((s) => s.models)
   const summary = useMemo(() => treeCostSummary(nodes, models), [nodes, models])
+  const reports = useTreeStore((s) => s.trees.find((t) => t.id === s.activeTreeId)?.reports)
+  const reportCost = useMemo(() => reportsCostUSD(reports, models), [reports, models])
+
+  // Real spend, but outside the comparison: it never moves the "saved" figure.
+  const reportsRow = reportCost.count > 0 && (
+    <div className="flex justify-between gap-4 mt-1" data-testid="receipt-reports">
+      <span>
+        Reports · {reportCost.count}
+        {reportCost.unpriced > 0 && <span className="text-slate-500"> ({reportCost.unpriced} unpriced)</span>}
+      </span>
+      <span>{formatUSD(reportCost.costUSD)}</span>
+    </div>
+  )
 
   const { turns, forks } = useMemo(() => {
     let turns = 0
@@ -38,7 +52,10 @@ export function CostReceipt() {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-md p-3 text-xs tabular-nums text-slate-300 w-80">
       {summary.pricedTurns === 0 ? (
-        <div className="text-slate-500">No priced turns yet.</div>
+        <>
+          <div className="text-slate-500">No priced turns yet.</div>
+          {reportsRow}
+        </>
       ) : (
         <>
           <div className="flex justify-between gap-4" title={ACTUAL_DETAIL}>
@@ -47,6 +64,7 @@ export function CostReceipt() {
             </span>
             <span>{formatUSD(summary.actual)}</span>
           </div>
+          {reportsRow}
           <div className="flex justify-between gap-4 mt-1" title={COUNTERFACTUAL_DETAIL}>
             <span>
               Same {turns} turns, one linear thread <span className="text-slate-500">(est.)</span>

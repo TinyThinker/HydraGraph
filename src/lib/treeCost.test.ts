@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { treeCostSummary } from './treeCost'
-import type { TurnNode } from '../types'
+import { treeCostSummary, reportsCostUSD } from './treeCost'
+import type { TreeReport, TurnNode } from '../types'
 import type { CatalogModel } from './openRouterCatalog'
 
 // Explicit fixture so the math never rides on BUNDLED_CATALOG values.
@@ -211,3 +211,33 @@ describe('treeCostSummary', () => {
     })
   })
 })
+
+describe('reportsCostUSD', () => {
+  const catalog: CatalogModel[] = [{ id: 'w/writer', label: 'Writer', inputPerM: 2, outputPerM: 10, tier: 'mid' }]
+  const report = (over: Partial<TreeReport>): TreeReport => ({
+    id: 'r', createdAt: 0, updatedAt: 0, title: 'R', leafIds: [], brief: '', provider: 'openrouter',
+    model: 'w/writer', text: '', status: 'idle', sourceDigest: '', ...over,
+  })
+
+  it('prices reports with tokens and a known model', () => {
+    // 1M in × $2 + 0.1M out × $10 = $3
+    expect(reportsCostUSD([report({ inputTokens: 1_000_000, outputTokens: 100_000 })], catalog)).toEqual({
+      count: 1,
+      costUSD: 3,
+      unpriced: 0,
+    })
+  })
+
+  it('counts a report with no tokens or an unknown model as unpriced', () => {
+    const out = reportsCostUSD(
+      [report({}), report({ model: 'nobody/knows', inputTokens: 10, outputTokens: 10 })],
+      catalog,
+    )
+    expect(out).toEqual({ count: 2, costUSD: 0, unpriced: 2 })
+  })
+
+  it('no reports → zero count, so the receipt hides the row', () => {
+    expect(reportsCostUSD(undefined, catalog)).toEqual({ count: 0, costUSD: 0, unpriced: 0 })
+  })
+})
+
