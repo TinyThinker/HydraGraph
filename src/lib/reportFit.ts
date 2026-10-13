@@ -1,4 +1,5 @@
 import { buildReportPayload, collectReportTurns } from './reportContext'
+import { resolvePrice, formatUSD } from './pricing'
 import type { CatalogModel } from './openRouterCatalog'
 import type { ContextResolutionResult, LLMProvider, TurnNode } from '../types'
 
@@ -93,4 +94,19 @@ export function planReport(input: {
 /** "Too big for <model>: ~N tokens, limit M" — shared by the store and the composer. */
 export function tooBigMessage(model: string, fit: FitResult): string {
   return `Too big for ${model}: ~${fit.needed.toLocaleString('en-US')} tokens, limit ${(fit.limit ?? 0).toLocaleString('en-US')}`
+}
+
+/** Assumed report length for the cost estimate; the real figure lands on the record. */
+const EST_OUTPUT_TOKENS = 2000
+
+const k = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
+
+/** The line under the model picker: size against the window, plus an estimated cost. */
+export function fitLine(plan: ReportPlan, model: string, catalog: CatalogModel[]): string {
+  if (!plan.fit.fits) return `Too big for this model: ~${k(plan.fit.needed)} tokens of ${k(plan.fit.limit ?? 0)}`
+  const size = plan.fit.limit === null ? `~${k(plan.inputTokens)} tokens · limit unknown` : `~${k(plan.inputTokens)} tokens of ${k(plan.fit.limit)}`
+  const price = resolvePrice(model, 'openrouter', catalog)
+  if (!price) return size
+  const cost = (plan.inputTokens * price.inputPerM + EST_OUTPUT_TOKENS * price.outputPerM) / 1_000_000
+  return `${size} · est. ${formatUSD(cost)}`
 }

@@ -22,6 +22,9 @@ interface ReportState {
   leafIds: string[]
   /** Every turn on a ticked path, recomputed on each toggle. */
   includedIds: Set<string>
+  panelOpen: boolean
+  /** The panel shows the composer (and the canvas ticks) instead of a report. */
+  composing: boolean
   /** The report the panel shows. */
   activeReportId: string | null
   generating: boolean
@@ -47,6 +50,11 @@ interface ReportActions {
   toggle: (id: string) => void
   clear: () => void
   stopSelecting: () => void
+  /** Open on the newest report, or on the composer when the tree has none. */
+  openPanel: () => void
+  closePanel: () => void
+  /** Show the composer and tick on the canvas, optionally starting from `leafIds`. */
+  compose: (leafIds?: string[]) => void
   setActiveReport: (id: string | null) => void
   generate: (opts: GenerateOptions) => Promise<void>
   /** Abort the stream; partial text is kept as an error report "Stopped". */
@@ -66,6 +74,8 @@ export const useReportStore = create<ReportState & ReportActions>((set, get) => 
   selecting: false,
   leafIds: [],
   includedIds: new Set(),
+  panelOpen: false,
+  composing: false,
   activeReportId: null,
   generating: false,
   liveText: null,
@@ -84,7 +94,21 @@ export const useReportStore = create<ReportState & ReportActions>((set, get) => 
 
   stopSelecting: () => set({ selecting: false }),
 
-  setActiveReport: (id) => set({ activeReportId: id }),
+  openPanel: () => {
+    const { trees, activeTreeId } = useTreeStore.getState()
+    const reports = trees.find((t) => t.id === activeTreeId)?.reports ?? []
+    if (reports.length === 0) return get().compose(get().leafIds)
+    set({ panelOpen: true, composing: false, selecting: false, activeReportId: reports[reports.length - 1].id })
+  },
+
+  closePanel: () => set({ panelOpen: false, composing: false, selecting: false, error: null }),
+
+  compose: (leafIds = []) => {
+    get().startSelecting(leafIds)
+    set({ panelOpen: true, composing: true, error: null })
+  },
+
+  setActiveReport: (id) => set({ activeReportId: id, composing: false, selecting: false }),
 
   generate: async ({ brief, provider, model, leafIds = get().leafIds, reportId }) => {
     if (get().generating) return
@@ -105,7 +129,7 @@ export const useReportStore = create<ReportState & ReportActions>((set, get) => 
       id, createdAt: previous?.createdAt ?? Date.now(), leafIds: [...leafIds], brief, provider, model,
       sourceDigest: reportSourceDigest(plan.turns),
     }
-    set({ generating: true, liveText: '', error: null, activeReportId: id })
+    set({ generating: true, liveText: '', error: null, activeReportId: id, composing: false, selecting: false })
 
     const coalescer = createTokenCoalescer((text) => set((s) => ({ liveText: (s.liveText ?? '') + text })))
     let settled = false

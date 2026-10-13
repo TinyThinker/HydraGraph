@@ -3,11 +3,12 @@ import { FileText } from 'lucide-react'
 import { useReportStore } from '../store/useReportStore'
 
 /**
- * Header toggle for report mode. While it is on, a pill click ticks that turn's
- * branch instead of selecting it. Escape leaves the mode.
+ * Header toggle for the report panel. While the composer shows, a pill click
+ * ticks that turn's branch instead of selecting it. Escape stops ticking.
  */
 export function ReportButton() {
   const selecting = useReportStore((s) => s.selecting)
+  const panelOpen = useReportStore((s) => s.panelOpen)
 
   useEffect(() => {
     if (!selecting) return
@@ -21,13 +22,13 @@ export function ReportButton() {
   return (
     <button
       onClick={() => {
-        const { selecting: on, startSelecting, stopSelecting } = useReportStore.getState()
-        if (on) stopSelecting()
-        else startSelecting(useReportStore.getState().leafIds)
+        const { panelOpen: open, openPanel, closePanel } = useReportStore.getState()
+        if (open) closePanel()
+        else openPanel()
       }}
-      aria-pressed={selecting}
-      title={selecting ? 'Stop picking branches (Esc)' : 'Write a report from selected branches'}
-      className={`transition-colors p-2 ${selecting ? 'text-indigo-300' : 'text-slate-400 hover:text-slate-200'}`}
+      aria-pressed={panelOpen}
+      title={panelOpen ? 'Close reports' : 'Reports from selected branches'}
+      className={`transition-colors p-2 ${panelOpen ? 'text-indigo-300' : 'text-slate-400 hover:text-slate-200'}`}
     >
       <FileText size={20} />
     </button>
